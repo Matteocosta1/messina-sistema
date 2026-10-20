@@ -174,6 +174,9 @@ create policy clienti_scrittura on public.clienti for all to authenticated
 
 create policy profili_se_stesso on public.profili for select to authenticated
   using (id = auth.uid() or (public.staff_di(azienda) and public.ha_ruolo('amministrazione')));
+-- i colleghi della stessa società si vedono (nome e ruolo, es. chi ha in carico una bolla)
+create policy profili_colleghi on public.profili for select to authenticated
+  using (public.staff_di(azienda));
 -- i profili li crea solo la direzione o il sistema (service_role)
 create policy profili_direzione on public.profili for all to authenticated
   using (public.staff_di(azienda) and public.mio_ruolo() = 'direzione')

@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx",
+    "strict": true, "noEmit": true, "skipLibCheck": true, "lib": ["ES2022", "DOM"],
+    "paths": { "@messina/ui": ["../../packages/ui/src/index.tsx"] }
+  },
+  "include": ["src", "../../packages/ui/src"]
+}

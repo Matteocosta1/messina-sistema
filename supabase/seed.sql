@@ -81,7 +81,7 @@ insert into public.posti (codice, zona) values ('RIC', 'Ricevimento'), ('PAS', '
 
 -- Bolle ------------------------------------------------------------------------
 insert into public.bolle (id, cliente_id, tipo, data_consegna, fascia, destinatario, indirizzo, citta, colli_previsti, accessori, dati_mancanti, stato, operatore_id) values
-  ('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Consegna', current_date + 1, 'Entro le 12', 'Snam', null, 'Milano', 4, '{Sponda}', '{Piano di consegna}', 'Nuova', '00000000-0000-0000-0000-000000000003'),
+  ('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Consegna', current_date + 1, 'Entro le 12', 'Snam', 'Via [indirizzo]', 'Milano', 4, '{Sponda}', '{Piano di consegna}', 'Nuova', '00000000-0000-0000-0000-000000000003'),
   ('40000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002', 'Consegna', current_date + 1, '10–12', 'Apple Store', 'Via [indirizzo]', 'Rozzano', 12, '{}', '{}', 'Nuova', '00000000-0000-0000-0000-000000000003'),
   ('40000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000003', 'Consegna', current_date + 1, '9–13', 'Luxiona', 'Via [indirizzo]', 'Assago', 3, '{}', '{}', 'Nuova', '00000000-0000-0000-0000-000000000003'),
   ('40000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'Consegna', current_date, 'Entro le 12', 'Snam', 'Via [indirizzo]', 'Milano', 4, '{Sponda}', '{}', 'Nuova', '00000000-0000-0000-0000-000000000003'),
