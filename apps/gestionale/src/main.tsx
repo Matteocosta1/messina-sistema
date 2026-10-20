@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
-import { collega, type Config } from '@messina/dati';
+import { collega, type Config, type Fattore } from '@messina/dati';
 import { motoreDiProva, ELENCO_PROVA } from '@messina/dati/prova';
 import { Btn } from '@messina/ui';
 import { AppCtx, type Profilo, Errore } from './core';
@@ -22,7 +22,10 @@ function App() {
   const carica = useCallback(async () => {
     const s = db.auth.sessione();
     if (!s) return setIo(null);
-    try { setIo(await db.from<Profilo>('profili').select('id,azienda,ruolo,nome,cliente_id').eq('id', s.user.id).single()); }
+    try {
+      if ((await db.auth.fattore()).stato !== 'ok') return setIo(null);   // manca il codice: lo chiede Login
+      setIo(await db.from<Profilo>('profili').select('id,azienda,ruolo,nome,cliente_id').eq('id', s.user.id).single());
+    }
     catch { await db.auth.logout(); setIo(null); }
   }, []);
   useEffect(() => { carica(); }, [carica]);
@@ -50,12 +53,39 @@ function App() {
 function Login({ onEntra }: { onEntra: () => void }) {
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
+  const [codice, setCodice] = useState('');
+  const [fattore, setFattore] = useState<Fattore | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
   const [attesa, setAttesa] = useState(false);
+  // sessione già aperta ma senza codice (pagina ricaricata a metà): si riparte dal codice
+  useEffect(() => { if (db.auth.sessione()) db.auth.fattore().then((f) => f.stato === 'ok' ? onEntra() : setFattore(f), () => db.auth.logout()); }, [onEntra]);
+  const dopo = async () => { const f = await db.auth.fattore(); if (f.stato === 'ok') onEntra(); else setFattore(f); };
   const entra = async (e?: string, p?: string) => {
     setAttesa(true); setErrore(null);
-    try { await db.auth.login(e ?? email, p ?? pw); onEntra(); } catch (x) { setErrore((x as Error).message); } finally { setAttesa(false); }
+    try { await db.auth.login(e ?? email, p ?? pw); await dopo(); } catch (x) { setErrore((x as Error).message); } finally { setAttesa(false); }
   };
+  const verifica = async () => {
+    if (!fattore || fattore.stato === 'ok') return;
+    setAttesa(true); setErrore(null);
+    try { await db.auth.verifica(fattore.id, codice); onEntra(); } catch (x) { setErrore((x as Error).message); setCodice(''); } finally { setAttesa(false); }
+  };
+  const esci = () => { db.auth.logout().finally(() => { setFattore(null); setCodice(''); setPw(''); }); };
+  if (fattore && fattore.stato !== 'ok') return (
+    <div className="login">
+      <form className="glass box stack" onSubmit={(e) => { e.preventDefault(); verifica(); }}>
+        <h1>Messina</h1>
+        {fattore.stato === 'nuovo' ? (<>
+          <p className="lbl" style={{ margin: 0 }}>Primo accesso: inquadra il QR con un'app di autenticazione (per esempio Microsoft Authenticator), poi scrivi il codice di 6 cifre.</p>
+          <img src={fattore.qr} alt="QR da inquadrare con l'app di autenticazione" width={180} height={180} style={{ alignSelf: 'center', background: '#fff', borderRadius: 12, padding: 8 }} />
+          <p className="lbl" style={{ margin: 0, wordBreak: 'break-all' }}>Senza fotocamera: {fattore.segreto}</p>
+        </>) : <p className="lbl" style={{ margin: 0 }}>Scrivi il codice di 6 cifre dell'app di autenticazione.</p>}
+        <label className="field"><span className="lbl">Codice</span><input className="input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} required autoFocus value={codice} onChange={(e) => setCodice(e.target.value)} /></label>
+        <Btn type="submit" disabled={attesa}>Conferma</Btn>
+        <Btn ghost disabled={attesa} onClick={esci}>Esci</Btn>
+        <Errore testo={errore} />
+      </form>
+    </div>
+  );
   const interni = ELENCO_PROVA.filter((u) => u.dove !== 'Cliente' && u.dove !== 'Autisti');
   return (
     <div className="login">

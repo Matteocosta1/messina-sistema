@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
 import './app.css';
-import { collega, type Config } from '@messina/dati';
+import { collega, type Config, type Fattore } from '@messina/dati';
 import { motoreDiProva } from '@messina/dati/prova';
 import { Pill } from '@messina/ui';
 import { AppCtx, type Profilo, type Dipendente, ErroreApp } from './core';
@@ -44,6 +44,7 @@ function App() {
     const s = db.auth.sessione();
     if (!s) return setIo(null);
     try {
+      if ((await db.auth.fattore()).stato !== 'ok') return setIo(null);   // manca il codice: lo chiede Login
       const p = await db.from<Profilo>('profili').select('id,azienda,ruolo,nome,cliente_id').eq('id', s.user.id).single();
       const d = await db.from<Dipendente>('dipendenti').select('id,nome,mansione,reparto,ore_settimana,azienda').eq('profilo_id', s.user.id).then((r) => r[0] ?? null, () => null);
       setDip(d); setIo(p);
@@ -85,12 +86,37 @@ const PROVA = [['autista@prova.messina', 'Autista 1'], ['magazzino@prova.messina
 function Login({ onEntra, onLettore }: { onEntra: () => void; onLettore: () => void }) {
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
+  const [codice, setCodice] = useState('');
+  const [fattore, setFattore] = useState<Fattore | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
   const [attesa, setAttesa] = useState(false);
+  useEffect(() => { if (db.auth.sessione()) db.auth.fattore().then((f) => f.stato === 'ok' ? onEntra() : setFattore(f), () => db.auth.logout()); }, [onEntra]);
   const entra = async (e?: string, p?: string) => {
     setAttesa(true); setErrore(null);
-    try { await db.auth.login(e ?? email, p ?? pw); onEntra(); } catch (x) { setErrore((x as Error).message); } finally { setAttesa(false); }
+    try { await db.auth.login(e ?? email, p ?? pw); const f = await db.auth.fattore(); if (f.stato === 'ok') onEntra(); else setFattore(f); }
+    catch (x) { setErrore((x as Error).message); } finally { setAttesa(false); }
   };
+  const verifica = async () => {
+    if (!fattore || fattore.stato === 'ok') return;
+    setAttesa(true); setErrore(null);
+    try { await db.auth.verifica(fattore.id, codice); onEntra(); } catch (x) { setErrore((x as Error).message); setCodice(''); } finally { setAttesa(false); }
+  };
+  const esci = () => { db.auth.logout().finally(() => { setFattore(null); setCodice(''); setPw(''); }); };
+  if (fattore && fattore.stato !== 'ok') return (
+    <form className="pscr" onSubmit={(e) => { e.preventDefault(); verifica(); }}>
+      <div><div className="lbl">App Messina</div><div className="ptitle">Codice</div></div>
+      {fattore.stato === 'nuovo' ? <>
+        <div className="lbl">Primo accesso: inquadra il QR con un'app di autenticazione (per esempio Microsoft Authenticator), poi scrivi il codice di 6 cifre.</div>
+        <img src={fattore.qr} alt="QR da inquadrare con l'app di autenticazione" width={180} height={180} style={{ alignSelf: 'center', background: '#fff', borderRadius: 12, padding: 8 }} />
+        <div className="lbl" style={{ wordBreak: 'break-all' }}>Senza fotocamera: {fattore.segreto}</div>
+      </> : <div className="lbl">Scrivi il codice di 6 cifre dell'app di autenticazione.</div>}
+      <label className="field"><span className="lbl">Codice</span><input className="input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} required autoFocus value={codice} onChange={(e) => setCodice(e.target.value)} /></label>
+      <div style={{ flex: 1 }} />
+      <button type="submit" className="bigbtn" disabled={attesa}>Conferma</button>
+      <button type="button" className="bigbtn ghost" disabled={attesa} onClick={esci}>Esci</button>
+      <ErroreApp testo={errore} />
+    </form>
+  );
   return (
     <form className="pscr" onSubmit={(e) => { e.preventDefault(); entra(); }}>
       <div><div className="lbl">App Messina</div><div className="ptitle">Entra</div></div>

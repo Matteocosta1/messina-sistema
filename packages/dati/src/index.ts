@@ -6,6 +6,8 @@
 
 export interface Config { supabaseUrl?: string; supabaseKey?: string }
 export interface Sessione { access_token: string; refresh_token: string; expires_at: number; user: { id: string; email?: string } }
+/** doppio fattore: «ok» = si entra; «codice» = chiedere il codice dell'app di autenticazione; «nuovo» = primo collegamento con il QR */
+export type Fattore = { stato: 'ok' } | { stato: 'codice'; id: string } | { stato: 'nuovo'; id: string; qr: string; segreto: string };
 
 type Filtro = [col: string, op: string, val: unknown];
 export interface Query {
@@ -22,6 +24,8 @@ export interface Motore {
   login(email: string, password: string): Promise<Sessione>;
   logout(): Promise<void>;
   sessione(): Sessione | null;
+  fattore(): Promise<Fattore>;
+  verifica(id: string, codice: string): Promise<void>;
   modo: 'supabase' | 'prova';
 }
 
@@ -56,7 +60,7 @@ export function creaDb(m: Motore) {
     rpc: <T = unknown>(fn: string, args: object = {}) => m.rpc(fn, args) as Promise<T>,
     fn: <T = unknown>(nome: string, corpo: unknown = {}) => m.fn(nome, corpo) as Promise<T>,
     storage: { carica: m.carica.bind(m), link: m.link.bind(m) },
-    auth: { login: m.login.bind(m), logout: m.logout.bind(m), sessione: m.sessione.bind(m) },
+    auth: { login: m.login.bind(m), logout: m.logout.bind(m), sessione: m.sessione.bind(m), fattore: m.fattore.bind(m), verifica: m.verifica.bind(m) },
   };
 }
 export type Db = ReturnType<typeof creaDb>;
@@ -117,7 +121,38 @@ export function motoreSupabase(url: string, chiave: string): Motore {
     async login(email, password) { salva(await auth('token?grant_type=password', { email, password })); return s!; },
     async logout() { try { if (s) await fetch(`${url}/auth/v1/logout`, { method: 'POST', headers: { apikey: chiave, Authorization: `Bearer ${s.access_token}` } }); } finally { salva(null); } },
     sessione: () => s,
+    // Doppio fattore (TOTP). Il database pretende il livello aal2 per i ruoli indicati in impostazioni
+    // («ruoli_doppio_fattore»): qui l'app chiede il codice, o al primo accesso mostra il QR da inquadrare.
+    async fattore() {
+      if (!s) throw new Error('Nessun accesso');
+      if (livello(await token()) === 'aal2') return { stato: 'ok' };
+      if (!(await chiama('/rest/v1/rpc/serve_doppio_fattore', { method: 'POST', body: '{}' }))) return { stato: 'ok' };
+      const u = await utente('user', 'GET') as { factors?: { id: string; factor_type: string; status: string }[] };
+      const totp = (u.factors ?? []).filter((f) => f.factor_type === 'totp');
+      const pronto = totp.find((f) => f.status === 'verified');
+      if (pronto) return { stato: 'codice', id: pronto.id };
+      for (const f of totp) await utente(`factors/${f.id}`, 'DELETE').catch(() => null);   // tentativi lasciati a metà
+      const n = await utente('factors', 'POST', { factor_type: 'totp', friendly_name: 'Messina', issuer: 'Messina' }) as { id: string; totp: { qr_code: string; secret: string } };
+      return { stato: 'nuovo', id: n.id, qr: n.totp.qr_code, segreto: n.totp.secret };
+    },
+    async verifica(id, codice) {
+      const c = await utente(`factors/${id}/challenge`, 'POST', {}) as { id: string };
+      const j = await utente(`factors/${id}/verify`, 'POST', { challenge_id: c.id, code: codice.replace(/\s/g, '') }) as Sessione & { expires_in: number };
+      salva({ ...j, expires_at: Math.floor(Date.now() / 1000) + j.expires_in });
+    },
   };
+  async function utente(path: string, method: string, body?: unknown) {
+    const r = await fetch(`${url}/auth/v1/${path}`, { method, headers: { apikey: chiave, Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(r.status === 422 || r.status === 400 ? 'Codice non valido: riprova con quello nuovo' : (j.msg || j.message || 'Verifica non riuscita'));
+    return j;
+  }
+}
+
+/** livello di accesso scritto nel token (aal1 = solo password, aal2 = anche il codice) */
+function livello(t: string): string | undefined {
+  try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).aal; } catch { return undefined; }
 }
 
 // ------------------------------------------------------------------ Prova
@@ -203,6 +238,8 @@ export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: R
     },
     async logout() { io = null; try { sessionStorage.removeItem('messina.prova'); } catch { /* */ } },
     sessione: () => io ? { access_token: 'prova', refresh_token: 'prova', expires_at: 0, user: { id: io } } : null,
+    async fattore() { return { stato: 'ok' }; },   // in Prova il codice non serve
+    async verifica() { /* */ },
   };
 }
 

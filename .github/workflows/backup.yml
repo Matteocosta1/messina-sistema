@@ -1,6 +1,6 @@
 # Copia notturna del database su Cloudflare R2, cifrata con age (oltre al PITR di Supabase).
 # Si decifra solo con la chiave privata age, che NON sta su GitHub (Bitwarden + copia offline).
-# Segreti: SUPABASE_DB_URL (stringa di connessione «Session pooler»), R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET
+# Segreti (ambiente GitHub «backup», solo questi): SUPABASE_DB_URL (stringa di connessione «Session pooler»), R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET
 # Variabile: AGE_PUBLIC_KEY (pubblica, inizia con age1…)
 name: Backup
 on:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   backup:
     runs-on: ubuntu-24.04
-    environment: produzione
+    environment: backup   # ambiente senza approvazione: altrimenti la copia notturna aspetterebbe un sì ogni notte
     steps:
       - run: sudo apt-get update -q && sudo apt-get install -y -q age
       - name: pg_dump → age → R2

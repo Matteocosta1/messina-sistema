@@ -1,0 +1,18 @@
+# Ogni modifica su main va prima qui: progetto Supabase «messina-prova» e siti *-prova.
+# Nessuna approvazione: è l'ambiente dove si prova. I dati veri non ci sono mai.
+name: Prova
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: pubblica-prova
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  pubblica:
+    uses: ./.github/workflows/_pubblica.yml
+    with:
+      ambiente: prova
+    secrets: inherit

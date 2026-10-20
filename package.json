@@ -5,6 +5,6 @@
   "scripts": {
     "anteprima": "npm run anteprima -w apps/gestionale",
     "build": "npm run build -w apps/gestionale",
-    "test:db": "node supabase/tests/run.mjs"
+    "test:db": "bash supabase/tests/run.sh"
   }
 }

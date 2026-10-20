@@ -1,0 +1,27 @@
+# Produzione: parte SOLO a mano (Actions → Produzione → Run workflow) e solo con il sì di Matteo o Pier
+# (ambiente «produzione» con Required reviewers). Si promuove ciò che è già stato provato su Prova.
+name: Produzione
+on:
+  workflow_dispatch:
+    inputs:
+      conferma:
+        description: "Scrivi PRODUZIONE per confermare"
+        required: true
+concurrency:
+  group: pubblica-produzione
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  controllo:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          test "${{ inputs.conferma }}" = "PRODUZIONE" || { echo "Conferma mancante: niente pubblicato"; exit 1; }
+          test "${{ github.ref }}" = "refs/heads/main" || { echo "In produzione va solo main"; exit 1; }
+  pubblica:
+    needs: controllo
+    uses: ./.github/workflows/_pubblica.yml
+    with:
+      ambiente: produzione
+    secrets: inherit

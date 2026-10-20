@@ -74,15 +74,22 @@ Poi, nel progetto:
 
 0. **Versioni bloccate** (una volta sola, su un Mac con Node 22): nella cartella del progetto `npm install`, poi mettere su GitHub il file `package-lock.json` che si crea. Il deploy usa `npm ci`, che installa esattamente quelle versioni: senza il file il deploy si ferma apposta. Poi in GitHub → Settings → Code security attivare **Dependabot** (gratis), che segnala librerie e azioni da aggiornare e propone di bloccare le azioni al loro commit.
 
-1. GitHub → Settings → **Environments** → New environment `produzione` → «Required reviewers»: Matteo e Pier. Così nessun deploy parte senza un sì.
-2. Controllare che su GitHub ci siano:
-   - **Secrets**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_DB_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`
-   - **Variables**: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `AGE_PUBLIC_KEY`
-3. Actions → **Deploy** → Run workflow. In ordine:
+1. GitHub → Settings → **Environments** ([link](https://github.com/Matteocosta1/messina-sistema/settings/environments)): tre ambienti.
+   - `prova`: nessuna approvazione. Riceve ogni modifica su `main` (Actions → **Prova**, parte da sola).
+   - `produzione`: «Required reviewers» Matteo e Pier, e «Deployment branches» solo `main`. Parte **solo a mano**: Actions → **Produzione** → Run workflow, scrivendo `PRODUZIONE`.
+   - `backup`: nessuna approvazione (altrimenti la copia notturna aspetterebbe un sì ogni notte). Contiene **solo** i segreti del backup.
+2. In `prova` e `produzione` gli **stessi nomi**, ognuno con i valori del suo progetto:
+   - **Secrets**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+   - **Variables**: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`
+
+   In `backup`: Secrets `SUPABASE_DB_URL` (del progetto di produzione), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`; Variable `AGE_PUBLIC_KEY`.
+3. Su Cloudflare Pages i progetti di prova hanno il suffisso `-prova` (`messina-app-prova`, `messina-gestionale-trasporti-prova`, …), su sottodomini come `app-prova.dominio.it`.
+4. Prima Actions → **Prova** → Run workflow. In ordine:
    1. carica le migrazioni del database (tabelle, permessi, regole, pianificazioni);
    2. pubblica le Edge Functions;
    3. costruisce i 5 siti, scrivendo `config.js` con URL e chiave publishable, e li pubblica su Cloudflare Pages.
-4. Actions → **Backup** → Run workflow una volta a mano: in R2 deve comparire `messina-AAAA-MM-GG.dump.age`.
+   Se tutto va, Actions → **Produzione** → Run workflow: stessa cosa sul progetto vero, dopo il sì di Matteo o Pier.
+5. Actions → **Backup** → Run workflow una volta a mano: in R2 deve comparire `messina-AAAA-MM-GG.dump.age`.
 
 Il seed con i dati finti (`supabase/seed.sql`) **non** va mai sul progetto vero: serve solo per i test e, se volete, per `messina-prova`.
 
@@ -98,7 +105,7 @@ Le funzioni che non trovano un segreto rispondono con un messaggio che dice qual
 |---|---|---|
 | `CRON_SEGRETO` | 40 caratteri casuali | generatore di Bitwarden |
 | `LETTORE_CHIAVE` | 40 caratteri casuali, diversi dal precedente | generatore di Bitwarden; si inserisce anche nel lettore QR all'ingresso (app Messina → modalità Lettore) |
-| `ORIGINI_CONSENTITE` | facoltativo: `https://app.dominio.it` ecc. | se lo lasciate vuoto, le funzioni accettano chiamate da qualunque sito; i permessi restano comunque quelli del database |
+| `ORIGINI_CONSENTITE` | gli indirizzi dei siti separati da virgola: `https://gestionale.dominio.it,https://corporation.dominio.it,https://app.dominio.it,https://portale.dominio.it,https://negozio.dominio.it` | in produzione va sempre messo; vuoto = qualunque sito (solo in prova). I permessi restano comunque quelli del database |
 
 Poi nel **SQL Editor** di Supabase (una volta, non in chat):
 
@@ -169,7 +176,9 @@ insert into public.profili (id, azienda, ruolo, nome)
 select id, 'trasporti', 'direzione', 'Matteo' from auth.users where email = 'matteo@dominio';
 ```
 
-Amministratori: **Matteo e Pier**, più un terzo da decidere con loro. Con tre, se uno perde l'accesso gli altri due coprono. Ognuno attiva la verifica in due passaggi al primo accesso.
+Amministratori: **Matteo e Pier**, più un terzo da decidere con loro. Con tre, se uno perde l'accesso gli altri due coprono.
+
+**Doppio fattore obbligatorio.** Per i ruoli in `impostazioni` → `ruoli_doppio_fattore` (all'inizio direzione, amministrazione e commerciale) il database non apre niente con la sola password. Al primo accesso il gestionale o l'app mostra un QR da inquadrare con un'app di autenticazione (Microsoft Authenticator, gratis), poi chiede il codice di 6 cifre a ogni accesso. Se una persona perde il telefono: Supabase → Authentication → Users → la persona → rimuovere il fattore; al prossimo accesso ne collega uno nuovo.
 
 Per gli autisti e il magazzino serve anche il collegamento alla scheda dipendente:
 `update public.dipendenti set profilo_id = (select id from auth.users where email = '…') where nome = '…';`
@@ -192,7 +201,8 @@ Il deploy si rifiuta di partire se in `SUPABASE_PUBLISHABLE_KEY` trova una chiav
 - [ ] Supabase Pro, Frankfurt, compute Small, PITR 7 giorni attivo
 - [ ] Iscrizione libera spenta, TOTP attivo, `pg_cron` e `pg_net` accesi
 - [ ] Vault: `progetto_url` e `cron_segreto` inseriti
-- [ ] GitHub: environment `produzione` con approvazione di Matteo e Pier; tutti i Secrets e le Variables elencati
+- [ ] GitHub: ambienti `prova`, `produzione` (approvazione di Matteo e Pier, solo `main`) e `backup`; Secrets e Variables in ognuno
+- [ ] Un accesso al gestionale con un utente di direzione chiede il codice; senza codice non si vede niente
 - [ ] Deploy riuscito: 5 siti online, ognuno sul suo sottodominio
 - [ ] Gestionali raggiungibili solo dopo il login Microsoft (Zero Trust)
 - [ ] Backup: un file `.dump.age` in R2 e una prova di ripristino su `messina-prova`, con la chiave privata age

@@ -1,21 +1,22 @@
-# Pubblicazione a ogni push su main: prima il database e le funzioni, poi i siti su Cloudflare Pages.
-# Segreti (GitHub → Settings → Secrets and variables → Actions → Secrets):
-#   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
-# Variabili (stessa pagina → Variables, valori pubblici): SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY
-name: Deploy
+# Pubblicazione comune a Prova e Produzione: prima il database e le funzioni, poi i siti su Cloudflare Pages.
+# Non parte da sola: la chiamano prova.yml (a ogni push su main) e produzione.yml (solo a mano, con approvazione).
+#
+# Ogni ambiente GitHub (Settings → Environments: «prova», «produzione») ha gli STESSI nomi, con i suoi valori:
+#   Secrets:   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+#   Variables: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY (valori pubblici)
+name: Pubblica
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ambiente:
+        type: string
+        required: true
 permissions:
   contents: read
-concurrency:
-  group: deploy
-  cancel-in-progress: false
 jobs:
   supabase:
     runs-on: ubuntu-24.04
-    environment: produzione
+    environment: ${{ inputs.ambiente }}
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -33,7 +34,7 @@ jobs:
   siti:
     needs: supabase
     runs-on: ubuntu-24.04
-    environment: produzione
+    environment: ${{ inputs.ambiente }}
     strategy:
       matrix:
         include:
@@ -47,10 +48,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # versioni bloccate dal package-lock.json (va creato una volta con «npm install» e messo su GitHub: vedi docs/SETUP.md)
       - run: npm ci --no-audit --no-fund --ignore-scripts
       - name: config.js con i valori pubblici
-        if: ${{ hashFiles(format('apps/{0}/build.mjs', matrix.app)) != '' }}
         env:
           URL: ${{ vars.SUPABASE_URL }}
           CHIAVE: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
@@ -59,9 +58,9 @@ jobs:
           printf 'window.MESSINA = { supabaseUrl: %s, supabaseKey: %s };\n' "\"$URL\"" "\"$CHIAVE\"" > apps/${{ matrix.app }}/config.js
           node apps/${{ matrix.app }}/build.mjs
       - name: Pubblica su Cloudflare Pages
-        if: ${{ hashFiles(format('apps/{0}/build.mjs', matrix.app)) != '' }}
         uses: cloudflare/wrangler-action@v3.14.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/${{ matrix.app }}/dist --project-name=${{ matrix.progetto }} --branch=main
+          # in prova i progetti hanno il suffisso -prova (es. messina-app-prova)
+          command: pages deploy apps/${{ matrix.app }}/dist --project-name=${{ matrix.progetto }}${{ inputs.ambiente == 'prova' && '-prova' || '' }} --branch=main

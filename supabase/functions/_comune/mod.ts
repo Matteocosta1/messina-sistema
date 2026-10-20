@@ -1,11 +1,20 @@
 // Aiuti comuni alle Edge Functions Messina: CORS, errori in italiano, segreti, client al database.
 // Nessuna libreria esterna: solo fetch verso REST (PostgREST), Storage e Auth di Supabase.
 
-export const CORS: Record<string, string> = {
-  'Access-Control-Allow-Origin': Deno.env.get('ORIGINI_CONSENTITE') ?? '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-lettore-chiave, x-cron-segreto',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+// ORIGINI_CONSENTITE: elenco separato da virgole (https://gestionale.dominio.it, https://app.dominio.it, …).
+// Il browser accetta un solo indirizzo per risposta: si rimanda quello di chi chiama, se è nell'elenco.
+// Vuoto = qualunque sito (solo per le prove: i permessi restano comunque quelli del database).
+const ORIGINI = (Deno.env.get('ORIGINI_CONSENTITE') ?? '').split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean);
+export function corsPer(req?: Request): Record<string, string> {
+  const da = req?.headers.get('origin') ?? '';
+  return {
+    'Access-Control-Allow-Origin': ORIGINI.length === 0 ? '*' : (ORIGINI.includes(da) ? da : ORIGINI[0]),
+    'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-lettore-chiave, x-cron-segreto',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    ...(ORIGINI.length ? { Vary: 'Origin' } : {}),
+  };
+}
+export const CORS = corsPer();
 
 export class Errore extends Error {
   constructor(messaggio: string, public stato = 400) { super(messaggio); }
@@ -24,7 +33,12 @@ export function segreto(nome: string): string {
 /** gestisce OPTIONS, errori e corpo JSON per ogni funzione */
 export function servi(gestore: (req: Request, corpo: any) => Promise<unknown>) {
   Deno.serve(async (req) => {
-    if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+    if (req.method === 'OPTIONS') return new Response('ok', { headers: corsPer(req) });
+    const r = await risposta(req);
+    for (const [k, v] of Object.entries(corsPer(req))) r.headers.set(k, v);
+    return r;
+  });
+  async function risposta(req: Request): Promise<Response> {
     if (req.method !== 'POST') return json({ errore: 'Usa POST' }, 405);
     try {
       const testo = await req.text();
@@ -38,7 +52,7 @@ export function servi(gestore: (req: Request, corpo: any) => Promise<unknown>) {
       if (!(e instanceof Errore)) console.error((e as Error)?.message ?? e);
       return json({ errore: err.message }, err.stato);
     }
-  });
+  }
 }
 
 const URL_SB = () => segreto('SUPABASE_URL');
