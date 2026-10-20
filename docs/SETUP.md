@@ -32,11 +32,13 @@ Su ogni account: Impostazioni → Sicurezza → aggiungere la YubiKey come «sec
 |---|---|---|---|
 | 5 | Account Cloudflare con `it@dominio` | **gratis** (piano Free) | [dash.cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up) |
 | 6 | Dominio (comprato o trasferito su Cloudflare Registrar) | **a pagamento**, prezzo di costo, circa 10–15 €/anno | [Cloudflare Registrar](https://dash.cloudflare.com/?to=/:account/domains/register) |
-| 7 | Cloudflare Pages: 5 progetti `messina-gestionale-trasporti`, `messina-gestionale-corporation`, `messina-app`, `messina-portale`, `messina-negozio` | **gratis** (uso commerciale permesso) | Workers & Pages → Create → Pages → «Direct upload» |
+| 7 | Cloudflare Pages: 7 progetti `messina-gestionale-trasporti`, `messina-gestionale-corporation`, `messina-app`, `messina-portale`, `messina-negozio`, `messina-sito-trasporti`, `messina-sito-corporation` | **gratis** (uso commerciale permesso) | Workers & Pages → Create → Pages → «Direct upload» |
 | 8 | Cloudflare Zero Trust (gestionali dietro il login Microsoft) | **gratis** fino a 50 utenti | [one.dash.cloudflare.com](https://one.dash.cloudflare.com) |
 | 9 | Cloudflare R2, bucket `messina-backup` | **gratis** fino a 10 GB, poi 0,015 $/GB/mese | R2 → Create bucket |
 
-Sottodomini consigliati: `gestionale.dominio.it` (Autotrasporti), `corporation.dominio.it`, `app.dominio.it`, `portale.dominio.it`, `negozio.dominio.it` (o il dominio principale). In ogni progetto Pages: Custom domains → aggiungere il suo.
+Sottodomini consigliati: `gestionale.dominio.it` (Autotrasporti), `corporation.dominio.it`, `app.dominio.it`, `portale.dominio.it`, `negozio.dominio.it`. I due **siti vetrina** vanno sui domini principali: `messina-sito-trasporti` su `www.` del dominio dei Trasporti, `messina-sito-corporation` su `www.` di quello della Corporation. In ogni progetto Pages: Custom domains → aggiungere il suo.
+
+**Siti vetrina** (`apps/sito-trasporti`, `apps/sito-corporation`): HTML statico generato da `siti/` con `node siti/genera.mjs` (testi in `siti/trasporti.html` e `siti/corporation.html`, stile comune in `siti/comune.css`). I moduli «Chiedi un preventivo» e «Valuta un lotto» chiamano la Edge Function `richiesta-sito`, che scrive nella Mail del gestionale (Trasporti → cartella Clienti, etichetta Preventivo; Corporation → cartella Lotti) con controlli contro lo spam (campo esca, massimo 3 richieste l'ora per email, 60 l'ora per sito). Prima di metterli online vanno sostituiti i segnaposto tra parentesi quadre (telefono, email, ragione sociale, P.IVA, garanzia), fatta verificare la bozza di `privacy.html` e, consigliato, caricato il font Figtree sul sito invece che da Google Fonts (lo chiede la giurisprudenza tedesca sul GDPR; in Italia è prudenza).
 
 Zero Trust: Settings → Authentication → aggiungere «Azure AD / Microsoft Entra ID»; Access → Applications → una per `gestionale.` e una per `corporation.`, con regola «email che finisce con @dominio». App, portale e negozio **non** vanno dietro Zero Trust (li usano autisti, clienti e acquirenti).
 
@@ -80,14 +82,14 @@ Poi, nel progetto:
    - `backup`: nessuna approvazione (altrimenti la copia notturna aspetterebbe un sì ogni notte). Contiene **solo** i segreti del backup.
 2. In `prova` e `produzione` gli **stessi nomi**, ognuno con i valori del suo progetto:
    - **Secrets**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-   - **Variables**: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`
+   - **Variables**: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, e gli indirizzi pubblici per i collegamenti tra i siti: `URL_NEGOZIO`, `URL_PORTALE`, `URL_SITO_TRASPORTI`, `URL_SITO_CORPORATION` (in prova quelli `-prova`)
 
    In `backup`: Secrets `SUPABASE_DB_URL` (del progetto di produzione), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`; Variable `AGE_PUBLIC_KEY`.
 3. Su Cloudflare Pages i progetti di prova hanno il suffisso `-prova` (`messina-app-prova`, `messina-gestionale-trasporti-prova`, …), su sottodomini come `app-prova.dominio.it`.
 4. Prima Actions → **Prova** → Run workflow. In ordine:
    1. carica le migrazioni del database (tabelle, permessi, regole, pianificazioni);
    2. pubblica le Edge Functions;
-   3. costruisce i 5 siti, scrivendo `config.js` con URL e chiave publishable, e li pubblica su Cloudflare Pages.
+   3. costruisce i 7 siti, scrivendo `config.js` con URL e chiave publishable, e li pubblica su Cloudflare Pages.
    Se tutto va, Actions → **Produzione** → Run workflow: stessa cosa sul progetto vero, dopo il sì di Matteo o Pier.
 5. Actions → **Backup** → Run workflow una volta a mano: in R2 deve comparire `messina-AAAA-MM-GG.dump.age`.
 

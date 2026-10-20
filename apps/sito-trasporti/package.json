@@ -1,0 +1,10 @@
+{
+  "name": "@messina/sito-trasporti",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "anteprima": "node build.mjs && python3 -m http.server 8766 -d dist"
+  }
+}

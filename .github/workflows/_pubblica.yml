@@ -43,6 +43,8 @@ jobs:
           - { app: app,        progetto: messina-app }
           - { app: portale,    progetto: messina-portale }
           - { app: negozio,    progetto: messina-negozio }
+          - { app: sito-trasporti,   progetto: messina-sito-trasporti }
+          - { app: sito-corporation, progetto: messina-sito-corporation }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,9 +55,13 @@ jobs:
         env:
           URL: ${{ vars.SUPABASE_URL }}
           CHIAVE: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          NEGOZIO: ${{ vars.URL_NEGOZIO }}
+          PORTALE: ${{ vars.URL_PORTALE }}
+          SITO_T: ${{ vars.URL_SITO_TRASPORTI }}
+          SITO_C: ${{ vars.URL_SITO_CORPORATION }}
         run: |
           case "$CHIAVE" in sb_secret_*|*service_role*) echo "Questa è una chiave SEGRETA: qui va la publishable" && exit 1;; esac
-          printf 'window.MESSINA = { supabaseUrl: %s, supabaseKey: %s };\n' "\"$URL\"" "\"$CHIAVE\"" > apps/${{ matrix.app }}/config.js
+          printf 'window.MESSINA = { supabaseUrl: %s, supabaseKey: %s, negozioUrl: %s, portaleUrl: %s, trasportiUrl: %s, corporationUrl: %s };\n' "\"$URL\"" "\"$CHIAVE\"" "\"$NEGOZIO\"" "\"$PORTALE\"" "\"$SITO_T\"" "\"$SITO_C\"" > apps/${{ matrix.app }}/config.js
           node apps/${{ matrix.app }}/build.mjs
       - name: Pubblica su Cloudflare Pages
         uses: cloudflare/wrangler-action@v3.14.0

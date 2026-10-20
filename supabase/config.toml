@@ -40,3 +40,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.resoconto]
 verify_jwt = false
+[functions.richiesta-sito]
+verify_jwt = false

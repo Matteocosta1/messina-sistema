@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Messina Autotrasporti</title>
+<meta name="description" content="Trasporto merci, magazzino conto terzi e logistica del materiale informatico da Lacchiarella (Milano). Ogni consegna con firma, foto e posizione.">
+<meta name="theme-color" content="#f2f3f5">
+<meta property="og:title" content="Messina Autotrasporti">
+<meta property="og:description" content="Ritiriamo, custodiamo, consegniamo. Trasporti e magazzino da Lacchiarella (Milano).">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111214'/%3E%3Ctext x='32' y='44' font-family='Arial' font-weight='900' font-size='34' text-anchor='middle' fill='%23fff'%3EM%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<style>
+:root{
+  --bg:#f2f3f5; --halo1:#e0e4eb; --halo2:#e9e9ee;
+  --ink:#111214; --muted:#5b5e66; --line:rgba(17,18,20,.10); --soft:rgba(17,18,20,.05);
+  --glass:rgba(255,255,255,.72); --glass-edge:rgba(255,255,255,.95); --glass-strong:rgba(255,255,255,.92);
+  --solid:#111214; --on-solid:#fff; --ok:#146c43; --ok-soft:#e7f5ec; --alert:#b42318; --alert-soft:#fdecea;
+  --shadow:0 1px 2px rgba(20,24,32,.04),0 18px 40px -24px rgba(20,24,32,.30);
+  --font:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --wrap:1200px; --gut:clamp(16px,4vw,40px);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:88px}
+body{margin:0;font-family:var(--font);font-size:17px;line-height:1.55;color:var(--ink);
+  background:radial-gradient(1000px 600px at 92% -10%,var(--halo1),transparent 65%),radial-gradient(800px 560px at -10% 40%,var(--halo2),transparent 60%),var(--bg);background-color:var(--bg)}
+img,svg{max-width:100%}
+a{color:inherit}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.03em}
+p{margin:0}
+:focus-visible{outline:2px solid var(--solid);outline-offset:3px;border-radius:6px}
+.wrap{max-width:var(--wrap);margin:0 auto;padding-left:max(var(--gut),env(safe-area-inset-left,0px));padding-right:max(var(--gut),env(safe-area-inset-right,0px))}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);border:1px solid var(--glass-edge);box-shadow:var(--shadow)}
+.muted{color:var(--muted)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:16px;font-weight:700;min-height:48px;padding:12px 22px;border-radius:999px;border:1px solid var(--solid);background:var(--solid);color:var(--on-solid);text-decoration:none;cursor:pointer}
+.btn.ghost{background:var(--glass-strong);color:var(--ink);border-color:var(--line)}
+.btn:hover{filter:brightness(1.25)}
+.btn.ghost:hover{filter:none;background:#fff}
+
+/* testata */
+.top{position:sticky;top:0;z-index:20;padding-top:env(safe-area-inset-top,0px)}
+.top .bar{display:flex;align-items:center;gap:20px;min-height:68px;margin-top:10px;padding:8px 8px 8px 20px;border-radius:999px}
+.logo{font-weight:900;font-size:20px;letter-spacing:-.04em;text-decoration:none;white-space:nowrap}
+.logo span{font-weight:500;letter-spacing:-.02em}
+.menu{display:flex;gap:2px;margin-left:auto}
+.menu a{font-size:15px;font-weight:600;text-decoration:none;padding:10px 14px;border-radius:999px}
+.menu a:hover{background:var(--soft)}
+.top .btn{min-height:44px;padding:10px 18px;font-size:15px}
+
+/* apertura */
+.hero{padding:clamp(40px,7vw,96px) 0 clamp(36px,5vw,64px)}
+.hero .g{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(24px,4vw,56px);align-items:center}
+.hero h1{font-size:clamp(44px,6.1vw,88px);font-weight:850;line-height:.95;letter-spacing:-.05em}
+.hero .sub{font-size:clamp(18px,1.6vw,21px);color:var(--muted);max-width:34ch;margin-top:22px}
+.hero .cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 28px;margin-top:40px;padding-top:22px;border-top:1px solid var(--line)}
+.facts b{display:block;font-size:clamp(17px,1.6vw,20px);line-height:1.25;letter-spacing:-.02em}
+.facts span{font-size:14px;color:var(--muted)}
+
+/* sezioni */
+section{padding:clamp(56px,8vw,112px) 0}
+.sh{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px 56px;align-items:end;margin-bottom:clamp(28px,4vw,48px)}
+.sh h2{font-size:clamp(32px,4.4vw,56px);font-weight:800;line-height:1.02}
+.sh p{color:var(--muted);max-width:52ch}
+.panel{border-radius:28px;padding:clamp(20px,3vw,36px)}
+
+/* elenco servizi: righe, non carte uguali */
+.servizi{border-radius:28px;overflow:hidden}
+.srv{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr) auto;gap:16px 40px;align-items:start;padding:28px clamp(20px,3vw,36px);border-top:1px solid var(--line)}
+.srv:first-child{border-top:0}
+.srv h3{font-size:clamp(22px,2.2vw,28px);font-weight:750}
+.srv p{color:var(--muted);max-width:56ch}
+.srv ul{margin:10px 0 0;padding-left:18px;color:var(--ink);font-size:15px}
+.srv .tag{font-size:13px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--glass-strong);white-space:nowrap}
+
+/* percorso: è davvero una sequenza */
+.passi{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));gap:0;counter-reset:p;border-radius:28px;overflow:hidden}
+.passi li{counter-increment:p;padding:26px 22px 28px;border-left:1px solid var(--line);position:relative}
+.passi li:first-child{border-left:0}
+.passi li::before{content:counter(p);display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:99px;background:var(--solid);color:var(--on-solid);font-weight:800;font-size:15px;margin-bottom:16px}
+.passi b{display:block;font-size:18px;letter-spacing:-.01em;margin-bottom:6px}
+.passi span{font-size:15px;color:var(--muted)}
+
+/* modulo */
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.form .w{grid-column:1/-1}
+.f{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+.f input,.f textarea,.f select{font:inherit;font-size:16px;font-weight:400;min-height:50px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--glass-strong);color:var(--ink);width:100%}
+.f textarea{min-height:120px;resize:vertical}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips label{display:inline-flex;align-items:center;font-size:15px;font-weight:600;min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--glass-strong);cursor:pointer}
+.chips input{position:absolute;opacity:0;width:1px;height:1px}
+.chips input:checked+span{color:var(--on-solid)}
+.chips label:has(input:checked){background:var(--solid);border-color:var(--solid);color:var(--on-solid)}
+.chips label:has(input:focus-visible){outline:2px solid var(--solid);outline-offset:2px}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.esito{grid-column:1/-1;border-radius:16px;padding:14px 16px;font-weight:600}
+.esito.ok{background:var(--solid);color:var(--on-solid)}
+.esito.ko{background:var(--alert-soft);color:var(--alert);box-shadow:inset 0 0 0 1px var(--alert)}
+.priv{grid-column:1/-1;font-size:13px;color:var(--muted)}
+
+/* piede */
+footer{padding:48px 0 calc(40px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);font-size:15px}
+footer .g{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:28px}
+footer b{display:block;margin-bottom:8px}
+footer a{display:block;text-decoration:none;color:var(--muted);padding:4px 0}
+footer a:hover{color:var(--ink)}
+.legal{margin-top:28px;font-size:13px;color:var(--muted)}
+
+@media (max-width:900px){
+  .hero .g,.sh{grid-template-columns:1fr}
+  .srv{grid-template-columns:1fr}
+  .srv .tag{justify-self:start}
+  footer .g{grid-template-columns:1fr 1fr}
+}
+@media (max-width:760px){
+  .menu{display:none}
+  .top .bar{gap:10px;padding-left:16px}
+  .top .btn{margin-left:auto}
+  .passi{grid-template-columns:1fr}
+  .passi li{border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:34px 1fr;gap:4px 14px;padding:20px}
+  .passi li:first-child{border-top:0}
+  .passi li::before{grid-row:1/3;margin:0}
+  .form{grid-template-columns:1fr}
+  .facts{grid-template-columns:1fr 1fr}
+  footer .g{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+
+/* mappa dei giri: l'unico movimento della pagina */
+.mappa{border-radius:32px;padding:clamp(14px,2vw,22px);position:relative}
+.mappa svg{display:block;width:100%;height:auto}
+.mappa .cap{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:2px 6px 10px;font-size:14px}
+.mappa .cap b{font-size:15px}
+.giro{fill:none;stroke:var(--ink);stroke-width:1.6;stroke-linecap:round;stroke-dasharray:var(--l);stroke-dashoffset:0;animation:traccia 1.15s cubic-bezier(.6,.05,.25,1) backwards;animation-delay:calc(.35s + var(--i) * .07s)}
+.citta circle{fill:#fff;stroke:var(--ink);stroke-width:1.6}
+.citta text{font-family:var(--font);font-size:11.5px;font-weight:600;fill:var(--muted)}
+.citta{animation:compare .4s ease-out backwards;animation-delay:calc(1.2s + var(--i) * .07s)}
+.base circle.c{fill:var(--ink)}
+.base circle.r{fill:none;stroke:var(--ink);stroke-width:1;opacity:0;animation:onda 1.6s ease-out .2s 2}
+.base text{font-family:var(--font);font-size:13px;font-weight:800;fill:var(--ink)}
+.puntini{fill:rgba(17,18,20,.13)}
+@keyframes traccia{from{stroke-dashoffset:var(--l)}}
+@keyframes compare{from{opacity:0;transform:translateY(3px)}}
+@keyframes onda{0%{opacity:.6;r:7}100%{opacity:0;r:30}}
+
+/* flotta: i mezzi in scala sulla stessa strada */
+.strada{display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1fr) minmax(0,1.5fr);gap:clamp(16px,3vw,40px);align-items:end;border-bottom:2px solid var(--ink);padding-bottom:0}
+.mezzo svg{display:block;width:100%;height:auto;overflow:visible}
+.mezzo svg .t{fill:var(--glass-strong);stroke:var(--ink);stroke-width:2;stroke-linejoin:round}
+.mezzo svg .v{fill:var(--ink)}
+.mezzo svg .ruota{fill:var(--ink)}
+.mezzo svg .cerchio{fill:#fff}
+.mezzi-testo{display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1fr) minmax(0,1.5fr);gap:clamp(16px,3vw,40px);margin-top:18px}
+.mezzi-testo h3{font-size:20px;font-weight:750}
+.mezzi-testo p{font-size:15px;color:var(--muted);margin-top:4px}
+
+/* magazzino */
+.mag{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(20px,4vw,56px);align-items:center}
+.mag ul{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:12px}
+.mag li{padding-left:22px;position:relative}
+.mag li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:8px;border-radius:2px;background:var(--ink)}
+.portale-mini{border-radius:26px;padding:18px}
+.portale-mini .testa{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px 6px 14px}
+.portale-mini .testa b{font-size:16px}
+.portale-mini .testa span{font-size:13px;color:var(--muted)}
+.portale-mini table{width:100%;border-collapse:collapse;font-size:14px}
+.portale-mini th{text-align:left;font-weight:600;color:var(--muted);font-size:12.5px;padding:8px 6px;border-bottom:1px solid var(--line)}
+.portale-mini td{padding:11px 6px;border-bottom:1px solid var(--line)}
+.portale-mini tr:last-child td{border-bottom:0}
+.stato{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--soft)}
+.stato.esce{background:var(--solid);color:var(--on-solid)}
+.portale-mini .piede{display:flex;justify-content:flex-end;padding-top:12px}
+.portale-mini .piede span{font-size:13px;font-weight:700;padding:9px 14px;border-radius:99px;background:var(--solid);color:var(--on-solid)}
+
+/* preventivo */
+.prev{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(24px,4vw,56px);align-items:start}
+.prev h2{font-size:clamp(32px,4.4vw,56px);font-weight:800;line-height:1.02}
+.prev .lead{color:var(--muted);margin-top:16px;max-width:40ch}
+.contatti{margin-top:28px;display:grid;gap:14px;font-size:16px}
+.contatti b{display:block;font-size:13px;color:var(--muted);font-weight:600}
+.contatti a{text-decoration:none;font-weight:600}
+@media (max-width:900px){.mag,.prev{grid-template-columns:1fr}}
+@media (max-width:640px){
+  .strada,.mezzi-testo{grid-template-columns:1fr}
+  .strada{border-bottom:0;gap:0}
+  .mezzo{border-bottom:2px solid var(--ink);padding-top:18px}
+  .mezzo.m1 svg{width:46%}.mezzo.m2 svg{width:70%}
+  .mezzi-testo{display:none}
+  .mezzo .solo-tel{display:block;padding:12px 0 18px}
+  .portale-mini td:nth-child(3),.portale-mini th:nth-child(3){display:none}
+}
+.solo-tel{display:none}
+@media (max-width:640px){.citta text{font-size:17px}.base text{font-size:18px}.citta circle{r:5.5}.base circle.c{r:9}.giro{stroke-width:2.2}}
+.solo-tel h3{font-size:19px;font-weight:750}.solo-tel p{font-size:15px;color:var(--muted);margin-top:2px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="bar glass" aria-label="Principale">
+      <a class="logo" href="#">Messina <span>Autotrasporti</span></a>
+      <div class="menu">
+        <a href="#servizi">Servizi</a><a href="#flotta">Flotta</a><a href="#magazzino">Magazzino</a><a href="#contatti">Contatti</a>
+      </div>
+      <a class="btn" href="#preventivo">Preventivo</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap g">
+      <div>
+        <h1>Ritiriamo, custodiamo, consegniamo.</h1>
+        <p class="sub">Trasporto merci, magazzino conto terzi e logistica del materiale informatico, da Lacchiarella. Ogni consegna arriva con firma, foto e posizione.</p>
+        <div class="cta">
+          <a class="btn" href="#preventivo">Chiedi un preventivo</a>
+          <a class="btn ghost" href="#servizi">Cosa facciamo</a>
+        </div>
+        <div class="facts">
+          <div><b>Circa 30 mezzi</b><span>dal furgone al bilico</span></div>
+          <div><b>Magazzino a Lacchiarella</b><span>scaffali a 6 piani</span></div>
+          <div><b>Prova di consegna</b><span>firma, foto, posizione</span></div>
+        </div>
+      </div>
+      <figure class="mappa glass" style="margin:0" aria-label="Giri in partenza da Lacchiarella verso le città del Nord Italia">
+        <div class="cap"><b>Ogni mattina da Lacchiarella</b><span class="muted">Nord Italia</span></div>
+        <svg viewBox="0 30 560 232" role="img" aria-hidden="true"><path class="puntini" d="M8 36h.01M22 36h.01M36 36h.01M50 36h.01M64 36h.01M78 36h.01M92 36h.01M106 36h.01M120 36h.01M134 36h.01M148 36h.01M162 36h.01M176 36h.01M190 36h.01M204 36h.01M218 36h.01M232 36h.01M246 36h.01M260 36h.01M274 36h.01M288 36h.01M302 36h.01M316 36h.01M330 36h.01M344 36h.01M358 36h.01M372 36h.01M386 36h.01M400 36h.01M414 36h.01M428 36h.01M442 36h.01M456 36h.01M470 36h.01M484 36h.01M498 36h.01M512 36h.01M526 36h.01M540 36h.01M554 36h.01M8 50h.01M22 50h.01M36 50h.01M50 50h.01M64 50h.01M78 50h.01M92 50h.01M106 50h.01M120 50h.01M134 50h.01M148 50h.01M162 50h.01M176 50h.01M190 50h.01M204 50h.01M218 50h.01M232 50h.01M246 50h.01M260 50h.01M274 50h.01M288 50h.01M302 50h.01M316 50h.01M330 50h.01M344 50h.01M358 50h.01M372 50h.01M386 50h.01M400 50h.01M414 50h.01M428 50h.01M442 50h.01M456 50h.01M470 50h.01M484 50h.01M498 50h.01M512 50h.01M526 50h.01M540 50h.01M554 50h.01M8 64h.01M22 64h.01M36 64h.01M50 64h.01M64 64h.01M78 64h.01M92 64h.01M106 64h.01M120 64h.01M134 64h.01M148 64h.01M162 64h.01M176 64h.01M190 64h.01M204 64h.01M218 64h.01M232 64h.01M246 64h.01M260 64h.01M274 64h.01M288 64h.01M302 64h.01M316 64h.01M330 64h.01M344 64h.01M358 64h.01M372 64h.01M386 64h.01M400 64h.01M414 64h.01M428 64h.01M442 64h.01M456 64h.01M470 64h.01M484 64h.01M498 64h.01M512 64h.01M526 64h.01M540 64h.01M554 64h.01M8 78h.01M22 78h.01M36 78h.01M50 78h.01M64 78h.01M78 78h.01M92 78h.01M106 78h.01M120 78h.01M134 78h.01M148 78h.01M162 78h.01M176 78h.01M190 78h.01M204 78h.01M218 78h.01M232 78h.01M246 78h.01M260 78h.01M274 78h.01M288 78h.01M302 78h.01M316 78h.01M330 78h.01M344 78h.01M358 78h.01M372 78h.01M386 78h.01M400 78h.01M414 78h.01M428 78h.01M442 78h.01M456 78h.01M470 78h.01M484 78h.01M498 78h.01M512 78h.01M526 78h.01M540 78h.01M554 78h.01M8 92h.01M22 92h.01M36 92h.01M50 92h.01M64 92h.01M78 92h.01M92 92h.01M106 92h.01M120 92h.01M134 92h.01M148 92h.01M162 92h.01M176 92h.01M190 92h.01M204 92h.01M218 92h.01M232 92h.01M246 92h.01M260 92h.01M274 92h.01M288 92h.01M302 92h.01M316 92h.01M330 92h.01M344 92h.01M358 92h.01M372 92h.01M386 92h.01M400 92h.01M414 92h.01M428 92h.01M442 92h.01M456 92h.01M470 92h.01M484 92h.01M498 92h.01M512 92h.01M526 92h.01M540 92h.01M554 92h.01M8 106h.01M22 106h.01M36 106h.01M50 106h.01M64 106h.01M78 106h.01M92 106h.01M106 106h.01M120 106h.01M134 106h.01M148 106h.01M162 106h.01M176 106h.01M190 106h.01M204 106h.01M218 106h.01M232 106h.01M246 106h.01M260 106h.01M274 106h.01M288 106h.01M302 106h.01M316 106h.01M330 106h.01M344 106h.01M358 106h.01M372 106h.01M386 106h.01M400 106h.01M414 106h.01M428 106h.01M442 106h.01M456 106h.01M470 106h.01M484 106h.01M498 106h.01M512 106h.01M526 106h.01M540 106h.01M554 106h.01M8 120h.01M22 120h.01M36 120h.01M50 120h.01M64 120h.01M78 120h.01M92 120h.01M106 120h.01M120 120h.01M134 120h.01M148 120h.01M162 120h.01M176 120h.01M190 120h.01M204 120h.01M218 120h.01M232 120h.01M246 120h.01M260 120h.01M274 120h.01M288 120h.01M302 120h.01M316 120h.01M330 120h.01M344 120h.01M358 120h.01M372 120h.01M386 120h.01M400 120h.01M414 120h.01M428 120h.01M442 120h.01M456 120h.01M470 120h.01M484 120h.01M498 120h.01M512 120h.01M526 120h.01M540 120h.01M554 120h.01M8 134h.01M22 134h.01M36 134h.01M50 134h.01M64 134h.01M78 134h.01M92 134h.01M106 134h.01M120 134h.01M134 134h.01M148 134h.01M162 134h.01M176 134h.01M190 134h.01M204 134h.01M218 134h.01M232 134h.01M246 134h.01M260 134h.01M274 134h.01M288 134h.01M302 134h.01M316 134h.01M330 134h.01M344 134h.01M358 134h.01M372 134h.01M386 134h.01M400 134h.01M414 134h.01M428 134h.01M442 134h.01M456 134h.01M470 134h.01M484 134h.01M498 134h.01M512 134h.01M526 134h.01M540 134h.01M554 134h.01M8 148h.01M22 148h.01M36 148h.01M50 148h.01M64 148h.01M78 148h.01M92 148h.01M106 148h.01M120 148h.01M134 148h.01M148 148h.01M162 148h.01M176 148h.01M190 148h.01M204 148h.01M218 148h.01M232 148h.01M246 148h.01M260 148h.01M274 148h.01M288 148h.01M302 148h.01M316 148h.01M330 148h.01M344 148h.01M358 148h.01M372 148h.01M386 148h.01M400 148h.01M414 148h.01M428 148h.01M442 148h.01M456 148h.01M470 148h.01M484 148h.01M498 148h.01M512 148h.01M526 148h.01M540 148h.01M554 148h.01M8 162h.01M22 162h.01M36 162h.01M50 162h.01M64 162h.01M78 162h.01M92 162h.01M106 162h.01M120 162h.01M134 162h.01M148 162h.01M162 162h.01M176 162h.01M190 162h.01M204 162h.01M218 162h.01M232 162h.01M246 162h.01M260 162h.01M274 162h.01M288 162h.01M302 162h.01M316 162h.01M330 162h.01M344 162h.01M358 162h.01M372 162h.01M386 162h.01M400 162h.01M414 162h.01M428 162h.01M442 162h.01M456 162h.01M470 162h.01M484 162h.01M498 162h.01M512 162h.01M526 162h.01M540 162h.01M554 162h.01M8 176h.01M22 176h.01M36 176h.01M50 176h.01M64 176h.01M78 176h.01M92 176h.01M106 176h.01M120 176h.01M134 176h.01M148 176h.01M162 176h.01M176 176h.01M190 176h.01M204 176h.01M218 176h.01M232 176h.01M246 176h.01M260 176h.01M274 176h.01M288 176h.01M302 176h.01M316 176h.01M330 176h.01M344 176h.01M358 176h.01M372 176h.01M386 176h.01M400 176h.01M414 176h.01M428 176h.01M442 176h.01M456 176h.01M470 176h.01M484 176h.01M498 176h.01M512 176h.01M526 176h.01M540 176h.01M554 176h.01M8 190h.01M22 190h.01M36 190h.01M50 190h.01M64 190h.01M78 190h.01M92 190h.01M106 190h.01M120 190h.01M134 190h.01M148 190h.01M162 190h.01M176 190h.01M190 190h.01M204 190h.01M218 190h.01M232 190h.01M246 190h.01M260 190h.01M274 190h.01M288 190h.01M302 190h.01M316 190h.01M330 190h.01M344 190h.01M358 190h.01M372 190h.01M386 190h.01M400 190h.01M414 190h.01M428 190h.01M442 190h.01M456 190h.01M470 190h.01M484 190h.01M498 190h.01M512 190h.01M526 190h.01M540 190h.01M554 190h.01M8 204h.01M22 204h.01M36 204h.01M50 204h.01M64 204h.01M78 204h.01M92 204h.01M106 204h.01M120 204h.01M134 204h.01M148 204h.01M162 204h.01M176 204h.01M190 204h.01M204 204h.01M218 204h.01M232 204h.01M246 204h.01M260 204h.01M274 204h.01M288 204h.01M302 204h.01M316 204h.01M330 204h.01M344 204h.01M358 204h.01M372 204h.01M386 204h.01M400 204h.01M414 204h.01M428 204h.01M442 204h.01M456 204h.01M470 204h.01M484 204h.01M498 204h.01M512 204h.01M526 204h.01M540 204h.01M554 204h.01M8 218h.01M22 218h.01M36 218h.01M50 218h.01M64 218h.01M78 218h.01M92 218h.01M106 218h.01M120 218h.01M134 218h.01M148 218h.01M162 218h.01M176 218h.01M190 218h.01M204 218h.01M218 218h.01M232 218h.01M246 218h.01M260 218h.01M274 218h.01M288 218h.01M302 218h.01M316 218h.01M330 218h.01M344 218h.01M358 218h.01M372 218h.01M386 218h.01M400 218h.01M414 218h.01M428 218h.01M442 218h.01M456 218h.01M470 218h.01M484 218h.01M498 218h.01M512 218h.01M526 218h.01M540 218h.01M554 218h.01M8 232h.01M22 232h.01M36 232h.01M50 232h.01M64 232h.01M78 232h.01M92 232h.01M106 232h.01M120 232h.01M134 232h.01M148 232h.01M162 232h.01M176 232h.01M190 232h.01M204 232h.01M218 232h.01M232 232h.01M246 232h.01M260 232h.01M274 232h.01M288 232h.01M302 232h.01M316 232h.01M330 232h.01M344 232h.01M358 232h.01M372 232h.01M386 232h.01M400 232h.01M414 232h.01M428 232h.01M442 232h.01M456 232h.01M470 232h.01M484 232h.01M498 232h.01M512 232h.01M526 232h.01M540 232h.01M554 232h.01M8 246h.01M22 246h.01M36 246h.01M50 246h.01M64 246h.01M78 246h.01M92 246h.01M106 246h.01M120 246h.01M134 246h.01M148 246h.01M162 246h.01M176 246h.01M190 246h.01M204 246h.01M218 246h.01M232 246h.01M246 246h.01M260 246h.01M274 246h.01M288 246h.01M302 246h.01M316 246h.01M330 246h.01M344 246h.01M358 246h.01M372 246h.01M386 246h.01M400 246h.01M414 246h.01M428 246h.01M442 246h.01M456 246h.01M470 246h.01M484 246h.01M498 246h.01M512 246h.01M526 246h.01M540 246h.01M554 246h.01M8 260h.01M22 260h.01M36 260h.01M50 260h.01M64 260h.01M78 260h.01M92 260h.01M106 260h.01M120 260h.01M134 260h.01M148 260h.01M162 260h.01M176 260h.01M190 260h.01M204 260h.01M218 260h.01M232 260h.01M246 260h.01M260 260h.01M274 260h.01M288 260h.01M302 260h.01M316 260h.01M330 260h.01M344 260h.01M358 260h.01M372 260h.01M386 260h.01M400 260h.01M414 260h.01M428 260h.01M442 260h.01M456 260h.01M470 260h.01M484 260h.01M498 260h.01M512 260h.01M526 260h.01M540 260h.01M554 260h.01" stroke="rgba(17,18,20,.14)" stroke-width="2.2" stroke-linecap="round"/><path class="giro" style="--i:0;--l:162" d="M197 110 Q130 148 53 145"/><path class="giro" style="--i:1;--l:62" d="M197 110 Q174 95 146 92"/><path class="giro" style="--i:2;--l:85" d="M197 110 Q218 77 251 57"/><path class="giro" style="--i:3;--l:124" d="M197 110 Q247 82 305 79"/><path class="giro" style="--i:4;--l:202" d="M197 110 Q290 98 383 93"/><path class="giro" style="--i:5;--l:296" d="M197 110 Q336 128 472 97"/><path class="giro" style="--i:6;--l:344" d="M197 110 Q355 63 517 93"/><path class="giro" style="--i:7;--l:76" d="M197 110 Q220 136 253 148"/><path class="giro" style="--i:8;--l:269" d="M197 110 Q294 195 418 226"/><path class="giro" style="--i:9;--l:141" d="M197 110 Q202 176 177 237"/><g class="citta" style="--i:0"><circle cx="53" cy="145" r="4"/><text x="53" y="162" text-anchor="middle">Torino</text></g><g class="citta" style="--i:1"><circle cx="146" cy="92" r="4"/><text x="146" y="83" text-anchor="middle">Novara</text></g><g class="citta" style="--i:2"><circle cx="251" cy="57" r="4"/><text x="251" y="48" text-anchor="middle">Bergamo</text></g><g class="citta" style="--i:3"><circle cx="305" cy="79" r="4"/><text x="305" y="70" text-anchor="middle">Brescia</text></g><g class="citta" style="--i:4"><circle cx="383" cy="93" r="4"/><text x="383" y="84" text-anchor="middle">Verona</text></g><g class="citta" style="--i:5"><circle cx="472" cy="97" r="4"/><text x="472" y="114" text-anchor="middle">Padova</text></g><g class="citta" style="--i:6"><circle cx="517" cy="93" r="4"/><text x="517" y="84" text-anchor="middle">Venezia</text></g><g class="citta" style="--i:7"><circle cx="253" cy="148" r="4"/><text x="262" y="152">Piacenza</text></g><g class="citta" style="--i:8"><circle cx="418" cy="226" r="4"/><text x="418" y="243" text-anchor="middle">Bologna</text></g><g class="citta" style="--i:9"><circle cx="177" cy="237" r="4"/><text x="177" y="254" text-anchor="middle">Genova</text></g><g class="base"><circle class="r" cx="197" cy="110" r="7"/><circle class="c" cx="197" cy="110" r="7"/><text x="191" y="144" text-anchor="end">Lacchiarella</text></g></svg>
+      </figure>
+    </div>
+  </div>
+
+  <section id="servizi">
+    <div class="wrap">
+      <div class="sh">
+        <h2>Quattro servizi, un solo interlocutore.</h2>
+        <p>Dalla bolla alla fattura, ogni passaggio è registrato nel nostro gestionale: sapete sempre dove si trova la vostra merce.</p>
+      </div>
+      <div class="servizi glass">
+        <div class="srv">
+          <h3>Trasporto merci</h3>
+          <div><p>Bancali e colli in giornata o su appuntamento, con sponda idraulica, consegna al piano e fascia oraria quando serve.</p>
+            <ul><li>Giri ottimizzati ogni giorno</li><li>Firma, foto e posizione a ogni consegna</li></ul></div>
+          <span class="tag">Bancali e colli</span>
+        </div>
+        <div class="srv">
+          <h3>Magazzino conto terzi</h3>
+          <div><p>Custodiamo la vostra merce a Lacchiarella. Ogni bancale ha un codice e un posto preciso, controllato con lo scanner a ogni movimento.</p>
+            <ul><li>Area clienti per vedere giacenze e movimenti</li><li>Riconsegna chiesta online</li></ul></div>
+          <span class="tag">Area clienti</span>
+        </div>
+        <div class="srv">
+          <h3>Logistica del materiale IT</h3>
+          <div><p>PC, telefoni e monitor aziendali: ritiro dei dispositivi dismessi, preparazione per singolo utente, consegna e gestione dei resi.</p>
+            <ul><li>Tracciamento per numero di serie</li><li>Insieme a Messina Corporation per il ricondizionamento</li></ul></div>
+          <span class="tag">Cespiti e resi</span>
+        </div>
+        <div class="srv">
+          <h3>Giacenze e riconsegne</h3>
+          <div><p>Se il destinatario non c'è, la merce torna in magazzino e vi avvisiamo subito. Decidete voi quando riconsegnarla.</p>
+            <ul><li>Avviso il giorno stesso</li><li>Nuova data scelta da voi</li></ul></div>
+          <span class="tag">Su richiesta</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="come" style="padding-top:0">
+    <div class="wrap">
+      <div class="sh">
+        <h2>Come lavoriamo.</h2>
+        <p>Sei passaggi, sempre gli stessi. Ognuno lascia una traccia che potete chiederci in qualsiasi momento.</p>
+      </div>
+      <ol class="passi glass">
+        <li><b>Ordine</b><span>Ci scrivete per mail, come fate oggi.</span></li>
+        <li><b>Bolla verificata</b><span>Controlliamo che ci sia tutto prima di partire.</span></li>
+        <li><b>Magazzino</b><span>Ogni collo passa dallo scanner.</span></li>
+        <li><b>Giro</b><span>Percorso e mezzo scelti per il carico.</span></li>
+        <li><b>Consegna</b><span>Firma, foto e posizione del destinatario.</span></li>
+        <li><b>Fattura</b><span>Elettronica, con il dettaglio delle consegne.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="flotta" style="padding-top:0">
+    <div class="wrap">
+      <div class="sh">
+        <h2>Il mezzo giusto per il carico.</h2>
+        <p>Circa 30 mezzi di proprietà, quasi tutti con sponda idraulica. Disegnati qui in scala, uno accanto all'altro.</p>
+      </div>
+      <div class="strada" role="list">
+        <div class="mezzo m1" role="listitem">
+          <svg viewBox="0 0 200 104" aria-hidden="true">
+            <path class="t" d="M6 92 V40 Q6 28 18 26 L118 22 Q132 22 140 32 L176 58 Q194 62 194 76 V92 Z"/>
+            <path class="v" d="M124 34 L166 60 H124 Z" opacity=".85"/>
+            <circle class="ruota" cx="44" cy="92" r="12"/><circle class="cerchio" cx="44" cy="92" r="4.5"/>
+            <circle class="ruota" cx="158" cy="92" r="12"/><circle class="cerchio" cx="158" cy="92" r="4.5"/>
+          </svg>
+          <div class="solo-tel"><h3>Furgoni e Sprinter</h3><p>Città, consegne veloci, ZTL.</p></div>
+        </div>
+        <div class="mezzo m2" role="listitem">
+          <svg viewBox="0 0 320 150" aria-hidden="true">
+            <rect class="t" x="6" y="10" width="214" height="118" rx="6"/>
+            <path class="t" d="M226 128 V58 Q226 46 238 46 H280 Q292 46 298 58 L314 94 V128 Z"/>
+            <path class="v" d="M240 58 H278 L292 88 H240 Z" opacity=".85"/>
+            <rect class="v" x="6" y="128" width="214" height="5"/>
+            <circle class="ruota" cx="48" cy="134" r="14"/><circle class="cerchio" cx="48" cy="134" r="5"/>
+            <circle class="ruota" cx="84" cy="134" r="14"/><circle class="cerchio" cx="84" cy="134" r="5"/>
+            <circle class="ruota" cx="276" cy="134" r="14"/><circle class="cerchio" cx="276" cy="134" r="5"/>
+          </svg>
+          <div class="solo-tel"><h3>Motrici e tre assi</h3><p>Con sponda, per bancali e consegne al piano.</p></div>
+        </div>
+        <div class="mezzo m3" role="listitem">
+          <svg viewBox="0 0 480 160" aria-hidden="true">
+            <rect class="t" x="6" y="8" width="372" height="124" rx="6"/>
+            <rect class="v" x="6" y="132" width="372" height="5"/>
+            <path class="t" d="M386 140 V64 Q386 52 398 52 H440 Q452 52 458 64 L474 100 V140 Z"/>
+            <path class="v" d="M400 64 H438 L452 94 H400 Z" opacity=".85"/>
+            <circle class="ruota" cx="250" cy="144" r="14"/><circle class="cerchio" cx="250" cy="144" r="5"/>
+            <circle class="ruota" cx="284" cy="144" r="14"/><circle class="cerchio" cx="284" cy="144" r="5"/>
+            <circle class="ruota" cx="318" cy="144" r="14"/><circle class="cerchio" cx="318" cy="144" r="5"/>
+            <circle class="ruota" cx="410" cy="144" r="14"/><circle class="cerchio" cx="410" cy="144" r="5"/>
+            <circle class="ruota" cx="446" cy="144" r="14"/><circle class="cerchio" cx="446" cy="144" r="5"/>
+          </svg>
+          <div class="solo-tel"><h3>Bilici</h3><p>Carichi completi e tratte lunghe.</p></div>
+        </div>
+      </div>
+      <div class="mezzi-testo" aria-hidden="false">
+        <div><h3>Furgoni e Sprinter</h3><p>Città, consegne veloci, ZTL.</p></div>
+        <div><h3>Motrici e tre assi</h3><p>Con sponda, per bancali e consegne al piano.</p></div>
+        <div><h3>Bilici</h3><p>Carichi completi e tratte lunghe.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="magazzino" style="padding-top:0">
+    <div class="wrap mag">
+      <div>
+        <h2 style="font-size:clamp(32px,4.4vw,56px);font-weight:800;line-height:1.02">La vostra merce, sempre sotto gli occhi.</h2>
+        <p class="muted" style="margin-top:16px;max-width:46ch">Il magazzino di Lacchiarella è organizzato in corsie e scaffali a 6 piani. Ogni bancale ha un codice, un posto e una storia: chi l'ha messo lì, quando, e quando è uscito.</p>
+        <ul>
+          <li>Area clienti con giacenze aggiornate in tempo reale</li>
+          <li>Controllo con lo scanner a ogni ingresso e uscita</li>
+          <li>Riconsegna chiesta online, con la data che preferite</li>
+        </ul>
+        <p style="margin-top:26px"><a class="btn ghost" href="#" data-link="portaleUrl">Entra nell'area clienti</a></p>
+      </div>
+      <div class="portale-mini glass" aria-label="Esempio dell'area clienti">
+        <div class="testa"><b>I vostri bancali</b><span>Area clienti</span></div>
+        <table>
+          <thead><tr><th>Codice</th><th>Posto</th><th>Dal</th><th>Stato</th></tr></thead>
+          <tbody>
+            <tr><td>B-1042</td><td>C3-2-4</td><td>2 ott</td><td><span class="stato">In magazzino</span></td></tr>
+            <tr><td>B-1043</td><td>C3-2-5</td><td>2 ott</td><td><span class="stato">In magazzino</span></td></tr>
+            <tr><td>B-1077</td><td>C5-1-1</td><td>9 ott</td><td><span class="stato esce">In uscita</span></td></tr>
+            <tr><td>B-1081</td><td>C1-4-2</td><td>14 ott</td><td><span class="stato">In magazzino</span></td></tr>
+          </tbody>
+        </table>
+        <div class="piede"><span>Richiedi riconsegna</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="preventivo" style="padding-top:0">
+    <div class="wrap prev">
+      <div id="contatti">
+        <h2>Chiedi un preventivo.</h2>
+        <p class="lead">Diteci cosa spedite, da dove a dove e ogni quanto. La richiesta arriva direttamente al nostro ufficio traffico.</p>
+        <div class="contatti">
+          <div><b>Sede e magazzino</b>Via Cascina Nuova 1, Lacchiarella (MI)</div>
+          <div><b>Telefono</b><a href="tel:+39">[telefono]</a></div>
+          <div><b>Email</b><a href="mailto:info@[dominio]">info@[dominio]</a></div>
+        </div>
+      </div>
+      <form class="form panel glass" data-sito="trasporti" data-ok="Richiesta inviata. Vi rispondiamo all'indirizzo email che avete indicato." novalidate>
+        <label class="f">Nome<input name="nome" autocomplete="name" required maxlength="80"></label>
+        <label class="f">Azienda<input name="azienda" autocomplete="organization" maxlength="120"></label>
+        <label class="f">Email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
+        <label class="f">Telefono<input name="telefono" type="tel" autocomplete="tel" maxlength="40"></label>
+        <fieldset class="f w" style="border:0;padding:0;margin:0"><legend style="padding:0;margin-bottom:6px">Cosa spedite</legend>
+          <div class="chips">
+            <label><input type="checkbox" value="Bancali" data-dettaglio="Cosa"><span>Bancali</span></label>
+            <label><input type="checkbox" value="Colli" data-dettaglio="Cosa"><span>Colli</span></label>
+            <label><input type="checkbox" value="Materiale IT" data-dettaglio="Cosa"><span>Materiale IT</span></label>
+            <label><input type="checkbox" value="Merce da tenere in magazzino" data-dettaglio="Cosa"><span>Magazzino</span></label>
+          </div>
+        </fieldset>
+        <label class="f">Da<input data-dettaglio="Da" placeholder="Città di ritiro" maxlength="120"></label>
+        <label class="f">A<input data-dettaglio="A" placeholder="Città di consegna" maxlength="120"></label>
+        <label class="f w">Ogni quanto<select data-dettaglio="Frequenza"><option value="">Scegli</option><option>Una volta</option><option>Ogni settimana</option><option>Ogni giorno</option><option>Da definire</option></select></label>
+        <label class="f w">Note<textarea name="note" maxlength="3000" placeholder="Quantità, misure, date, accessori come sponda o consegna al piano"></textarea></label>
+        <label class="hp" aria-hidden="true">Sito web<input name="sito_web" tabindex="-1" autocomplete="off"></label>
+        <label class="priv" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" name="privacy" required style="width:20px;height:20px;margin:1px 0 0;flex:none"><span>Ho letto l'<a href="privacy.html">informativa privacy</a>. Usiamo questi dati solo per rispondere alla richiesta.</span></label>
+        <div class="w"><button class="btn" type="submit" style="width:100%">Chiedi un preventivo</button></div>
+        <div class="esito" role="status" tabindex="-1" hidden></div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="g">
+      <div><b>Messina Autotrasporti</b><span class="muted">Via Cascina Nuova 1, Lacchiarella (MI)</span></div>
+      <div><b>Sito</b><a href="#servizi">Servizi</a><a href="#flotta">Flotta</a><a href="#magazzino">Magazzino</a><a href="#preventivo">Preventivo</a></div>
+      <div><b>Altro</b><a href="#" data-link="portaleUrl">Area clienti</a><a href="#" data-link="corporationUrl">Messina Corporation</a><a href="privacy.html">Privacy</a></div>
+    </div>
+    <p class="legal">[Ragione sociale] P.IVA [da inserire]. Questo sito non usa cookie di profilazione.</p>
+  </div>
+</footer>
+<script>// Siti pubblici: collegamenti dalla configurazione e invio dei moduli.
+// Collegato: manda alla funzione «richiesta-sito» di Supabase con la chiave publishable.
+// Dentro il pannello di prova (nessuna configurazione): passa la richiesta al pannello, che la mette nella Mail del gestionale.
+(function () {
+  var cfg = window.MESSINA || {};
+  var incorporato = window.parent !== window;
+  document.querySelectorAll('[data-link]').forEach(function (a) {
+    var u = cfg[a.getAttribute('data-link')];
+    if (u) a.setAttribute('href', u);
+  });
+  if (incorporato) {
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('[data-link]');
+      if (!a || cfg[a.getAttribute('data-link')]) return;
+      e.preventDefault();
+      parent.postMessage({ tipo: 'messina-vai', dove: a.getAttribute('data-link') }, '*');
+    });
+  }
+
+  document.querySelectorAll('form[data-sito]').forEach(function (f) {
+    var esito = f.querySelector('.esito');
+    var btn = f.querySelector('button[type=submit]');
+    var testoBtn = btn.textContent;
+    function mostra(tipo, msg) { esito.hidden = false; esito.className = 'esito ' + tipo; esito.textContent = msg; esito.focus(); }
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!f.reportValidity()) return;
+      var d = new FormData(f), dettagli = {};
+      f.querySelectorAll('[data-dettaglio]').forEach(function (el) {
+        var k = el.getAttribute('data-dettaglio');
+        if (el.type === 'checkbox') { if (el.checked) (dettagli[k] = dettagli[k] || []).push(el.value); }
+        else if (el.value.trim()) dettagli[k] = el.value.trim();
+      });
+      var corpo = {
+        sito: f.getAttribute('data-sito'), nome: d.get('nome'), azienda: d.get('azienda'), email: d.get('email'),
+        telefono: d.get('telefono'), note: d.get('note'), dettagli: dettagli, privacy: !!d.get('privacy'), sito_web: d.get('sito_web') || '',
+      };
+      btn.disabled = true; btn.textContent = 'Invio in corso';
+      var invio;
+      if (cfg.supabaseUrl && cfg.supabaseKey) {
+        invio = fetch(cfg.supabaseUrl + '/functions/v1/richiesta-sito', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: cfg.supabaseKey, Authorization: 'Bearer ' + cfg.supabaseKey },
+          body: JSON.stringify(corpo),
+        }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.errore || 'Invio non riuscito'); }); });
+      } else if (incorporato) {
+        parent.postMessage({ tipo: 'messina-sito', corpo: corpo }, '*');
+        invio = new Promise(function (ok) { setTimeout(ok, 450); });
+      } else {
+        invio = Promise.reject(new Error('Il modulo si attiva quando il sito è collegato. Nel frattempo scriveteci una mail.'));
+      }
+      invio.then(function () {
+        f.reset();
+        mostra('ok', f.getAttribute('data-ok'));
+      }, function (err) {
+        mostra('ko', err.message || 'Invio non riuscito: riprovate o scriveteci una mail.');
+      }).then(function () { btn.disabled = false; btn.textContent = testoBtn; });
+    });
+  });
+})();
+</script>
+</body>
+</html>
