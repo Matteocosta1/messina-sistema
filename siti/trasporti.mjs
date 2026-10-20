@@ -3,30 +3,6 @@
 // articolo Italia Daily News 24 del 3/5/2023 (storia e famiglia). Le parti tra [parentesi] o con «bozza» sono da confermare.
 import { href, intest, sezione, righe, passi, faq, dati, azioni, modulo, dett, scelta, chips, recapiti, bozza } from './parti.mjs';
 
-// ---- mappa dei giri (unico movimento della pagina) ----
-const P = ([lon, lat]) => [Math.round((lon - 7.3) * 100 + 14), Math.round((46.02 - lat) * 140 + 12)];
-const BASE = P([9.13, 45.32]);
-const CITTA = [
-  ['Torino', [7.69, 45.07], 's', -0.14], ['Novara', [8.62, 45.45], 'n', 0.12], ['Bergamo', [9.67, 45.70], 'n', -0.12], ['Brescia', [10.21, 45.54], 'n', -0.12],
-  ['Verona', [10.99, 45.44], 'n', -0.02], ['Padova', [11.88, 45.41], 's', 0.09], ['Venezia', [12.33, 45.44], 'n', -0.12],
-  ['Piacenza', [9.69, 45.05], 'e', 0.12], ['Bologna', [11.34, 44.49], 's', 0.12], ['Genova', [8.93, 44.41], 's', -0.12],
-];
-function mappa() {
-  const [bx, by] = BASE;
-  let giri = '', punti = '';
-  CITTA.forEach(([nome, ll, pos, k], i) => {
-    const [x, y] = P(ll);
-    const dx = x - bx, dy = y - by, l = Math.hypot(dx, dy);
-    const cx = Math.round(bx + dx / 2 - dy * k), cy = Math.round(by + dy / 2 + dx * k);
-    giri += `<path class="giro" style="--i:${i};--l:${Math.ceil(l * 1.06 + 4)}" d="M${bx} ${by} Q${cx} ${cy} ${x} ${y}"/>`;
-    const t = pos === 'n' ? `x="${x}" y="${y - 9}" text-anchor="middle"` : pos === 's' ? `x="${x}" y="${y + 17}" text-anchor="middle"` : `x="${x + 9}" y="${y + 4}"`;
-    punti += `<g class="citta" style="--i:${i}"><circle cx="${x}" cy="${y}" r="4"/><text ${t}>${nome}</text></g>`;
-  });
-  let griglia = '';
-  for (let y = 36; y < 262; y += 14) for (let x = 8; x < 556; x += 14) griglia += `M${x} ${y}h.01`;
-  return `<svg viewBox="0 30 560 232" role="img" aria-hidden="true"><path class="puntini" d="${griglia}" stroke="rgba(17,18,20,.14)" stroke-width="2.2" stroke-linecap="round"/>${giri}${punti}<g class="base"><circle class="r" cx="${bx}" cy="${by}" r="7"/><circle class="c" cx="${bx}" cy="${by}" r="7"/><text x="${bx - 6}" y="${by + 34}" text-anchor="end">Lacchiarella</text></g></svg>`;
-}
-
 // ---- mezzi disegnati in scala ----
 const ruota = (x, y, r) => `<circle class="ruota" cx="${x}" cy="${y}" r="${r}"/><circle class="cerchio" cx="${x}" cy="${y}" r="${r * 0.36}"/>`;
 const SVG = {
@@ -61,7 +37,7 @@ const MAIL = (u) => `<a href="mailto:${u}@messina-autotrasporti.it">${u}@messina
 const MAPPA_URL = 'https://www.google.com/maps/search/?api=1&query=Via+Cascina+Nuova+1+20084+Lacchiarella+MI';
 
 const SERVIZI = [
-  { t: 'Distribuzione e trasporto', link: 'servizi/trasporto', tag: 'Bancali e colli', p: 'Consegne in giornata o su appuntamento in tutto il Nord Italia, con sponda idraulica, consegna al piano e fascia oraria quando serve.', punti: ['Collettame e carichi completi', 'Firma, foto e posizione a ogni consegna'] },
+  { t: 'Distribuzione e trasporto', link: 'servizi/trasporto', tag: 'Bancali e colli', p: 'Consegne in giornata o su appuntamento, con sponda idraulica, consegna al piano e fascia oraria quando serve.', punti: ['Collettame e carichi completi', 'Firma, foto e posizione a ogni consegna'] },
   { t: 'Magazzino e logistica', link: 'servizi/magazzino', tag: 'Area clienti', p: 'Custodiamo la vostra merce a Lacchiarella: ogni bancale ha un codice e un posto, controllato con lo scanner a ogni movimento.', punti: ['Giacenze visibili dal vivo', 'Preparazione ordini e merce di passaggio in giornata'] },
   { t: 'Logistica IT', link: 'servizi/logistica-it', tag: 'Seriali e IMEI', p: 'PC e telefoni aziendali preparati per ogni dipendente, consegnati in sede e ritirati a fine vita, tutto tracciato per numero di serie.', punti: ['Etichette cespite e accessori per utente', 'Busta di reso per il dispositivo vecchio'] },
   { t: 'Giacenze e resi', link: 'servizi/giacenze-resi', tag: 'Avviso in giornata', p: 'Se il destinatario non c\'è, la merce torna al sicuro in magazzino e vi avvisiamo il giorno stesso. Decidete voi come procedere.', punti: ['Riconsegna, reso o ritiro in sede', 'Resi dai vostri clienti gestiti per voi'] },
@@ -91,11 +67,11 @@ const sito = {
 const P2 = (path, titolo, descrizione, html) => sito.pagine.push({ path, titolo, descrizione, html });
 
 // ======================= HOME =======================
-P2('', 'Messina Autotrasporti', 'Trasporto merci, magazzino conto terzi e logistica IT da Lacchiarella (Milano) per tutto il Nord Italia. Ogni consegna con firma, foto e posizione.', `
-<div class="hero"><div class="wrap g">
+P2('', 'Messina Autotrasporti', 'Trasporto merci, magazzino conto terzi e logistica IT da Lacchiarella (Milano). Ogni consegna con firma, foto e posizione.', `
+<div class="hero"><div class="wrap g g1">
   <div>
     <h1>Ritiriamo, custodiamo, consegniamo.</h1>
-    <p class="sub">Trasporto merci, magazzino conto terzi e logistica del materiale informatico, da Lacchiarella per tutto il Nord Italia. Ogni consegna arriva con firma, foto e posizione.</p>
+    <p class="sub">Trasporto merci, magazzino conto terzi e logistica del materiale informatico, da Lacchiarella. Ogni consegna arriva con firma, foto e posizione.</p>
     <div class="cta"><a class="btn" href="${href('preventivo')}">Chiedi un preventivo</a><a class="btn ghost" href="${href('servizi')}">Cosa facciamo</a></div>
     <div class="facts">
       <div><b>Dal 2000</b><span>un'azienda di famiglia</span></div>
@@ -103,9 +79,6 @@ P2('', 'Messina Autotrasporti', 'Trasporto merci, magazzino conto terzi e logist
       <div><b>Magazzino a Lacchiarella</b><span>scaffali a 6 piani</span></div>
     </div>
   </div>
-  <figure class="mappa glass" aria-label="Giri in partenza da Lacchiarella verso le città del Nord Italia">
-    <div class="cap"><b>Ogni mattina da Lacchiarella</b><span class="muted">Nord Italia</span></div>${mappa()}
-  </figure>
 </div></div>
 <div class="wrap">${azioni([['traccia', 'Traccia una spedizione', 'Con il numero della bolla'], ['preventivo', 'Chiedi un preventivo', 'Risposta dal nostro commerciale'], ['ritiro', 'Prenota un ritiro', 'Per i clienti già attivi'], ['', 'Area clienti', 'Giacenze, spedizioni, fatture', 'portaleUrl']])}</div>
 ${sezione('Quattro servizi, un solo interlocutore.', 'Dalla bolla alla fattura ogni passaggio è registrato nel nostro gestionale: sapete sempre dove si trova la vostra merce.', righe(SERVIZI), 'servizi')}
@@ -145,19 +118,18 @@ P2('servizi', 'Servizi', 'Distribuzione, magazzino conto terzi, logistica IT, gi
     <tr><td>Prova di consegna</td><td>Firma, foto della bolla e posizione, sempre disponibili</td></tr>
     </tbody></table></div>`, '', 'padding-top:0'));
 
-P2('servizi/trasporto', 'Distribuzione e trasporto', 'Collettame, carichi completi e consegne dedicate in tutto il Nord Italia, con sponda, consegna al piano e prova di consegna digitale.',
+P2('servizi/trasporto', 'Distribuzione e trasporto', 'Collettame, carichi completi e consegne dedicate, con sponda, consegna al piano e prova di consegna digitale.',
   intest([['servizi', 'Servizi'], [null, 'Distribuzione']], 'Distribuzione e trasporto', 'Dal singolo collo al bilico completo, con i nostri mezzi e i nostri autisti: non affidiamo le vostre consegne ad altri vettori.') +
   sezione('Cosa trasportiamo.', 'Merce su bancale e a colli, per aziende, negozi, cantieri e consegne a privati per conto dei nostri clienti.', righe([
     { t: 'Collettame', tag: 'Da 1 collo', p: 'Spedizioni piccole e medie raggruppate nei giri del giorno. Ritiro da voi o consegna diretta a Lacchiarella.' },
-    { t: 'Carichi completi', tag: 'Fino a 33 bancali', p: 'Un mezzo dedicato da un punto all\'altro, dalla motrice al bilico. Partenza al mattino, consegna in giornata nel Nord.' },
+    { t: 'Carichi completi', tag: 'Fino a 33 bancali', p: 'Un mezzo dedicato da un punto all\'altro, dalla motrice al bilico. Partenza al mattino, consegna in giornata.' },
     { t: 'Consegne dedicate', tag: 'Su richiesta', p: 'Un mezzo e un autista per voi, per lanci di prodotto, allestimenti, urgenze o consegne che richiedono attenzione particolare.' },
     { t: 'Consegne a domicilio', tag: 'Per conto vostro', p: 'Consegniamo ai vostri clienti finali con appuntamento, consegna al piano e avviso prima dell\'arrivo.' },
   ])) +
   sezione('Come arriva la vostra spedizione.', 'Ogni passaggio è registrato dallo scanner o dall\'app dell\'autista.', passi([
     ['Ritiro o ingresso', 'Ritiriamo da voi o ricevete a Lacchiarella.'], ['Scansione', 'Ogni collo è letto prima di salire sul mezzo.'], ['Giro ottimizzato', 'Percorsi calcolati per camion, non per auto.'], ['Avviso', 'Il destinatario sa quando arriviamo.'], ['Prova di consegna', 'Firma, foto della bolla e posizione GPS.']]), '', 'padding-top:0') +
-  sezione('Dove arriviamo.', 'Partiamo ogni mattina da Lacchiarella, a sud di Milano. Copriamo con mezzi propri Lombardia, Piemonte, Liguria, Emilia-Romagna e Veneto; per le altre destinazioni chiedeteci un preventivo.', `<div class="mappa glass solo">${mappa()}</div>`, '', 'padding-top:0') +
   sezione('Domande frequenti.', '', faq([
-    ['In quanto tempo consegnate?', 'Nel Nord Italia di solito in giornata o il giorno lavorativo dopo il ritiro, a seconda di zona e orario. Per consegne con appuntamento concordiamo la data con il destinatario.'],
+    ['In quanto tempo consegnate?', 'Di solito in giornata o il giorno lavorativo dopo il ritiro, a seconda della destinazione e dell\'orario. Per consegne con appuntamento concordiamo la data con il destinatario.'],
     ['Consegnate di sabato?', 'Sì, il sabato mattina su richiesta. La domenica solo per lavori concordati.'],
     ['Posso sapere dov\'è la mia spedizione?', `Sì: con il numero della bolla nella pagina <a href="${href('traccia')}">Traccia</a>, oppure dall'area clienti con tutte le vostre spedizioni.`],
   ]), '', 'padding-top:0'));
@@ -203,7 +175,7 @@ P2('servizi/giacenze-resi', 'Giacenze e resi', 'Mancate consegne, giacenze e res
 P2('settori', 'Settori', 'Tecnologia, energia, banche, beverage, cosmetica ed e-commerce: come lavoriamo per ogni settore.',
   intest([[null, 'Settori']], 'Settori', 'Ogni settore ha le sue regole di consegna. Le conosciamo perché le seguiamo ogni giorno.') +
   sezione('', '', righe([
-    { t: 'Tecnologia ed elettronica', tag: 'Seriali', p: 'Distribuzione di prodotti di elettronica nel Nord Italia, con merce di alto valore tracciata collo per collo e consegne su appuntamento.' },
+    { t: 'Tecnologia ed elettronica', tag: 'Seriali', p: 'Distribuzione di prodotti di elettronica, con merce tracciata collo per collo e consegne su appuntamento.' },
     { t: 'Energia e impianti', tag: 'Portale dal vivo', p: 'Materiali per cantieri e sedi tecniche, con magazzino dedicato e seriali visibili al cliente 24 ore su 24.' },
     { t: 'Banche e assicurazioni', tag: 'IMEI e cespiti', p: 'Rinnovi di telefoni e PC per migliaia di dipendenti, con etichette cespite, accessori per utente e resi.', link: 'servizi/logistica-it', vai: 'Logistica IT' },
     { t: 'Beverage', tag: 'Consegna in cantina', p: 'Consegne a ristoranti, enoteche e privati con prenotazione, consegna al piano o in cantina.' },
@@ -260,7 +232,7 @@ P2('documenti', 'Documenti', 'Documenti di qualifica fornitore di Messina Autotr
 P2('lavora-con-noi', 'Lavora con noi', 'Posizioni aperte in Messina Autotrasporti: autisti con patente C e CE, magazzinieri, mulettisti, impiegati.',
   intest([[null, 'Lavora con noi']], 'Lavora con noi', 'Cerchiamo persone affidabili che vogliono lavorare in una squadra seria, con mezzi in ordine e strumenti nuovi.') +
   sezione('Chi cerchiamo.', '', righe([
-    { t: 'Autisti', tag: 'Patente C o CE', p: 'Distribuzione nel Nord Italia con rientro in giornata. Servono patente C o CE e carta di qualificazione del conducente (CQC merci).' },
+    { t: 'Autisti', tag: 'Patente C o CE', p: 'Distribuzione con rientro in giornata. Servono patente C o CE e carta di qualificazione del conducente (CQC merci).' },
     { t: 'Magazzinieri', tag: 'Lacchiarella', p: 'Ricevimento, preparazione e carico con lo scanner. Turni tra le 6 del mattino e la sera.' },
     { t: 'Mulettisti', tag: 'Patentino', p: 'Movimentazione bancali a scaffale. Serve l\'abilitazione all\'uso del carrello elevatore.' },
     { t: 'Ufficio', tag: 'Bolle e traffico', p: 'Gestione ordini, bolle e giri insieme al nostro ufficio traffico.' },
