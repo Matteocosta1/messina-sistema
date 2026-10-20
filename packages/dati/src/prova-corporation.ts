@@ -1,5 +1,6 @@
 // Dati e funzioni di prova in più per il Gestionale Corporation.
 import { estendiProva } from './prova';
+import './prova-ricambi';
 
 estendiProva(({ t, funzioni, viste }) => {
   // in Postgres lo stato del telefono è una colonna calcolata: qui la ricalcoliamo

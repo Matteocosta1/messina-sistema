@@ -29,7 +29,7 @@ export function Magazzino({ tab }: { tab?: string }) {
   </>);
 }
 
-// ------------------------------------------------------------------ Pianta e Contenuto
+// ------------------------------------------------------------------ Pianta e Articoli
 function Pianta({ cli }: { cli: string }) {
   const [s, set] = useStato({ scaf: 0, posto: '' });
   const { dati } = useDati(async (d) => {
@@ -52,7 +52,11 @@ function Pianta({ cli }: { cli: string }) {
   const terra = dati.posti.filter((p) => p.zona !== 'Scaffale');
   const zone = [...new Set(terra.map((p) => p.zona))];
   const righe = sc.filter((p) => p.scaffale === sel).sort((a, b) => b.piano - a.piano || a.numero - b.numero);
-  const giorni = (iso: string) => { const g = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 86400000)); return g === 1 ? '1 giorno' : g + ' giorni'; };
+  // Articoli: quantità e tipo di tutto quello che c'è nel posto (es. «10 iPhone, 10 iPad»); Arrivo: data completa del primo bancale entrato
+  const articoli = (b: any[]) => { const q = new Map<string, number>();
+    b.forEach((x) => (x.contenuto ?? []).forEach((c: any) => q.set(c.articolo, (q.get(c.articolo) ?? 0) + Number(c.quantita ?? 0))));
+    return q.size ? [...q].map(([a, n]) => `${num(n)} ${a}`).join(', ') : b.map((x) => 'Bancale ' + x.codice).join(', '); };
+  const arrivo = (b: any[]) => new Date(b.map((x) => x.creato_il).sort()[0]).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const pianta = (
     <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
       <div className="glass card" style={{ flex: '1 1 420px', minWidth: 0 }}>
@@ -70,14 +74,14 @@ function Pianta({ cli }: { cli: string }) {
           return <div key={z}><b>{z}</b><br />{n === 1 ? '1 bancale' : n + ' bancali'}</div>; }) : <div>Nessuna zona a terra registrata.</div>}</div>
       </div>
       <div className="glass" style={{ flex: '1 1 380px', minWidth: 0 }}><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Scaffale S{pad(sel)} · {prevalente(sel)}</div>
-        <div className="tbox"><table className="t"><thead><tr><th>Posto</th><th>Piano</th><th>Cliente</th><th>Cosa c’è</th><th>Da</th></tr></thead><tbody>
+        <div className="tbox"><table className="t"><thead><tr><th>Posto</th><th>Piano</th><th>Cliente</th><th>Articoli</th><th>Arrivo</th></tr></thead><tbody>
           {righe.map((p) => { const b = inPosto(p.id); const full = b.length > 0;
             return <tr key={p.id} className={full ? 'click' : undefined} onClick={full ? () => set({ posto: p.id }) : undefined} style={s.posto === p.id ? { background: 'var(--soft)' } : undefined}>
               <td><b>{p.codice}</b></td><td>Piano {p.piano}</td><td>{full ? b[0].clienti?.nome : <span className="lbl">Libero</span>}</td>
-              <td>{full ? (b[0].contenuto?.[0]?.articolo ?? 'Bancale ' + b[0].codice) + (b.length > 1 ? ` (+${b.length - 1})` : '') : '—'}</td><td>{full ? giorni(b[0].creato_il) : '—'}</td></tr>; })}
+              <td>{full ? articoli(b) : '—'}</td><td>{full ? arrivo(b) : '—'}</td></tr>; })}
         </tbody></table></div></div>
     </div>);
-  if (!s.posto) return <><p className="lbl" style={{ margin: 0 }}>Tocca un posto pieno nella tabella per vedere il suo contenuto.</p>{pianta}</>;
+  if (!s.posto) return <><p className="lbl" style={{ margin: 0 }}>Tocca un posto pieno nella tabella per vedere i suoi articoli.</p>{pianta}</>;
   const p = dati.posti.find((x) => x.id === s.posto)!;
   return <><Contenuto posto={p} bancali={inPosto(p.id)} />{pianta}</>;
 }
@@ -99,7 +103,7 @@ function Contenuto({ posto, bancali }: { posto: any; bancali: any[] }) {
   const codici = (c: string[]) => !c?.length ? '—' : c.length <= 2 ? c.join(', ') : `${c.slice(0, 2).join(', ')} +${c.length - 2}`;
   return (
     <div className="glass card stack">
-      <div className="row between"><h3 style={{ fontSize: 20 }}>Contenuto · {posto.codice}</h3><span className="lbl">{bancali[0]?.clienti?.nome} · {bancali.map((b) => b.codice).join(', ')}</span></div>
+      <div className="row between"><h3 style={{ fontSize: 20 }}>Articoli · {posto.codice}</h3><span className="lbl">{bancali[0]?.clienti?.nome} · {bancali.map((b) => b.codice).join(', ')}</span></div>
       <div className="tbox"><table className="t nw"><thead><tr><th>Articolo</th><th>Quantità</th><th>Codici</th><th>Inserito</th><th>Chi</th><th>Ora</th></tr></thead><tbody>
         {righe.map((x) => <tr key={x.id} className={x.inserito === 'Manuale' ? 'korow' : ''}><td><b>{x.articolo}</b></td>
           <td>{mano ? <input className="input" type="number" min={0} style={{ width: 90, minHeight: 34, padding: '4px 8px' }} value={mano[x.id] ?? x.quantita} onChange={(e) => setMano({ ...mano, [x.id]: e.target.value })} aria-label={'Quantità ' + x.articolo} /> : x.quantita}</td>

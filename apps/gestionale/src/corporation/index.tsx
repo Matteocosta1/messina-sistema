@@ -6,7 +6,7 @@ import { Telecamere } from '../telecamere';
 import { Shell, vociPer, useApp, useDati, useAzione, useStato, MailView, type Mail, Errore, hm, Mese, num, eur0, oggiISO, meseISO } from '../core';
 
 const LAPTOP = <svg width="84" height="58" viewBox="0 0 64 44" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="10" y="4" width="44" height="28" rx="2" /><path d="M2 38h60l-4 4H6z" /></svg>;
-const TITOLI: Record<string, string> = { home: 'Home', mail: 'Mail', lotti: 'Lotti', inv: 'Inventario', ordini: 'Ordini', stage: 'Stage Computer', stageTel: 'Stage Cellulari', telecamere: 'Telecamere' };
+const TITOLI: Record<string, string> = { home: 'Home', mail: 'Mail', lotti: 'Lotti', inv: 'Inventario', ordini: 'Ordini', stage: 'Stage Computer', stageTel: 'Stage Cellulari', ricambi: 'Ricambi', telecamere: 'Telecamere' };
 const giorniDa = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 const giornoLocale = (iso: string) => { const d = new Date(iso); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const quandoOrdine = (iso: string) => { const g = giornoLocale(iso), o = oggiISO(); if (g === o) return hm(iso);
@@ -25,7 +25,7 @@ export function Corporation() {
   const voci = vociPer(io);
   const s = voci.some((v) => v.id === sez) ? sez : 'home';
   const corpo = s === 'mail' ? <MailCorp onCerca={(q) => setRicerca({ sez: 'inv', q })} /> : s === 'lotti' ? <Lotti q={cerca} /> : s === 'inv' ? <Inventario q={cerca} />
-    : s === 'ordini' ? <Ordini q={cerca} /> : s === 'stage' ? <Stage /> : s === 'stageTel' ? <StageTel q={cerca} /> : s === 'telecamere' ? <Telecamere /> : <Home />;
+    : s === 'ordini' ? <Ordini q={cerca} /> : s === 'stage' ? <Stage /> : s === 'stageTel' ? <StageTel q={cerca} /> : s === 'ricambi' ? <Ricambi q={cerca} /> : s === 'telecamere' ? <Telecamere /> : <Home />;
   return <Shell voci={voci} titolo={TITOLI[s]} cerca={cerca} onCerca={setCerca}>{corpo}</Shell>;
 }
 
@@ -186,7 +186,7 @@ function Inventario({ q }: { q: string }) {
   const posto = (d: any) => d.bancali?.posti?.codice ?? (d.bancali ? 'Ricevimento' : '—');
   const filters = <div className="row">
     {marche.map((x) => <Chip key={x} on={s.brand === x} onClick={() => set({ brand: x })}>{x}</Chip>)}<span style={{ width: 8 }} />
-    {['Tutti', 'A', 'B', 'C'].map((x) => <Chip key={x} on={s.grado === x} onClick={() => set({ grado: x })}>{x === 'Tutti' ? 'Tutti i gradi' : 'Grado ' + x}</Chip>)}
+    {['Tutti', 'A', 'B', 'C', 'D'].map((x) => <Chip key={x} on={s.grado === x} onClick={() => set({ grado: x })}>{x === 'Tutti' ? 'Tutti i gradi' : 'Grado ' + x}</Chip>)}
     <div className="row" style={{ marginLeft: 'auto', gap: 4, padding: 4, borderRadius: 999 }}>
       <Chip on={s.vista === 'schede'} onClick={() => set({ vista: 'schede' })}>Schede</Chip><Chip on={s.vista === 'tabella'} onClick={() => set({ vista: 'tabella' })}>Tabella</Chip></div>
   </div>;
@@ -235,6 +235,71 @@ function Scheda({ d, onChiudi, io, db }: { d: any; onChiudi: () => void; io: str
       <div className="row">{!venduto && <Btn onClick={salva} disabled={az.inCorso}>Salva</Btn>}<Btn ghost onClick={onChiudi}>Chiudi</Btn></div>
     </div>
   );
+}
+
+// ------------------------------------------------------------------ Ricambi
+// Pezzi smontati dai computer che non si vendono interi: ogni ricambio resta legato al computer e al lotto da cui viene,
+// e quello che incassa conta nel recupero del lotto (vista lotti_conti). Le regole le fa il database (trigger ricambi_regole).
+const TIPI_RICAMBIO = ['Display', 'Tastiera', 'Batteria', 'Scheda madre', 'Disco', 'Memoria', 'Scocca', 'Alimentatore', 'Altro'];
+function Ricambi({ q }: { q: string }) {
+  const { db } = useApp();
+  const az = useAzione();
+  const [s, set] = useStato({ nuovo: false, seriale: '', tipo: 'Display', descrizione: '', prezzo: '', vendi: '' as string, canale: 'eBay', venduto: '', msg: '' });
+  const { dati } = useDati(async (d) => {
+    const [R, smontati] = await Promise.all([
+      d.from<any>('ricambi').select('*,device(seriale,marca,modello),lotti(codice)').order('creato_il', { ascending: false }),
+      d.from<any>('device').select('id').eq('stato', 'Smontato'),
+    ]);
+    return { R, smontati };
+  }, []);
+  if (!dati) return null;
+  const { R } = dati;
+  const meseOra = meseISO();
+  const lista = R.filter((r) => has(q, r.descrizione, r.tipo, r.device?.seriale, r.device?.modello, r.lotti?.codice));
+  const vendutiMese = R.filter((r) => r.stato === 'Venduto' && String(r.venduto_il ?? '').startsWith(meseOra)).reduce((a, r) => a + Number(r.incassato ?? 0), 0);
+  const prezzo = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.')));
+  const smonta = () => az.esegui(async () => {
+    const [d] = await db.from<any>('device').select('id').eq('seriale', s.seriale.trim());
+    if (!d) throw new Error('Nessun computer con il seriale ' + s.seriale.trim());
+    await db.from('ricambi').insert({ device_id: d.id, tipo: s.tipo, descrizione: s.descrizione.trim() || s.tipo, prezzo: prezzo(s.prezzo) });
+  }).then((ok: boolean) => ok && set({ nuovo: false, seriale: '', descrizione: '', prezzo: '', msg: 'Ricambio registrato: il computer risulta smontato e non si vende più intero.' }));
+  const inVendita = (r: any) => az.esegui(() => db.from('ricambi').update({ stato: 'Disponibile', siti: ['Sito', 'eBay'] }).eq('id', r.id))
+    .then((ok: boolean) => ok && set({ msg: `${r.descrizione}: in vendita sul sito ed eBay.` }));
+  const vendi = (r: any) => az.esegui(() => db.from('ricambi').update({ stato: 'Venduto', canale: s.canale, venduto_prezzo: prezzo(s.venduto) ?? Number(r.prezzo) }).eq('id', r.id))
+    .then((ok: boolean) => ok && set({ vendi: '', venduto: '', msg: `${r.descrizione}: venduto, l’incasso entra nel recupero del lotto ${r.lotti?.codice ?? ''}.` }));
+  const statoR = (x: string) => x === 'Venduto' ? <Pill tone="ok">Venduto</Pill> : x === 'Scartato' ? <Pill tone="red">Scartato</Pill> : <Pill tone="dark">{x}</Pill>;
+  return (<>
+    <div className="grid g4">
+      <div className="glass card"><div className="lbl">Ricambi a magazzino</div><div className="big">{num(R.filter((r) => r.stato === 'Disponibile' || r.stato === 'Da vendere').length)}</div></div>
+      <div className="glass card"><div className="lbl">Venduti a {Mese().toLowerCase()}</div><div className="big">{eur0(vendutiMese)}</div><div className="lbl">già nel recupero dei lotti</div></div>
+      <div className="glass card"><div className="lbl">Computer smontati</div><div className="big">{num(dati.smontati.length)}</div><div className="lbl">non si vendono più interi</div></div>
+    </div>
+    {s.msg && <Msg>{s.msg}</Msg>}
+    <Errore testo={az.errore} />
+    {s.nuovo ? (
+      <div className="glass card stack">
+        <b>Smonta un computer</b>
+        <div className="row" style={{ alignItems: 'flex-end' }}>
+          <label className="field"><span className="lbl">Seriale del computer</span><input className="input" value={s.seriale} onChange={(e) => set({ seriale: e.target.value })} /></label>
+          <label className="field"><span className="lbl">Tipo</span><select className="input" value={s.tipo} onChange={(e) => set({ tipo: e.target.value })}>{TIPI_RICAMBIO.map((t) => <option key={t}>{t}</option>)}</select></label>
+          <label className="field"><span className="lbl">Descrizione</span><input className="input" value={s.descrizione} onChange={(e) => set({ descrizione: e.target.value })} /></label>
+          <label className="field"><span className="lbl">Prezzo</span><input className="input" style={{ maxWidth: 120 }} inputMode="decimal" value={s.prezzo} onChange={(e) => set({ prezzo: e.target.value })} /></label>
+        </div>
+        <div className="row"><Btn onClick={smonta} disabled={az.inCorso || !s.seriale.trim()}>Registra</Btn><Btn ghost onClick={() => set({ nuovo: false })}>Annulla</Btn></div>
+      </div>) : <div className="row"><Btn onClick={() => set({ nuovo: true, msg: '' })}>Smonta un computer</Btn></div>}
+    <div className="glass tbox"><table className="t nw"><thead><tr><th>Ricambio</th><th>Da</th><th>Seriale del computer</th><th>Lotto</th><th>Prezzo</th><th>Stato</th><th /></tr></thead><tbody>
+      {lista.length ? lista.map((r) => <tr key={r.id}>
+        <td><b>{r.descrizione}</b></td><td>{r.device?.modello ?? '—'}</td><td>{r.device?.seriale ?? '—'}</td><td>{r.lotti?.codice ?? '—'}</td>
+        <td>{r.prezzo != null ? '€ ' + num(Number(r.prezzo)) : '—'}</td><td>{statoR(r.stato)}</td>
+        <td>{r.stato === 'Da vendere' ? <Btn ghost sm onClick={() => inVendita(r)} disabled={az.inCorso}>Metti in vendita</Btn>
+          : r.stato === 'Disponibile' ? (s.vendi === r.id
+            ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><select className="input" value={s.canale} onChange={(e) => set({ canale: e.target.value })}>{['eBay', 'Sito', 'Subito', 'Di persona'].map((c) => <option key={c}>{c}</option>)}</select>
+              <input className="input" style={{ maxWidth: 90 }} inputMode="decimal" placeholder={String(r.prezzo)} value={s.venduto} onChange={(e) => set({ venduto: e.target.value })} /><Btn sm onClick={() => vendi(r)} disabled={az.inCorso}>Conferma</Btn></span>
+            : <Btn ghost sm onClick={() => set({ vendi: r.id, venduto: '' })}>Venduto</Btn>) : null}</td></tr>)
+        : <tr><td colSpan={7} className="lbl">Nessun ricambio.</td></tr>}
+    </tbody></table></div>
+    <p className="lbl" style={{ margin: 0 }}>Prima di smontare, il disco passa dalla cancellazione certificata come tutto il resto: un disco non si vende mai senza rapporto.</p>
+  </>);
 }
 
 // ------------------------------------------------------------------ Ordini

@@ -2,9 +2,11 @@ import React, { useEffect } from 'react';
 import { Badge, Btn, Msg, Pill } from '@messina/ui';
 import { useApp, useDati, oggiISO, meseISO, eur0, num, Mese, quando } from '../core';
 
-const SEZ = ['Magazzino', 'Missioni', 'Bolle', 'Presenze', 'Fatturazione', 'Telepass'] as const;
+const SEZ = ['Magazzino', 'Missioni', 'Bolle', 'Presenze', 'Fatturazione', 'Telepass', 'Satellitare'] as const;
+/** il satellitare lo vede solo la direzione: agli altri la scheda non compare (non sarebbe mai piena) */
+const sezioniPer = (ruolo: string) => SEZ.filter((x) => x !== 'Satellitare' || ruolo === 'direzione');
 /** dove si risolve ogni sezione e il colore della pill nella Home */
-const PILL: Record<string, 'red' | undefined> = { Magazzino: 'red', Missioni: 'red', Bolle: 'red', Presenze: 'red', Fatturazione: 'red', Telepass: 'red' };
+const PILL: Record<string, 'red' | undefined> = { Magazzino: 'red', Missioni: 'red', Bolle: 'red', Presenze: 'red', Fatturazione: 'red', Telepass: 'red', Satellitare: 'red' };
 
 export function Home() {
   const { vai } = useApp();
@@ -69,7 +71,7 @@ export function Home() {
 }
 
 export function Anomalie({ sezione, titolo }: { sezione?: string; titolo: (t: string | null) => void }) {
-  const { vai } = useApp();
+  const { vai, io } = useApp();
   const sez = sezione ? decodeURIComponent(sezione) : null;
   useEffect(() => { titolo(sez); }, [sez, titolo]);
   const { dati: AN } = useDati((db) => db.from<any>('anomalie').select('*').order('da', { ascending: false }), []);
@@ -82,7 +84,7 @@ export function Anomalie({ sezione, titolo }: { sezione?: string; titolo: (t: st
       </div>
     </div>
     <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(min(300px,100%),1fr))' }}>
-      {SEZ.map((x) => { const n = cnt(x); return (
+      {sezioniPer(io.ruolo).map((x) => { const n = cnt(x); return (
         <button key={x} type="button" className="glass card" onClick={() => vai('anomalie/' + x)} style={{ textAlign: 'left', cursor: 'pointer', font: 'inherit', ...(n ? {} : { opacity: .6 }) }}>
           <div className="row between"><b style={{ fontSize: 18 }}>{x}</b>{n ? <Badge n={n} /> : <Pill tone="ok">Ok</Pill>}</div>
           <div className="lbl" style={{ marginTop: 6 }}>{n ? (n === 1 ? '1 anomalia' : n + ' anomalie') : 'Nessuna'}</div>

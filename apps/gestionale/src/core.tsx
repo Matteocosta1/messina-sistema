@@ -74,6 +74,7 @@ export const C_NAV: Voce[] = [
   { id: 'ordini', nome: 'Ordini', ruoli: ['vendite', 'magazzino'] },
   { id: 'stage', nome: 'Stage Computer', ruoli: ['vendite', 'stage'] },
   { id: 'stageTel', nome: 'Stage Cellulari', ruoli: ['vendite', 'stage'] },
+  { id: 'ricambi', nome: 'Ricambi', ruoli: ['vendite', 'stage', 'magazzino', 'amministrazione'] },
   { id: 'telecamere', nome: 'Telecamere', ruoli: [] },     // solo direzione: lo stesso capannone
 ];
 export function vociPer(io: Profilo): Voce[] {

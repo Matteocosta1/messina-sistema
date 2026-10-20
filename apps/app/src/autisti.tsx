@@ -27,6 +27,7 @@ export function Autisti() {
   const [why, setWhy] = useState('');
   const [esito, setEsito] = useState<'rico' | 'dopo' | 'giac'>('giac');
   const [conf, setConf] = useState<Record<string, { colli?: boolean; acc?: boolean }>>({});
+  const [mancDa, setMancDa] = useState<'dett' | 'firma'>('dett');   // «Indietro» dal motivo torna alla pagina da cui si è venuti
   const vai = (s: Scr) => { setScr(s); window.scrollTo(0, 0); };
   if (errore) return <div className="pscr"><ErroreApp testo={errore} /></div>;
   if (g === null) return <div className="pscr"><div className="lbl">Carico il giro…</div></div>;
@@ -52,11 +53,11 @@ export function Autisti() {
   const c = conf[f.id] ?? {};
   const pronto = !!c.colli && !!c.acc && f.firmata;
   if (scr === 'dett') return <Dettaglio f={f} idx={idx} conf={c} conferma={(k) => setConf((x) => ({ ...x, [f.id]: { ...x[f.id], [k]: true } }))}
-    onBack={() => vai('lista')} onAvanti={() => vai('firma')} />;
-  if (scr === 'firma') return <FotoBolla f={f} soglia={soglia ?? 35} pronto={pronto} onBack={() => vai('dett')} onFatto={() => vai('lista')} onMancata={() => vai('mancata')} />;
+    onBack={() => vai('lista')} onAvanti={() => vai('firma')} onMancata={() => { setMancDa('dett'); vai('mancata'); }} />;
+  if (scr === 'firma') return <FotoBolla f={f} soglia={soglia ?? 35} pronto={pronto} onBack={() => vai('dett')} onFatto={() => vai('lista')} onMancata={() => { setMancDa('firma'); vai('mancata'); }} />;
   if (scr === 'mancata') return (
     <div className="pscr">
-      <button type="button" className="back" onClick={() => vai('firma')}>Indietro</button>
+      <button type="button" className="back" onClick={() => vai(mancDa)}>Indietro</button>
       <div className="lbl">Passo 1 di 2</div>
       <div className="ptitle">Perché non è stata consegnata?</div>
       {MOTIVI.map((x) => <button key={x} type="button" className="bigbtn ghost" style={{ textAlign: 'left', fontSize: 17 }} onClick={() => { if (x.startsWith('Altro')) vai('nota'); else { setWhy(x); vai('merce'); } }}>{x}</button>)}
@@ -74,7 +75,7 @@ export function Autisti() {
   return <Esito f={f} why={why} esito={esito} onBack={() => vai('mancata')} onFatto={() => vai('lista')} db={db} />;
 }
 
-function Dettaglio({ f, idx, conf, conferma, onBack, onAvanti }: { f: Fermata; idx: number; conf: { colli?: boolean; acc?: boolean }; conferma: (k: 'colli' | 'acc') => void; onBack: () => void; onAvanti: () => void }) {
+function Dettaglio({ f, idx, conf, conferma, onBack, onAvanti, onMancata }: { f: Fermata; idx: number; conf: { colli?: boolean; acc?: boolean }; conferma: (k: 'colli' | 'acc') => void; onBack: () => void; onAvanti: () => void; onMancata: () => void }) {
   const { db } = useApp();
   const scan = useScan();
   const az = useAzione();
@@ -134,6 +135,8 @@ function Dettaglio({ f, idx, conf, conferma, onBack, onAvanti }: { f: Fermata; i
           <button type="button" className="bigbtn" onClick={() => setFirma(true)} aria-label="Firma del cliente" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{big30(KI.pen(30))}</button></>)}
       <div style={{ flex: 1 }} />
       <button type="button" className="bigbtn" onClick={onAvanti} {...(d1 ? {} : off)}>Avanti</button>
+      {/* sempre attivo: se la merce non scende dal mezzo non c'è niente da scansionare */}
+      <button type="button" className="bigbtn ghost" onClick={onMancata}>Non Consegnato</button>
     </div>
   );
 }
@@ -179,7 +182,7 @@ function FotoBolla({ f, soglia, pronto, onBack, onFatto, onMancata }: { f: Ferma
       {stato === 2 && !pronto && <div className="lbl" style={{ color: 'var(--alert)', fontWeight: 600 }}>Per «Consegnato» servono anche Accessori e Firma confermati.</div>}
       <div style={{ flex: 1 }} />
       <button type="button" className="bigbtn" onClick={conferma} {...(stato === 2 && pronto && !az.inCorso ? {} : off)}>Consegnato</button>
-      <button type="button" className="bigbtn ghost" onClick={onMancata} {...(stato === 2 && !az.inCorso ? {} : off)}>Non consegnato</button>
+      <button type="button" className="bigbtn ghost" onClick={onMancata} {...(stato === 2 && !az.inCorso ? {} : off)}>Non Consegnato</button>
     </div>
   );
 }

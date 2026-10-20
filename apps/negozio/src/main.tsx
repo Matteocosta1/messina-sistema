@@ -14,15 +14,18 @@ declare global { interface Window { MESSINA?: Config } }
 const db = collega(window.MESSINA, motoreDiProva);
 
 // ------------------------------------------------------------------ dati
-interface Riga { modello: string; marca: string; cpu: string | null; ram: string | null; disco: string | null; schermo: string | null; gpu: string | null; grado: string; prezzo: number; disponibili: number }
+interface Riga { modello: string; marca: string; cpu: string | null; ram: string | null; disco: string | null; schermo: string | null; gpu: string | null; grado: string; prezzo: number; disponibili: number;
+  generazione?: string | null; batteria_min?: number | null; sistema_operativo?: string | null; tastiera?: string | null; porte?: string | null; rete?: string | null; webcam?: string | null; peso?: string | null; dati_cancellati?: boolean }
+interface Ricambio { id: string; tipo: string; descrizione: string; origine: string; prezzo: number }
 interface Prodotto { slug: string; marca: string; modello: string; spec: string; righe: Riga[]; da: number }
-type Condizione = 'Discreto' | 'Buono' | 'Ottimo';
-const CONDIZIONI: Condizione[] = ['Discreto', 'Buono', 'Ottimo'];
-const GRADO: Record<Condizione, string> = { Ottimo: 'A', Buono: 'B', Discreto: 'C' };
+type Condizione = 'Grado A' | 'Grado B' | 'Grado C' | 'Grado D';
+const CONDIZIONI: Condizione[] = ['Grado A', 'Grado B', 'Grado C', 'Grado D'];
+const GRADO: Record<Condizione, string> = { 'Grado A': 'A', 'Grado B': 'B', 'Grado C': 'C', 'Grado D': 'D' };
 const GDESC: Record<Condizione, string> = {
-  Ottimo: 'Grado A: quasi impossibile distinguerlo da nuovo. Al massimo micro-segni visibili da vicino.',
-  Buono: 'Grado B: leggeri segni d’uso sulla scocca. Schermo e tastiera in ordine. Funziona al 100%.',
-  Discreto: 'Grado C: segni evidenti d’uso, possibile piccola ammaccatura. Funziona al 100%.',
+  'Grado A': 'Quasi impossibile distinguerlo da nuovo. Al massimo micro-segni visibili da vicino. Funziona al 100%.',
+  'Grado B': 'Leggeri segni d’uso sulla scocca. Schermo e tastiera in ordine. Funziona al 100%.',
+  'Grado C': 'Segni evidenti d’uso, possibile piccola ammaccatura. Funziona al 100%.',
+  'Grado D': 'Funziona al 100%, ma ha la scocca rotta o danni estetici importanti. Testato e garantito come gli altri gradi.',
 };
 const slug = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const configDi = (r: Riga) => `${r.ram ?? '—'} RAM · ${r.disco ?? '—'}`;
@@ -32,14 +35,14 @@ const cpuBreve = (c: string | null) => !c ? '' : /^i[3579]-/i.test(c) ? 'Intel '
 function raggruppa(righe: Riga[]): Prodotto[] {
   const m = new Map<string, Prodotto>();
   for (const r of righe) {
-    if (!GRADO_INVERSO[r.grado]) continue;  // sul sito solo A, B e C
+    if (!GRADO_INVERSO[r.grado]) continue;  // sul sito i gradi A, B, C e D
     const k = r.marca + ' ' + r.modello;
     if (!m.has(k)) m.set(k, { slug: slug(k), marca: r.marca, modello: r.modello, spec: [cpuBreve(r.cpu), r.schermo].filter(Boolean).join(' · '), righe: [], da: Infinity });
     const p = m.get(k)!; p.righe.push(r); p.da = Math.min(p.da, r.prezzo);
   }
   return [...m.values()];
 }
-const GRADO_INVERSO: Record<string, Condizione> = { A: 'Ottimo', B: 'Buono', C: 'Discreto' };
+const GRADO_INVERSO: Record<string, Condizione> = { A: 'Grado A', B: 'Grado B', C: 'Grado C', D: 'Grado D' };
 
 // ------------------------------------------------------------------ carrello (solo in questo browser)
 interface Voce { slug: string; nome: string; modello: string; marca: string; grado: string; ram: string | null; disco: string | null; det: string; p: number }
@@ -92,6 +95,7 @@ function App() {
         <button type="button" className="tab" onClick={() => { setBrand('Tutti'); vai(''); }}>Portatili</button>
         <button type="button" className="tab" onClick={() => { setBrand('Apple'); vai(''); }}>Apple</button>
         <button type="button" className="tab" onClick={() => vai('aziende')}>Per aziende</button>
+        <button type="button" className="tab" onClick={() => vai('ricambi')}>Ricambi</button>
       </div>
       <Btn sm onClick={() => vai('carrello')}>{'Carrello · ' + carrello.length}</Btn>
     </div>
@@ -99,6 +103,7 @@ function App() {
 
   let inner: React.ReactNode;
   if (sez === 'p') inner = prodotti === null ? <Attesa /> : prodotto ? <Scheda p={prodotto} carrello={carrello} onCarrello={cambiaCarrello} vai={vai} /> : <Pagina titolo="Non trovato"><p>Questo computer non è più disponibile.</p><Btn ghost sm onClick={() => vai('')}>Tutti i portatili</Btn></Pagina>;
+  else if (sez === 'ricambi') inner = <Ricambi />;
   else if (sez === 'carrello') inner = <Carrello carrello={carrello} onCarrello={cambiaCarrello} vai={vai} />;
   else if (sez === 'grazie') inner = <Grazie onSvuota={() => cambiaCarrello([])} vai={vai} />;
   else if (sez === 'annullato') inner = <Pagina titolo="Pagamento annullato"><p className="muted">Nessun addebito. Il carrello è ancora qui.</p><Btn sm onClick={() => vai('carrello')}>Carrello</Btn></Pagina>;
@@ -160,10 +165,10 @@ function Scheda(p: { p: Prodotto; carrello: Voce[]; onCarrello: (c: Voce[]) => v
     if (!rr.length) return null;
     return { ...rr[0], prezzo: Math.min(...rr.map((r) => r.prezzo)), disponibili: rr.reduce((a, r) => a + r.disponibili, 0) };
   };
-  // si parte dalla scelta più comune del mockup: Buono, configurazione più venduta disponibile
+  // si parte dalla scelta più comune del mockup: Grado B, configurazione più venduta disponibile
   const iniziale = (): [string, Condizione] => {
-    for (const g of ['Buono', 'Ottimo', 'Discreto'] as Condizione[]) for (const c of [...configs].reverse()) if (riga(c, g)) return [c, g];
-    return [configs[0], 'Buono'];
+    for (const g of ['Grado B', 'Grado A', 'Grado C', 'Grado D'] as Condizione[]) for (const c of [...configs].reverse()) if (riga(c, g)) return [c, g];
+    return [configs[0], 'Grado B'];
   };
   const [[cfg, g], setScelta] = useState<[string, Condizione]>(iniziale);
   const [added, setAdded] = useState(false);
@@ -183,8 +188,8 @@ function Scheda(p: { p: Prodotto; carrello: Voce[]; onCarrello: (c: Voce[]) => v
       <div className="stack">
         <div><div className="lbl">{p.p.marca}</div><h2 style={{ fontSize: 'clamp(28px,4vw,40px)', fontWeight: 900, letterSpacing: '-.04em', lineHeight: 1.05 }}>{p.p.modello}</h2><div className="muted">{p.p.spec}</div></div>
         <div style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-.04em' }}>{r ? eur(r.prezzo) : '—'}</div>
-        <div><b>Condizioni</b>
-          <div className="gradebox" style={{ marginTop: 8 }}>
+        <div><b>Grado</b>
+          <div className="gradebox g4b" style={{ marginTop: 8 }}>
             {CONDIZIONI.map((x) => { const rx = riga(cfg, x); return (
               <button key={x} type="button" className={'gopt' + (g === x ? ' on' : '')} disabled={!rx} aria-pressed={g === x}
                 style={rx ? undefined : { opacity: .35, cursor: 'not-allowed' }} onClick={() => { setAdded(false); setScelta([cfg, x]); }}>
@@ -197,7 +202,43 @@ function Scheda(p: { p: Prodotto; carrello: Voce[]; onCarrello: (c: Voce[]) => v
         <button type="button" className="bigbtn" onClick={add} disabled={!added && esaurito} style={!added && esaurito ? { opacity: .35, cursor: 'not-allowed' } : undefined}>
           {added ? 'Aggiunto · vai al carrello' : esaurito ? 'Esaurito' : 'Aggiungi al carrello'}</button>
         <div className="row"><Pill>Dati cancellati con metodo certificato</Pill><Pill>Garanzia [mesi]</Pill><Pill>Reso entro [giorni]</Pill></div>
-      </div></div></div>
+      </div></div>
+      {r && <SchedaTecnica r={r} g={g} />}
+    </div>
+  );
+}
+
+/** tutte le voci dell'inventario che il cliente può vedere (niente seriali, costi o lotti) */
+function SchedaTecnica({ r, g }: { r: Riga; g: Condizione }) {
+  const voci: [string, React.ReactNode][] = [
+    ['Marca', r.marca], ['Modello', r.modello], ['Generazione', r.generazione], ['Processore', r.cpu], ['Scheda grafica', r.gpu], ['RAM', r.ram], ['Disco', r.disco],
+    ['Schermo', r.schermo], ['Batteria', r.batteria_min != null ? `almeno ${r.batteria_min}% della capacità originale` : null], ['Sistema operativo', r.sistema_operativo],
+    ['Tastiera', r.tastiera], ['Porte', r.porte], ['Rete', r.rete], ['Webcam', r.webcam], ['Peso', r.peso], ['Grado', g],
+    ['Dati', r.dati_cancellati ? 'Cancellati con software certificato, rapporto per numero di serie' : 'Cancellati con metodo certificato prima della spedizione'],
+  ];
+  return (
+    <div className="pcard" style={{ padding: 18, marginTop: 18 }}><b style={{ fontSize: 20 }}>Scheda tecnica</b>
+      <div className="schedat">{voci.filter(([, v]) => v != null && v !== '').map(([k, v]) => <div key={k}><span className="lbl">{k}</span><b>{v}</b></div>)}</div>
+    </div>
+  );
+}
+
+/** ricambi originali smontati dai computer che non si vendono interi */
+function Ricambi() {
+  const [R, setR] = useState<Ricambio[] | null>(null);
+  const [errore, setErrore] = useState<string | null>(null);
+  useEffect(() => { db.rpc<Ricambio[]>('catalogo_ricambi').then((r) => setR((r ?? []).map((x) => ({ ...x, prezzo: Number(x.prezzo) }))), () => setErrore('I ricambi non si sono caricati. Riprova tra poco.')); }, []);
+  return (
+    <div className="shopbody"><h1 className="shoph1">Ricambi</h1>
+      <p className="muted" style={{ maxWidth: '60ch', margin: '0 0 18px' }}>Pezzi originali smontati dai computer che non si possono vendere interi. Ogni ricambio dice da quale modello arriva. I dischi si vendono solo dopo la cancellazione certificata dei dati.</p>
+      {errore && <div className="warn">{errore}</div>}
+      {R === null && !errore ? <p className="lbl">Carico…</p> : (
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(230px,1fr))' }}>
+          {(R ?? []).map((x) => <div key={x.id} className="prod" style={{ cursor: 'default' }}><span className="lbl">Da {x.origine}</span>
+            <b style={{ fontSize: 18, letterSpacing: '-.02em' }}>{x.descrizione}</b><span><b style={{ fontSize: 20 }}>{eur(x.prezzo)}</b></span></div>)}
+          {R && !R.length && <p className="lbl">Nessun ricambio in vendita adesso.</p>}
+        </div>)}
+    </div>
   );
 }
 
