@@ -163,3 +163,54 @@ insert into public.timbrature (dipendente_id, badge_id, quando, verso, esito) va
   ('20000000-0000-0000-0000-000000000004', '80000000-0000-0000-0000-000000000002', (current_date - 1) + time '17:35', 'Uscita', 'Valida');
 insert into public.timbrature (dipendente_id, badge_id, quando, esito, motivo, lettore) values
   ('20000000-0000-0000-0000-000000000004', '80000000-0000-0000-0000-000000000002', now() - interval '3 hours', 'Rifiutata', 'Codice scaduto (foto o screenshot?)', 'Ingresso');
+
+-- ===================== dati per le sezioni complete =====================
+update public.clienti set cosa_spedisce = 'Bancali di materiale tecnico', referente_interno = 'Gabriele', contratto_al = current_date + 300,
+  fatturazione = 'Mensile', esigenze = 'Vede il magazzino in tempo reale con i seriali; consegna entro le 12' where nome = 'Snam';
+update public.clienti set cosa_spedisce = 'Colli per i negozi del Nord', referente_interno = 'Alberto', contratto_al = current_date + 200,
+  fatturazione = 'Mensile', esigenze = 'Consegne con fascia oraria; sabato su richiesta' where nome = 'Apple';
+update public.clienti set cosa_spedisce = 'Ordini di magazzino', referente_interno = 'Anna', fatturazione = 'Mensile',
+  esigenze = 'Ordini giornalieri per mail' where nome = 'Luxiona';
+update public.clienti set cosa_spedisce = 'PC e telefoni aziendali', referente_interno = 'Pier', fatturazione = 'Mensile',
+  esigenze = 'Tutti i seriali visibili a ogni sparo, carico e scarico' where nome = 'Econocom';
+update public.tariffe set quando = 'Dalla bolla o aggiunta dall''autista' where voce = 'Sponda';
+update public.tariffe set quando = 'La merce non consegnata resta in deposito' where voce = 'Giacenza';
+update public.tariffe set quando = 'Nuova consegna prenotata dal cliente dopo la giacenza' where voce = 'Riconsegna';
+
+update public.dipendenti set reparto = 'Strada', ore_settimana = 39, inizio = '06:00', fine = '15:00', patente_scadenza = current_date + 400, cqc_scadenza = current_date + 25 where nome = 'Autista 1';
+update public.dipendenti set reparto = 'Strada', ore_settimana = 39, inizio = '06:00', fine = '15:00', patente_scadenza = current_date + 700, cqc_scadenza = current_date + 500 where nome = 'Autista 2';
+update public.dipendenti set reparto = 'Magazzino', ore_settimana = 40, inizio = '06:00', fine = '14:00' where nome = 'Magazziniere 1';
+update public.dipendenti set reparto = 'Ufficio bolle', ore_settimana = 40, inizio = '08:30', fine = '17:30' where nome = 'Gabriele';
+update public.dipendenti set reparto = 'Stage', ore_settimana = 40, inizio = '08:00', fine = '17:00' where nome = 'Manuel';
+
+insert into public.telepass (mezzo_id, quando, entrata, uscita, importo) values
+  ('30000000-0000-0000-0000-000000000001', current_date + time '07:12', 'Milano Sud', 'Bergamo', 14.20),
+  ('30000000-0000-0000-0000-000000000001', current_date + time '11:48', 'Bergamo', 'Brescia Ovest', 8.60),
+  ('30000000-0000-0000-0000-000000000002', (current_date - 2) + time '16:35', 'Milano Sud', 'Piacenza', 7.90),
+  ('30000000-0000-0000-0000-000000000001', (current_date - 4) + time '21:52', 'Agrate', 'Milano Est', 2.70);
+
+insert into public.mail (azienda, casella, cartella, etichetta, da_nome, da_indirizzo, oggetto, testo, anteprima, ricevuta_il, bozza) values
+  ('trasporti', 'ordini@prova.messina', 'Ordini', 'Ordine', 'Snam', 'logistica@snam.prova', 'Ritiro 4 bancali domani',
+   E'Buongiorno,\ndomani mattina ritirare 4 bancali dal nostro magazzino e consegnare in via [indirizzo], Milano, entro le 12. Serve la sponda.\nGrazie',
+   'Domani mattina ritirare 4 bancali…', now() - interval '3 hours', E'Buongiorno, confermato il ritiro di domani. Ci indicate il piano di consegna?\nGrazie'),
+  ('trasporti', 'ordini@prova.messina', 'Clienti', 'Preventivo', '[Cliente]', 'info@cliente.prova', 'Richiesta preventivo',
+   E'Buongiorno,\nvorremmo un preventivo per 10 bancali al mese verso Torino.\nGrazie', 'Vorremmo un preventivo per…', now() - interval '4 hours',
+   'Buongiorno, grazie della richiesta. Vi giro a Gianluca che vi preparerà il preventivo.'),
+  ('corporation', 'vendite@prova.messina', 'Vendite', 'Vendite', 'Acquirente eBay', 'tramite eBay', 'Domanda su EliteBook 840 G8',
+   E'Ciao,\nla batteria com''è messa? Riuscite a spedire entro venerdì?', 'La batteria com''è messa?…', now() - interval '1 hour',
+   'Ciao, la batteria è all''88% dal test. Spediamo entro domani.');
+
+insert into public.stage_pc (seriale, cliente_id, postazione, esito, iniziato_il, finito_il)
+select 'ST' || lpad(n::text, 5, '0'), '10000000-0000-0000-0000-000000000008', ((n - 1) % 60) + 1,
+       case when n in (23, 47) then 'Fallito' when n % 9 = 0 then 'Ricevuto' when n % 4 = 0 or n % 7 = 0 then 'In corso' else 'Formattato' end,
+       now() - interval '5 hours', case when n % 4 = 0 or n % 7 = 0 or n % 9 = 0 then null else now() - interval '1 hour' end
+from generate_series(1, 60) n;
+
+insert into public.ordini (canale, riferimento, cliente, stato, entro, device_id) values
+  ('Back Market', 'BM-48213', 'Cliente Back Market', 'Da preparare', now() + interval '6 hours', '71000000-0000-0000-0000-000000000001'),
+  ('eBay', 'EB-99120', 'Cliente eBay', 'Spedito', now() - interval '1 day', '71000000-0000-0000-0000-000000000004');
+
+-- prezzi confermati da Vendite (nei dati di prova lo facciamo d'ufficio)
+alter table public.device disable trigger device_regole;
+update public.device set prezzo_confermato_da = '00000000-0000-0000-0000-000000000008' where stato = 'Disponibile';
+alter table public.device enable trigger device_regole;

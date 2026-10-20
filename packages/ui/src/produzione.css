@@ -1,0 +1,14 @@
+/* Aggiunte per il programma vero, nello stesso stile del mockup.
+   Il mockup mostra le app dentro la cornice di un telefono: sul telefono vero
+   la schermata occupa tutto lo schermo (.appvera). */
+.input,select.input{font:inherit;font-size:15px;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--glass-strong);color:var(--ink);padding:10px 12px;width:100%}
+.field{display:flex;flex-direction:column;gap:6px}
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.login .box{width:100%;max-width:400px;padding:28px}
+.login h1{font-size:34px;font-weight:800;letter-spacing:-.04em}
+.appvera{min-height:100vh;min-height:100svh;background:linear-gradient(180deg,var(--screen1),var(--screen2) 55%,var(--screen1));position:relative}
+.appvera .pscr{position:relative;inset:auto;min-height:100vh;min-height:100svh;max-width:560px;margin:0 auto;
+  padding:calc(18px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.video{width:100%;border-radius:18px;background:#1d1e22;aspect-ratio:3/4;object-fit:cover}
+.esci{margin-top:12px}
+@media (max-width:760px){.input,select.input{font-size:16px}.esci{margin:0}}

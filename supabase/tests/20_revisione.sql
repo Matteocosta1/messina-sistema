@@ -81,7 +81,7 @@ reset role;
 
 -- 9 · device
 select pg_temp.come('00000000-0000-0000-0000-000000000009');
-select pg_temp.deve_fallire($$update public.device set prezzo_confermato_da = '00000000-0000-0000-0000-000000000008' where seriale = 'PF3XXXX1'$$, 'finta conferma del prezzo');
+select pg_temp.deve_fallire($$update public.device set prezzo_confermato_da = '00000000-0000-0000-0000-000000000009' where seriale = 'PF3XXXX1'$$, 'finta conferma del prezzo');
 select pg_temp.deve_fallire($$update public.device set stato = 'Venduto' where seriale = 'PF3XXXX1'$$, 'venduto senza vendita');
 select pg_temp.deve_fallire($$delete from public.device where seriale = 'PF3XXXX1'$$, 'cancellare un device');
 update public.device set prezzo = 239 where seriale = 'PF3XXXX1';
