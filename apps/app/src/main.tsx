@@ -2,6 +2,7 @@
 // Cosa si vede lo decide chi entra: autista → Consegne, magazzino → Magazzino,
 // Corporation → Entrate (App Corporation), ogni dipendente → Badge. Più il Lettore all'ingresso (…/#lettore).
 import '@messina/dati/prova-app';
+import '@messina/dati/prova-traffico';
 import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';

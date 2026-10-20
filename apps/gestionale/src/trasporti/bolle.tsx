@@ -116,61 +116,145 @@ function Completa({ bolla }: { bolla: any }) {
 }
 
 // ------------------------------------------------------------------ Traffico
-export function Traffico() {
-  const { db } = useApp();
+// I giri di domani li prepara il sistema da solo (impostazioni.ora_giri). Qui si controllano, si aprono e si confermano.
+const ACCESSORI = ['Sponda', 'Piano terra', 'Consegna al piano', 'Fascia oraria', 'Sabato', 'Firma obbligatoria', 'Chiamare prima'];
+const FERMATE_SEL = 'id,ordine,bolla_id,esito,firmata,accessori_extra(voce),bolle(id,citta,indirizzo,fascia,colli_previsti,accessori,clienti(nome))';
+const ordinate = (g: any) => [...(g.fermate ?? [])].sort((a: any, b: any) => a.ordine - b.ordine);
+/** arrivo previsto: partenza 07:30, 25 minuti alla prima fermata, poi 28 tra una e l'altra (finché non c'è l'ottimizzatore) */
+const orari = (n: number) => { let m = 7 * 60 + 30; return Array.from({ length: n }, (_, i) => { m += i ? 28 : 25; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; }); };
+const kmGiro = (g: any) => g.km_previsti != null ? `${Math.round(g.km_previsti)} km` : null;
+const nomeMezzo = (g: any) => `${g.mezzi?.tipo ?? '—'}${g.mezzi?.sponda ? ' con sponda' : ''}${g.mezzi?.targa ? ' ' + g.mezzi.targa : ''}`;
+
+export function Traffico({ scelto }: { scelto?: string }) {
+  const { db, vai } = useApp();
   const domani = domaniISO();
   const az = useAzione();
-  const [msg, setMsg] = useState('');
-  const [trascino, setTrascino] = useState<{ fermata?: string; bolla?: string } | null>(null);
+  const [ok, setOk] = useState('');
   const { dati } = useDati(async (d) => {
-    const [bolle, mezzi, giri] = await Promise.all([
-      d.from<any>('bolle').select('id,tipo,citta,colli_previsti,accessori,clienti(nome)').eq('data_consegna', domani).in('stato', ['Confermata', 'In giro']).neq('tipo', 'Magazzino'),
-      d.from<any>('mezzi').select('id').eq('stato', 'Attivo'),
-      d.from<any>('giri').select('*,mezzi(tipo,sponda,targa),dipendenti(nome),fermate(id,ordine,bolla_id,bolle(citta,tipo,colli_previsti,clienti(nome)))').eq('data', domani),
+    const [bolle, giri, prep, imp] = await Promise.all([
+      d.from<any>('bolle').select('id,tipo,citta,indirizzo,fascia,colli_previsti,accessori,clienti(nome)').eq('data_consegna', domani).in('stato', ['Confermata', 'In giro']).neq('tipo', 'Magazzino'),
+      d.from<any>('giri').select(`*,mezzi(tipo,sponda,targa),dipendenti(nome),fermate(${FERMATE_SEL})`).eq('data', domani),
+      d.from<any>('giri_preparazioni').select('*').eq('data', domani).order('eseguita_il', { ascending: false }).limit(1),
+      d.from<any>('impostazioni').select('valore').eq('chiave', 'ora_giri'),
     ]);
-    return { bolle, mezzi, giri };
+    return { bolle, giri: giri.sort((a, b) => String(a.dipendenti?.nome).localeCompare(String(b.dipendenti?.nome))), prep: prep[0] ?? null, ora: Number(imp[0]?.valore ?? 15) };
   }, []);
   if (!dati) return null;
-  const assegnate = new Set(dati.giri.flatMap((g) => g.fermate.map((f: any) => f.bolla_id)));
+  const assegnate = new Set(dati.giri.flatMap((g) => g.fermate.filter((f: any) => f.esito === 'Da fare').map((f: any) => f.bolla_id)));
   const libere = dati.bolle.filter((b) => !assegnate.has(b.id));
-  const proponi = () => az.esegui(() => db.rpc<number>('proponi_giri', { p_data: domani }).then((n) => setMsg(
-    `Cosa ha fatto il programma: ha preso le spedizioni di domani ancora da assegnare (${n}) e le ha divise tra i mezzi liberi, guardando portata, sponda e fasce orarie dei clienti, `
-    + 'poi ha messo le fermate di ogni mezzo nell’ordine più corto per un camion. Adesso controllate: se volete cambiare, trascinate una fermata da un giro all’altro. Quando va bene, premete «Conferma i giri».')));
-  const confermati = dati.giri.length > 0 && dati.giri.every((g) => g.confermato_il);
-  const conferma = () => az.esegui(() => db.rpc<number>('conferma_giri', { p_data: domani }).then(() => setMsg('Giri confermati: domattina ogni autista li trova già in ordine nella sua app.')));
-  const sposta = (giro: any | null) => {
-    if (!trascino) return;
-    const ordine = giro ? Math.max(0, ...giro.fermate.map((f: any) => f.ordine)) + 1 : 0;
-    if (trascino.fermata && giro) az.esegui(() => db.from('fermate').update({ giro_id: giro.id, ordine }).eq('id', trascino.fermata!));
-    else if (trascino.fermata && !giro) az.esegui(() => db.from('fermate').delete().eq('id', trascino.fermata!));
-    else if (trascino.bolla && giro) az.esegui(() => db.from('fermate').insert({ giro_id: giro.id, bolla_id: trascino.bolla, ordine }));
-    setTrascino(null);
-  };
-  const dove = (b: any) => `${b.clienti?.nome} · ${b.tipo === 'Ritiro' ? 'ritiro' : b.citta ?? '—'}`;
-  const zona = { onDragOver: (e: any) => e.preventDefault() };
+  const giro = scelto ? dati.giri.find((g) => g.id === scelto) : null;
+  if (giro) return <GiroPagina giro={giro} giri={dati.giri} libere={libere} />;
+
+  const daConfermare = dati.giri.filter((g) => !g.confermato_il);
+  const nuove = daConfermare.filter((g) => g.da_confermare?.length);
+  const tot = dati.giri.reduce((n, g) => n + g.fermate.length, 0);
+  const km = dati.giri.every((g) => g.km_previsti != null) && dati.giri.length ? dati.giri.reduce((n, g) => n + Number(g.km_previsti), 0) : null;
+  const conferma = () => az.esegui(() => db.rpc<number>('conferma_giri', { p_data: domani }).then(() => setOk('Giri confermati: domattina ogni autista li trova già in ordine nella sua app.')));
   return (<>
-    <div className="glass card row between"><span><b>Domani</b> <span className="lbl">{dati.bolle.length} spedizioni · {dati.mezzi.length} mezzi · pronto entro le 18:00</span></span>
-      <div className="row">{libere.length ? <Btn onClick={proponi} disabled={az.inCorso}>Proponi i giri</Btn>
-        : confermati ? <Pill tone="ok">Giri confermati</Pill>
-        : <Btn onClick={conferma} disabled={az.inCorso || !dati.giri.length}>Conferma i giri</Btn>}</div></div>
-    {msg && <Msg>{msg}</Msg>}
+    <div className="glass card row between"><span><b>Domani</b> <span className="lbl">{tot} fermate · {dati.giri.length} mezzi</span></span>
+      <div className="row">{!dati.giri.length ? null : daConfermare.length ? <Btn onClick={conferma} disabled={az.inCorso}>Conferma</Btn> : <Pill tone="ok">Confermati</Pill>}</div></div>
+    {ok && !daConfermare.length && <Msg>{ok}</Msg>}
+    {!dati.giri.length && <Msg>I giri di domani li prepara il programma da solo alle {String(dati.ora).padStart(2, '0')}:00 con le spedizioni confermate. Li trovate qui, pronti da controllare.</Msg>}
+    {daConfermare.length > 0 && !nuove.length && dati.giri.length > 0 && <Msg>
+      Il programma ha preparato i giri di domani{dati.prep ? ` alle ${hm(dati.prep.eseguita_il)}` : ''}: ha diviso le spedizioni tra i mezzi per zona e ha messo le fermate di ogni mezzo in ordine di fascia oraria{km != null ? ` (${Math.round(km)} km)` : ''}. Controllate, aprite un giro se volete cambiarlo, poi premete «Conferma».</Msg>}
+    {nuove.length > 0 && <Msg>
+      {nuove.reduce((n, g) => n + g.da_confermare.length, 0) === 1 ? 'È arrivata una spedizione nuova' : 'Sono arrivate spedizioni nuove'} e il programma l’ha messa nel giro di {nuove.map((g) => g.dipendenti?.nome).join(', ')}: {nuove.flatMap((g) => g.da_confermare).join('; ')}. Controllate e premete «Conferma».</Msg>}
     <Errore testo={az.errore} />
     <div className="grid g4">
       {dati.giri.map((g) => {
-        const fer = [...g.fermate].sort((a: any, b: any) => a.ordine - b.ordine);
-        const colli = fer.reduce((s: number, f: any) => s + (f.bolle?.colli_previsti ?? 0), 0);
-        return <div key={g.id} className="glass card" {...zona} onDrop={() => sposta(g)}>
-          <div className="row between"><b>{g.mezzi?.tipo}{g.mezzi?.sponda ? ' con sponda' : ''} · {g.dipendenti?.nome}</b><Pill>{g.zona ?? '—'}</Pill></div>
-          <ol style={{ margin: '12px 0 0', paddingLeft: 20, lineHeight: 1.9 }}>
-            {fer.map((f: any) => <li key={f.id} draggable onDragStart={() => setTrascino({ fermata: f.id })} style={{ cursor: 'grab' }}>{dove({ ...f.bolle })}</li>)}
+        const fer = ordinate(g);
+        return <button key={g.id} type="button" className="glass card giro" onClick={() => vai('traffico/' + g.id)}>
+          <span className="row between" style={{ width: '100%' }}><b>{nomeMezzo(g)} · {g.dipendenti?.nome}</b><Pill>{g.zona ?? '—'}</Pill></span>
+          <ol style={{ margin: '12px 0 0', paddingLeft: 20, lineHeight: 1.9, textAlign: 'left' }}>
+            {fer.map((f: any) => <li key={f.id}>{f.bolle?.clienti?.nome} · {f.bolle?.citta ?? '—'}</li>)}
           </ol>
-          <div className="lbl" style={{ marginTop: 8 }}>{fer.length} {fer.length === 1 ? 'fermata' : 'fermate'} · {colli} colli</div>
-        </div>;
+          <span className="lbl" style={{ marginTop: 8 }}>{[kmGiro(g), `${fer.length} ${fer.length === 1 ? 'fermata' : 'fermate'}`].filter(Boolean).join(' · ')}</span>
+          <span className="go" style={{ marginTop: 6 }}>Apri</span>
+        </button>;
       })}
-      <div className="glass card" style={{ borderStyle: 'dashed' }} {...zona} onDrop={() => sposta(null)}><b>Da assegnare</b>
-        {libere.length ? <ul style={{ margin: '12px 0 0', paddingLeft: 20, lineHeight: 1.9 }}>
-          {libere.map((b) => <li key={b.id} draggable onDragStart={() => setTrascino({ bolla: b.id })} style={{ cursor: 'grab' }}>{dove(b)}{b.accessori?.includes('Sabato') ? ' · consegna sabato' : ''}</li>)}
-        </ul> : <p className="lbl" style={{ margin: '10px 0 0' }}>Tutto assegnato.</p>}</div>
+      <div className="glass card" style={{ borderStyle: 'dashed' }}><b>Da assegnare</b>
+        {libere.length ? <><ul style={{ margin: '12px 0 0', paddingLeft: 20, lineHeight: 1.9 }}>
+          {libere.map((b) => <li key={b.id}>{b.clienti?.nome} · {b.fascia ?? b.citta ?? '—'}</li>)}
+        </ul><p className="lbl" style={{ margin: '8px 0 0' }}>Aprite un giro e premete «+ Aggiungi fermata».</p></> : <p className="lbl" style={{ margin: '10px 0 0' }}>Tutto assegnato.</p>}</div>
+    </div>
+  </>);
+}
+
+/** mappa schematica del solo giro: le fermate in ordine (le coordinate vere arrivano con l'ottimizzatore per camion) */
+function MappaGiro({ n, chi }: { n: number; chi: string }) {
+  const P = [[60, 170], [110, 120], [170, 95], [230, 70], [280, 110], [300, 170], [240, 200], [180, 215]];
+  const pts = Array.from({ length: n }, (_, i) => P[(i + 1) % P.length]);
+  return <svg viewBox="0 0 340 240" style={{ width: '100%', display: 'block' }} role="img" aria-label={`Mappa del giro di ${chi}`}>
+    <rect width="340" height="240" rx="16" fill="rgba(17,18,20,.03)" />
+    <path d="M0 120 Q170 100 340 140" stroke="rgba(17,18,20,.07)" strokeWidth="10" fill="none" /><path d="M150 0 Q160 140 140 240" stroke="rgba(17,18,20,.07)" strokeWidth="8" fill="none" />
+    <path d={`M40 200 ${pts.map((p) => `L${p[0]} ${p[1]}`).join(' ')}`} stroke="#111214" strokeWidth="3" fill="none" strokeLinejoin="round" />
+    <rect x="26" y="188" width="28" height="24" rx="6" fill="#111214" />
+    {pts.map((p, i) => <g key={i}><circle cx={p[0]} cy={p[1]} r="11" fill="#fff" stroke="#111214" strokeWidth="2" /><text x={p[0]} y={p[1] + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill="#111214">{i + 1}</text></g>)}
+  </svg>;
+}
+
+function GiroPagina({ giro: g, giri, libere }: { giro: any; giri: any[]; libere: any[] }) {
+  const { db, vai } = useApp();
+  const az = useAzione();
+  const [edit, setEdit] = useState<{ id: string; fascia: string; acc: string[] } | null>(null);
+  const [aggiungi, setAggiungi] = useState(false);
+  const [dest, setDest] = useState<Record<string, string>>({});
+  const fer = ordinate(g); const ore = orari(fer.length);
+  const altri = giri.filter((x) => x.id !== g.id && !['Rientrato', 'Chiuso'].includes(x.stato));
+  const chi = g.dipendenti?.nome ?? '—';
+  const fai = (fn: string, args: Record<string, unknown>) => az.esegui(() => db.rpc(fn, args));
+  return (<>
+    <div className="row"><Btn ghost sm onClick={() => vai('traffico')}>← Tutti i giri</Btn></div>
+    <div className="glass card row between" style={{ gap: 12 }}><div><b style={{ fontSize: 22 }}>{chi} · {nomeMezzo(g)}</b>
+      <div className="lbl">{[g.zona ?? '—', `${fer.length} ${fer.length === 1 ? 'fermata' : 'fermate'}`, kmGiro(g), 'partenza 07:30'].filter(Boolean).join(' · ')}</div></div>
+      {g.stato === 'Partito' ? <Pill tone="dark">Partito</Pill> : <Pill>{g.stato === 'Preparato' ? 'In magazzino' : g.stato}</Pill>}</div>
+    {g.confermato_il && g.stato === 'Partito' && <Msg>Questo giro è confermato e l’autista è già partito: ogni modifica gli arriva subito nell’app con un avviso.</Msg>}
+    <Errore testo={az.errore} />
+    <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
+      <div className="glass card stack" style={{ flex: '2 1 520px', minWidth: 0, gap: 0 }}>
+        {fer.map((f: any, j: number) => {
+          const b = f.bolle ?? {}; const acc = [...(b.accessori ?? []), ...(f.accessori_extra ?? []).map((x: any) => x.voce)];
+          const libera = f.esito === 'Da fare' && !f.firmata; const ed = edit?.id === f.id ? edit : null;
+          return <div key={f.id} className="ferm">
+            <span className="fn">{j + 1}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="row between" style={{ gap: 8 }}><b style={{ fontSize: 17 }}>{b.clienti?.nome ?? '—'}</b><span className="lbl">{f.esito === 'Da fare' ? `arrivo ${ore[j]}` : f.esito}</span></div>
+              <div className="lbl">{[b.indirizzo && b.citta ? `${b.indirizzo}, ${b.citta}` : b.indirizzo ?? b.citta, b.fascia, b.colli_previsti != null ? `${b.colli_previsti} colli` : null].filter(Boolean).join(' · ')}</div>
+              {acc.length > 0 && <div className="row" style={{ gap: 6, marginTop: 6 }}>{acc.map((a) => <Pill key={a}>{a}</Pill>)}</div>}
+              {ed && <div className="stack" style={{ gap: 8, marginTop: 10, padding: 12, borderRadius: 14, background: 'var(--soft)' }}>
+                <label className="stack" style={{ gap: 4 }}><span className="lbl">Fascia oraria</span>
+                  <input value={ed.fascia} onChange={(e) => setEdit({ ...ed, fascia: e.target.value })} style={{ font: 'inherit', padding: '8px 10px', borderRadius: 10, border: '1px solid var(--line)' }} /></label>
+                <div className="row" style={{ gap: 6 }}>{ACCESSORI.map((a) => {
+                  const fisso = (b.accessori ?? []).includes(a);
+                  return <label key={a} className="chipbtn" style={{ cursor: fisso ? 'default' : 'pointer' }}>
+                    <input type="checkbox" checked={fisso || ed.acc.includes(a)} disabled={fisso} style={{ marginRight: 6 }}
+                      onChange={(e) => setEdit({ ...ed, acc: e.target.checked ? [...ed.acc, a] : ed.acc.filter((x) => x !== a) })} />{a}</label>;
+                })}</div>
+                <div className="row"><Btn sm disabled={az.inCorso} onClick={() => fai('giro_modifica', { p_fermata: f.id, p_fascia: ed.fascia, p_accessori: ed.acc }).then((x) => x && setEdit(null))}>Salva</Btn>
+                  <Btn ghost sm onClick={() => setEdit(null)}>Annulla</Btn></div>
+              </div>}
+              {libera && <div className="row" style={{ gap: 6, marginTop: 10 }}>
+                <Btn ghost sm disabled={az.inCorso} onClick={() => fai('giro_ordine', { p_fermata: f.id, p_su: true })}>Su</Btn>
+                <Btn ghost sm disabled={az.inCorso} onClick={() => fai('giro_ordine', { p_fermata: f.id, p_su: false })}>Giù</Btn>
+                <Btn ghost sm onClick={() => setEdit(edit?.id === f.id ? null : { id: f.id, fascia: b.fascia ?? '', acc: (f.accessori_extra ?? []).map((x: any) => x.voce) })}>Modifica</Btn>
+                <select aria-label="Passa a un altro mezzo" value={dest[f.id] ?? ''} onChange={(e) => setDest({ ...dest, [f.id]: e.target.value })}
+                  style={{ font: 'inherit', fontSize: 14, padding: '6px 8px', borderRadius: 999, border: '1px solid var(--line)', background: '#fff' }}>
+                  <option value="">Passa a…</option>{altri.map((x) => <option key={x.id} value={x.id}>{x.dipendenti?.nome ?? '—'}</option>)}</select>
+                <Btn ghost sm disabled={!dest[f.id] || az.inCorso} onClick={() => fai('giro_passa', { p_fermata: f.id, p_giro: dest[f.id] })}>Sposta</Btn>
+                <Btn ghost sm disabled={az.inCorso} onClick={() => fai('giro_togli', { p_fermata: f.id })}>Togli</Btn>
+              </div>}
+            </div>
+          </div>;
+        })}
+        <div style={{ paddingTop: 12 }}><Btn ghost sm onClick={() => setAggiungi(!aggiungi)}>+ Aggiungi fermata</Btn></div>
+        {aggiungi && <div className="list" style={{ marginTop: 8 }}>{libere.length ? libere.map((b) =>
+          <button key={b.id} type="button" className="li" disabled={az.inCorso} onClick={() => fai('giro_aggiungi', { p_giro: g.id, p_bolla: b.id }).then((x) => x && setAggiungi(false))}>
+            <span className="row between" style={{ width: '100%' }}><b>{b.clienti?.nome}</b><span className="lbl">{b.fascia ?? ''}</span></span>
+            <span className="lbl">{[b.indirizzo && b.citta ? `${b.indirizzo}, ${b.citta}` : b.indirizzo ?? b.citta, `${b.colli_previsti ?? 0} colli`].filter(Boolean).join(' · ')}</span></button>)
+          : <div className="lbl" style={{ padding: 10 }}>Nessuna spedizione da assegnare.</div>}</div>}
+      </div>
+      <div className="glass card stack" style={{ flex: '1 1 320px', minWidth: 0 }}><b>Il giro di {chi}</b><MappaGiro n={fer.length} chi={chi} />
+        <div className="lbl">Percorso per camion, nell’ordine delle fermate. Ogni modifica finisce nello Storico con chi l’ha fatta e quando.</div></div>
     </div>
   </>);
 }

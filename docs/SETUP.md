@@ -116,6 +116,16 @@ select vault.create_secret('https://<ref>.supabase.co', 'progetto_url');
 select vault.create_secret('<lo stesso valore di CRON_SEGRETO>', 'cron_segreto');
 ```
 
+### Giri del giorno dopo (Traffico)
+
+I giri li prepara il database da solo, dal lunedì al venerdì, all'ora scritta in `impostazioni` → `ora_giri` (ora di Roma, **15** se non la cambiate; il venerdì prepara anche il lunedì). Il lavoro pianificato si chiama `messina-giri` e lo crea la migrazione `20261021000400_traffico_giri.sql` se `pg_cron` è già acceso. Se l'avete acceso dopo, nel **SQL Editor** una volta:
+
+```sql
+select cron.schedule('messina-giri', '0 * * * 1-5', $$select public.prepara_giri_pianificato()$$);
+```
+
+Per cambiare l'ora: `update public.impostazioni set valore = '16' where chiave = 'ora_giri';`. Le spedizioni confermate dopo la preparazione entrano da sole nei giri e il giro torna «da confermare».
+
 ### Claude (lettura mail, bolle, seriali, resoconto)
 
 - `ANTHROPIC_API_KEY`: **a pagamento a consumo**, senza canone. Si caricano crediti in anticipo e Haiku 5.5 costa 0,10 $ per milione di token in entrata e 0,50 $ in uscita. Si crea su [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) con l'account `it@dominio`. In Limits conviene fissare un tetto di spesa mensile.

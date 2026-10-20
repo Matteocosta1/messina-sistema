@@ -22,7 +22,7 @@ export function Trasporti() {
   const nome = T_NAV.find((v) => v.id === id)!.nome;
   const pagine: Record<string, React.ReactNode> = {
     home: <Home />, anomalie: <Anomalie sezione={sotto} titolo={setTitolo} />, mail: <MailT />, bolle: <Bolle scelta={sotto} />,
-    traffico: <Traffico />, magazzino: <Magazzino tab={sotto} />, giacenze: <Giacenze />, clienti: <Clienti scelto={sotto} titolo={setTitolo} />,
+    traffico: <Traffico scelto={sotto} />, magazzino: <Magazzino tab={sotto} />, giacenze: <Giacenze />, clienti: <Clienti scelto={sotto} titolo={setTitolo} />,
     fatture: <Fatturazione />, mezzi: <Mezzi />, autisti: <Autisti />, telepass: <Telepass />, satellitare: <Satellitare />, presenze: <Presenze tab={sotto} />, telecamere: <Telecamere />,
   };
   return (

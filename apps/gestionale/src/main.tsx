@@ -6,6 +6,7 @@ import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
 import { collega, type Config, type Fattore } from '@messina/dati';
 import '@messina/dati/prova-recap';
+import '@messina/dati/prova-traffico';
 import { motoreDiProva, ELENCO_PROVA } from '@messina/dati/prova';
 import { Btn } from '@messina/ui';
 import { AppCtx, type Profilo, Errore } from './core';

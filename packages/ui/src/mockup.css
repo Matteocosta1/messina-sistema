@@ -231,3 +231,9 @@ textarea{font:inherit;font-size:15px;line-height:1.5;min-height:110px;border-rad
 .big-cam{aspect-ratio:16/8;cursor:default}
 .cam-mini{display:inline-block;width:46px;height:28px;border-radius:6px;background:linear-gradient(160deg,#2a2d33,#121316);vertical-align:middle;object-fit:cover}
 @media (max-width:760px){.camgrid{grid-template-columns:1fr 1fr}}
+/* Traffico: schede dei giri e pagina del giro (prova-messina mod12) */
+.giro{display:flex;flex-direction:column;align-items:stretch;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.giro:hover{background:rgba(255,255,255,.9)}
+.ferm{display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
+.ferm:first-child{border-top:0;padding-top:0}
+.fn{width:30px;height:30px;border-radius:99px;background:var(--solid);color:var(--on-solid);display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}

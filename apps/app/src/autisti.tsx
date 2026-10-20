@@ -18,6 +18,28 @@ const cli = (f: Fermata) => f.destinatario ?? '—';
 const etichetta = (f: Fermata) => f.esito === 'Consegnata' ? 'Fatta' : f.esito === 'Non consegnata' ? (f.dopo === 'Giacenza' ? 'Giacenza' : 'Riconsegna fissata') : f.motivo ? 'Riprovo dopo' : '';
 const big30 = (el: React.ReactNode) => <span style={{ display: 'inline-flex' }}>{el}</span>;
 
+/** «Il tuo giro è cambiato»: il traffico ha modificato il giro dopo la partenza. L'app li legge ogni 30 secondi e ricarica il giro. */
+function useAvvisi() {
+  const { db, aggiorna } = useApp();
+  const [lista, setLista] = useState<{ id: string; testo: string }[]>([]);
+  const visti = useRef(new Set<string>());
+  useEffect(() => {
+    let vivo = true;
+    const leggi = () => db.rpc<{ id: string; testo: string }[]>('miei_avvisi').then((a) => {
+      if (!vivo) return;
+      const nuovi = (a ?? []).filter((x) => !visti.current.has(x.id));
+      nuovi.forEach((x) => visti.current.add(x.id));
+      setLista(a ?? []);
+      if (nuovi.length) { vibra([120, 80, 120]); aggiorna(); }
+    }, () => {});
+    leggi();
+    const t = setInterval(leggi, 30000);
+    return () => { vivo = false; clearInterval(t); };
+  }, [db, aggiorna]);
+  const letti = () => { const ids = lista.map((x) => x.id); setLista([]); Promise.all(ids.map((id) => db.rpc('avviso_letto', { p_avviso: id }))).catch(() => {}); };
+  return { lista, letti };
+}
+
 export function Autisti() {
   const { db } = useApp();
   const { dati: g, errore } = useDati((d) => d.rpc<Giro | null>('mio_giro_oggi'), []);
@@ -29,6 +51,7 @@ export function Autisti() {
   const [conf, setConf] = useState<Record<string, { colli?: boolean; acc?: boolean }>>({});
   const [mancDa, setMancDa] = useState<'dett' | 'firma'>('dett');   // «Indietro» dal motivo torna alla pagina da cui si è venuti
   const vai = (s: Scr) => { setScr(s); window.scrollTo(0, 0); };
+  const avvisi = useAvvisi();
   if (errore) return <div className="pscr"><ErroreApp testo={errore} /></div>;
   if (g === null) return <div className="pscr"><div className="lbl">Carico il giro…</div></div>;
   if (!g) return <div className="pscr"><div className="pcard" style={{ padding: 16 }}><div className="lbl">{dataApp()}</div><div className="ptitle" style={{ marginTop: 2 }}>Consegne</div>
@@ -40,6 +63,10 @@ export function Autisti() {
       <div className="pscr">
         <div className="pcard" style={{ padding: 16 }}><div className="lbl">{dataApp()}{g.mezzo ? ' · ' + g.mezzo.tipo + (g.mezzo.sponda ? ' con sponda' : '') : ''}</div><div className="ptitle" style={{ marginTop: 2 }}>Consegne</div>
           <div className="bar" style={{ marginTop: 12 }}><i style={{ width: (tot ? n / tot * 100 : 0) + '%' }} /></div><div className="lbl" style={{ marginTop: 6 }}>{n} di {tot} fermate fatte</div></div>
+        {avvisi.lista.length > 0 && <div className="pcard stack" role="alert" style={{ padding: 14, gap: 8, border: '2px solid var(--solid)' }}>
+          <b style={{ fontSize: 18 }}>Il tuo giro è cambiato</b>
+          {avvisi.lista.map((x) => <div key={x.id} style={{ fontSize: 16 }}>{x.testo.replace(/^Il tuo giro è cambiato: /, '')}</div>)}
+          <button type="button" className="bigbtn" onClick={avvisi.letti}>Ho capito</button></div>}
         {g.fermate.map((s, i) => { const chiusa = s.esito !== 'Da fare';
           return <button key={s.id} type="button" className={'stop' + (chiusa ? ' done' : '')} onClick={() => { if (chiusa) return; setCur(s.id); vai('dett'); }}>
             <span className="n">{i + 1}</span>
@@ -135,8 +162,9 @@ function Dettaglio({ f, idx, conf, conferma, onBack, onAvanti, onMancata }: { f:
           <button type="button" className="bigbtn" onClick={() => setFirma(true)} aria-label="Firma del cliente" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{big30(KI.pen(30))}</button></>)}
       <div style={{ flex: 1 }} />
       <button type="button" className="bigbtn" onClick={onAvanti} {...(d1 ? {} : off)}>Avanti</button>
-      {/* sempre attivo: se la merce non scende dal mezzo non c'è niente da scansionare */}
-      <button type="button" className="bigbtn ghost" onClick={onMancata}>Non Consegnato</button>
+      {/* sempre attivo finché il cliente non firma: se la merce non scende dal mezzo non c'è niente da scansionare.
+          Con la firma la merce è consegnata: «Non Consegnato» sparisce (e il database non lo accetta più) */}
+      {!f.firmata && <button type="button" className="bigbtn ghost" onClick={onMancata}>Non Consegnato</button>}
     </div>
   );
 }
@@ -182,7 +210,7 @@ function FotoBolla({ f, soglia, pronto, onBack, onFatto, onMancata }: { f: Ferma
       {stato === 2 && !pronto && <div className="lbl" style={{ color: 'var(--alert)', fontWeight: 600 }}>Per «Consegnato» servono anche Accessori e Firma confermati.</div>}
       <div style={{ flex: 1 }} />
       <button type="button" className="bigbtn" onClick={conferma} {...(stato === 2 && pronto && !az.inCorso ? {} : off)}>Consegnato</button>
-      <button type="button" className="bigbtn ghost" onClick={onMancata} {...(stato === 2 && !az.inCorso ? {} : off)}>Non Consegnato</button>
+      {!f.firmata && <button type="button" className="bigbtn ghost" onClick={onMancata} {...(stato === 2 && !az.inCorso ? {} : off)}>Non Consegnato</button>}
     </div>
   );
 }
