@@ -1,14 +1,29 @@
-// Moduli dei siti pubblici: «Chiedi un preventivo» (Autotrasporti) e «Valuta un lotto» (Corporation).
+// Moduli dei siti pubblici: preventivo, ritiro, candidatura e contatto (Autotrasporti); lotto e contatto (Corporation).
 // Nessun accesso richiesto: per questo la funzione controlla tutto da sé (campo esca, lunghezze, limiti per ora)
-// e scrive solo una riga in «mail» (Clienti per i Trasporti, Lotti per la Corporation), che compare nella Mail del gestionale come «Da leggere».
+// e scrive solo una riga in «mail», nella cartella giusta per il tipo di modulo, che compare nella Mail del gestionale come «Da leggere».
 import { dbServizio, Errore } from '../_comune/mod.ts';
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const risposta = (dati: unknown, stato = 200) => new Response(JSON.stringify(dati), { status: stato, headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' } });
 
+// sito → tipo di modulo → dove arriva nella Mail del gestionale
 const SITI = {
-  trasporti: { azienda: 'trasporti', cartella: 'Clienti', etichetta: 'Preventivo', oggetto: 'Richiesta di preventivo dal sito' },
-  corporation: { azienda: 'corporation', cartella: 'Lotti', etichetta: 'Lotti', oggetto: 'Lotto da valutare dal sito' },
+  trasporti: {
+    azienda: 'trasporti',
+    tipi: {
+      preventivo: { cartella: 'Clienti', etichetta: 'Preventivo', oggetto: 'Richiesta di preventivo dal sito' },
+      ritiro: { cartella: 'Ordini', etichetta: 'Ordine', oggetto: 'Richiesta di ritiro dal sito' },
+      candidatura: { cartella: 'In arrivo', etichetta: 'Personale', oggetto: 'Candidatura dal sito' },
+      contatto: { cartella: 'In arrivo', etichetta: 'Sito', oggetto: 'Messaggio dal sito' },
+    },
+  },
+  corporation: {
+    azienda: 'corporation',
+    tipi: {
+      lotto: { cartella: 'Lotti', etichetta: 'Lotti', oggetto: 'Lotto da valutare dal sito' },
+      contatto: { cartella: 'In arrivo', etichetta: 'Sito', oggetto: 'Messaggio dal sito' },
+    },
+  },
 } as const;
 
 const testo = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim().slice(0, max) : '');
@@ -22,8 +37,11 @@ Deno.serve(async (req) => {
     if (grezzo.length > 12000) throw new Errore('Messaggio troppo lungo');
     let c: any = {};
     try { c = JSON.parse(grezzo); } catch { throw new Errore('Richiesta non valida'); }
-    const sito = SITI[c?.sito as keyof typeof SITI];
-    if (!sito) throw new Errore('Sito sconosciuto');
+    const s0 = SITI[c?.sito as keyof typeof SITI];
+    if (!s0) throw new Errore('Sito sconosciuto');
+    const tipi = s0.tipi as Record<string, { cartella: string; etichetta: string; oggetto: string }>;
+    const t = tipi[typeof c.tipo === 'string' ? c.tipo : ''] ?? Object.values(tipi)[0];   // vecchie versioni del sito: primo tipo
+    const sito = { azienda: s0.azienda, ...t };
     if (testo(c.sito_web, 200)) return risposta({ ok: true });          // campo esca compilato: è un programma, si risponde ok e non si salva nulla
 
     const nome = testo(c.nome, 80), azienda = testo(c.azienda, 120), email = testo(c.email, 200).toLowerCase(), telefono = testo(c.telefono, 40);

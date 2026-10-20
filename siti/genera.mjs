@@ -1,48 +1,56 @@
-// Genera i due siti pubblici (apps/sito-trasporti, apps/sito-corporation) da siti/*.html.
-// Ogni pagina esce in un solo file: stile e script dentro, nessuna libreria. Lancia: node siti/genera.mjs
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+// Genera i due siti pubblici da siti/trasporti.mjs e siti/corporation.mjs.
+//  - apps/sito-<x>/sito/      una cartella per pagina (/servizi/trasporto/index.html): è quello che va online
+//  - apps/sito-<x>/anteprima.html   tutte le pagine in un solo file, per il pannello di prova
+// Stile e script dentro ogni pagina, nessuna libreria. Lancia: node siti/genera.mjs
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { testa, piede, href, esc } from './parti.mjs';
+import trasporti from './trasporti.mjs';
+import corporation from './corporation.mjs';
 
 const qui = new URL('.', import.meta.url).pathname;
 const radice = new URL('..', import.meta.url).pathname;
-const css = readFileSync(qui + 'comune.css', 'utf8').replace(/^\/\*[^\n]*\*\/\n/, '');
+const css = readFileSync(qui + 'comune.css', 'utf8');
 const js = readFileSync(qui + 'comune.js', 'utf8');
+const hash = 'sha256-' + createHash('sha256').update(js).digest('base64');
 
-// mappa dei giri: città del Nord proiettate da longitudine e latitudine, curve dalla base di Lacchiarella
-const P = ([lon, lat]) => [Math.round((lon - 7.3) * 100 + 14), Math.round((46.02 - lat) * 140 + 12)];
-const BASE = P([9.13, 45.32]);
-const CITTA = [   // nome, [lon, lat], posizione dell'etichetta, curvatura (segno = da che parte piega)
-  ['Torino', [7.69, 45.07], 's', -0.14], ['Novara', [8.62, 45.45], 'n', 0.12], ['Bergamo', [9.67, 45.70], 'n', -0.12], ['Brescia', [10.21, 45.54], 'n', -0.12],
-  ['Verona', [10.99, 45.44], 'n', -0.02], ['Padova', [11.88, 45.41], 's', 0.09], ['Venezia', [12.33, 45.44], 'n', -0.12],
-  ['Piacenza', [9.69, 45.05], 'e', 0.12], ['Bologna', [11.34, 44.49], 's', 0.12], ['Genova', [8.93, 44.41], 's', -0.12],
-];
-function mappa() {
-  const [bx, by] = BASE;
-  let giri = '', punti = '';
-  CITTA.forEach(([nome, ll, pos, k], i) => {
-    const [x, y] = P(ll);
-    const dx = x - bx, dy = y - by, l = Math.hypot(dx, dy);
-    const cx = Math.round(bx + dx / 2 - dy * k), cy = Math.round(by + dy / 2 + dx * k);
-    const lung = Math.ceil(l * 1.06 + 4);
-    giri += `<path class="giro" style="--i:${i};--l:${lung}" d="M${bx} ${by} Q${cx} ${cy} ${x} ${y}"/>`;
-    const t = pos === 'n' ? `x="${x}" y="${y - 9}" text-anchor="middle"` : pos === 's' ? `x="${x}" y="${y + 17}" text-anchor="middle"` : `x="${x + 9}" y="${y + 4}"`;
-    punti += `<g class="citta" style="--i:${i}"><circle cx="${x}" cy="${y}" r="4"/><text ${t}>${nome}</text></g>`;
-  });
-  let griglia = '';
-  for (let y = 36; y < 262; y += 14) for (let x = 8; x < 556; x += 14) griglia += `M${x} ${y}h.01`;
-  return `<svg viewBox="0 30 560 232" role="img" aria-hidden="true">` +
-    `<path class="puntini" d="${griglia}" stroke="rgba(17,18,20,.14)" stroke-width="2.2" stroke-linecap="round"/>` +
-    giri + punti +
-    `<g class="base"><circle class="r" cx="${bx}" cy="${by}" r="7"/><circle class="c" cx="${bx}" cy="${by}" r="7"/><text x="${bx - 6}" y="${by + 34}" text-anchor="end">Lacchiarella</text></g></svg>`;
+const ICONA = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111214'/%3E%3Ctext x='32' y='44' font-family='Arial' font-weight='900' font-size='34' text-anchor='middle' fill='%23fff'%3EM%3C/text%3E%3C/svg%3E`;
+
+function testaDoc(sito, titolo, descrizione, cssSito, config = true) {
+  return `<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>${esc(titolo)}</title>
+<meta name="description" content="${esc(descrizione)}">
+<meta name="theme-color" content="#f2f3f5">
+<meta property="og:title" content="${esc(titolo)}">
+<meta property="og:description" content="${esc(descrizione)}">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="it_IT">
+<link rel="icon" href="${ICONA}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+${config ? '<script src="/config.js"></script>\n' : ''}<style>
+${css}
+${cssSito}
+</style>
+</head>`;
 }
 
-const postazioni = Array.from({ length: 60 }, () => '<i></i>').join('');
+const titoloDi = (sito, p) => (p.path === '' ? sito.titoloBase : `${p.titolo} | ${sito.titoloBase}`);
+const datiStrutturati = (sito) => `<script type="application/ld+json">${JSON.stringify({
+  '@context': 'https://schema.org', '@type': 'LocalBusiness', name: sito.nome, telephone: '+39 02 9227 0155',
+  address: { '@type': 'PostalAddress', streetAddress: 'Via Cascina Nuova 1', postalCode: '20084', addressLocality: 'Lacchiarella', addressRegion: 'MI', addressCountry: 'IT' },
+})}</script>`;
 
-function intestazioni(hashScript) {
-  return `# Intestazioni di sicurezza per Cloudflare Pages (copiate in dist/ dalla build). Generato da siti/genera.mjs.
-# Lo script della pagina è ammesso con la sua impronta (sha256): se cambia siti/comune.js si rigenera con «node siti/genera.mjs».
+function intestazioni() {
+  return `# Intestazioni di sicurezza per Cloudflare Pages. Generato da siti/genera.mjs: non modificare a mano.
+# Lo script delle pagine è ammesso con la sua impronta (sha256); i dati strutturati (ld+json) non sono script eseguibili.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' '${hashScript}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' '${hash}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
@@ -52,67 +60,51 @@ function intestazioni(hashScript) {
 
 /config.js
   Cache-Control: no-cache
-/index.html
+/*.html
   Cache-Control: no-cache
 `;
 }
 
-const privacy = (nome, cosa) => `<!doctype html>
-<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Privacy - ${nome}</title><meta name="robots" content="noindex">
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;800&display=swap" rel="stylesheet">
-<style>${css}
-main{max-width:720px;margin:0 auto;padding:48px var(--gut) 80px}
-h1{font-size:clamp(32px,5vw,48px);font-weight:800;margin-bottom:24px}h2{font-size:20px;margin:28px 0 8px}
-p,li{color:var(--ink)}.bozza{border-radius:16px;padding:14px 16px;background:var(--alert-soft);color:var(--alert);font-weight:600;margin-bottom:24px}</style></head>
-<body><main>
-<p><a href="./">Torna al sito</a></p>
-<h1>Informativa privacy</h1>
-<p class="bozza">Bozza da far verificare al consulente prima della pubblicazione.</p>
-<h2>Titolare</h2><p>${nome}, [ragione sociale], Via Cascina Nuova 1, Lacchiarella (MI), P.IVA [da inserire], email info@[dominio].</p>
-<h2>Quali dati e perché</h2><p>I dati che scrivete nel modulo (nome, azienda, email, telefono, ${cosa}) servono solo a rispondere alla vostra richiesta e a preparare un'offerta. Base giuridica: misure precontrattuali richieste da voi (art. 6.1.b GDPR).</p>
-<h2>Per quanto tempo</h2><p>Fino a 24 mesi dall'ultima comunicazione, salvo che la richiesta diventi un contratto: in quel caso per i tempi previsti dalla legge.</p>
-<h2>Chi li vede</h2><p>Solo il nostro personale incaricato. I dati sono conservati su server nell'Unione europea (Supabase, Cloudflare) con cui abbiamo accordi di trattamento.</p>
-<h2>Cookie</h2><p>Il sito non usa cookie di profilazione né strumenti di statistica.</p>
-<h2>I vostri diritti</h2><p>Potete chiedere di vedere, correggere o cancellare i vostri dati, o opporvi al trattamento, scrivendo a info@[dominio]. Potete anche rivolgervi al Garante per la protezione dei dati personali.</p>
-</main></body></html>
-`;
+for (const [app, sito] of [['sito-trasporti', trasporti], ['sito-corporation', corporation]]) {
+  const dir = `${radice}apps/${app}/`;
+  const cssSito = readFileSync(`${qui}${sito.id}.css`, 'utf8');
+  rmSync(dir + 'sito', { recursive: true, force: true });
+  mkdirSync(dir + 'sito', { recursive: true });
 
-const SITI = [
-  { app: 'sito-trasporti', sorgente: 'trasporti.html', nome: 'Messina Autotrasporti', cosa: 'tratte e tipo di merce' },
-  { app: 'sito-corporation', sorgente: 'corporation.html', nome: 'Messina Corporation', cosa: 'tipo e numero di dispositivi' },
-];
+  // una pagina per cartella
+  for (const p of sito.pagine) {
+    const cartella = dir + 'sito/' + (p.path ? p.path + '/' : '');
+    mkdirSync(cartella, { recursive: true });
+    writeFileSync(cartella + 'index.html', testaDoc(sito, titoloDi(sito, p), p.descrizione, cssSito) +
+      `\n<body>\n${testa(sito, href(p.path || '/'))}\n<main>${p.html}</main>\n${piede(sito)}\n${p.path === '' ? datiStrutturati(sito) : ''}<script>${js}</script>\n</body>\n</html>\n`);
+  }
+  writeFileSync(dir + 'sito/404.html', testaDoc(sito, 'Pagina non trovata | ' + sito.titoloBase, 'Pagina non trovata', cssSito) +
+    `\n<body>\n${testa(sito, '/x')}\n<main><div class="ph"><div class="wrap"><h1>Questa pagina non c'è.</h1><p class="lead">Forse l'indirizzo è cambiato. Ripartite dalla home o scriveteci.</p><p style="margin-top:24px"><a class="btn" href="/">Torna alla home</a></p></div></div></main>\n${piede(sito)}\n<script>${js}</script>\n</body>\n</html>\n`);
+  writeFileSync(dir + 'sito/robots.txt', 'User-agent: *\nAllow: /\n');
+  writeFileSync(dir + 'sito/_headers', intestazioni());
 
-for (const s of SITI) {
-  const dir = `${radice}apps/${s.app}/`;
-  mkdirSync(dir, { recursive: true });
-  const html = readFileSync(qui + s.sorgente, 'utf8')
-    .replace('/*COMUNE_CSS*/', () => css)
-    .replace('/*COMUNE_JS*/', () => js)
-    .replace('<!--MAPPA-->', () => mappa())
-    .replace('<!--POSTAZIONI-->', () => postazioni);
-  const hash = 'sha256-' + createHash('sha256').update(js).digest('base64');
-  writeFileSync(dir + 'index.html', html);
-  writeFileSync(dir + 'privacy.html', privacy(s.nome, s.cosa));
-  writeFileSync(dir + '_headers', intestazioni(hash));
+  // anteprima: tutte le pagine in un file
+  const tutte = sito.pagine.map((p) => `<main data-path="${href(p.path || '/')}" data-titolo="${esc(titoloDi(sito, p))}" hidden>${p.html}</main>`).join('\n');
+  writeFileSync(dir + 'anteprima.html', testaDoc(sito, sito.titoloBase, sito.pagine[0].descrizione, cssSito, false) +
+    `\n<body data-anteprima>\n${testa(sito, '/')}\n${tutte}\n${piede(sito)}\n<script>${js}</script>\n</body>\n</html>\n`);
+
   writeFileSync(dir + 'config.example.js', `// Copia in config.js. Solo valori pubblici: la chiave è la publishable, mai quella segreta.
-// Senza config.js il modulo non invia (in anteprima dentro il pannello di prova passa la richiesta alla Mail di prova).
+// Senza config.js il sito si vede lo stesso, ma i moduli non inviano.
 window.MESSINA = {
   supabaseUrl: 'https://XXXX.supabase.co', supabaseKey: 'sb_publishable_...',
-  negozioUrl: 'https://negozio.[dominio]', portaleUrl: 'https://clienti.[dominio]',
-  trasportiUrl: 'https://[dominio-trasporti]', corporationUrl: 'https://[dominio-corporation]',
+  negozioUrl: 'https://negozio.[dominio]', portaleUrl: 'https://portale.[dominio]',
+  trasportiUrl: 'https://www.[dominio-trasporti]', corporationUrl: 'https://www.[dominio-corporation]',
 };
 `);
-  writeFileSync(dir + 'build.mjs', `// Copia la pagina già pronta in dist/ (nessuna compilazione: è HTML statico generato da siti/genera.mjs).
-import { mkdirSync, copyFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+  writeFileSync(dir + 'build.mjs', `// Copia il sito già generato (cartella sito/, da siti/genera.mjs) in dist/ e aggiunge config.js.
+import { cpSync, existsSync, rmSync, copyFileSync, writeFileSync } from 'node:fs';
 const qui = new URL('.', import.meta.url).pathname;
 rmSync(qui + 'dist', { recursive: true, force: true });
-mkdirSync(qui + 'dist');
-for (const f of ['index.html', 'privacy.html', '_headers']) copyFileSync(qui + f, qui + 'dist/' + f);
+cpSync(qui + 'sito', qui + 'dist', { recursive: true });
 if (existsSync(qui + 'config.js')) copyFileSync(qui + 'config.js', qui + 'dist/config.js');
-else writeFileSync(qui + 'dist/config.js', 'window.MESSINA = window.MESSINA || {};\\n');   // senza configurazione: sito visibile, modulo spento
-console.log('${s.app}: dist pronta');
+else writeFileSync(qui + 'dist/config.js', 'window.MESSINA = window.MESSINA || {};\\n');   // senza configurazione: sito visibile, moduli spenti
+console.log('${app}: dist pronta');
 `);
-  writeFileSync(dir + 'package.json', JSON.stringify({ name: `@messina/${s.app}`, private: true, version: '0.1.0', type: 'module', scripts: { build: 'node build.mjs', anteprima: 'node build.mjs && python3 -m http.server 8766 -d dist' } }, null, 2) + '\n');
-  console.log(s.app, (html.length / 1024).toFixed(1) + ' KB');
+  writeFileSync(dir + 'package.json', JSON.stringify({ name: `@messina/${app}`, private: true, version: '0.2.0', type: 'module', scripts: { build: 'node build.mjs', anteprima: 'node build.mjs && python3 -m http.server 8766 -d dist' } }, null, 2) + '\n');
+  console.log(app, sito.pagine.length, 'pagine');
 }

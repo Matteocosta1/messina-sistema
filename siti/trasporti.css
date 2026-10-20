@@ -1,0 +1,60 @@
+/* mappa dei giri: l'unico movimento della pagina */
+.mappa{border-radius:32px;padding:clamp(14px,2vw,22px);position:relative}
+.mappa svg{display:block;width:100%;height:auto}
+.mappa .cap{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:2px 6px 10px;font-size:14px}
+.mappa .cap b{font-size:15px}
+.giro{fill:none;stroke:var(--ink);stroke-width:1.6;stroke-linecap:round;stroke-dasharray:var(--l);stroke-dashoffset:0;animation:traccia 1.15s cubic-bezier(.6,.05,.25,1) backwards;animation-delay:calc(.35s + var(--i) * .07s)}
+.citta circle{fill:#fff;stroke:var(--ink);stroke-width:1.6}
+.citta text,.base text{paint-order:stroke;stroke:#f7f8fa;stroke-width:4px;stroke-linejoin:round}
+.citta text{font-family:var(--font);font-size:11.5px;font-weight:600;fill:var(--muted)}
+.citta{animation:compare .4s ease-out backwards;animation-delay:calc(1.2s + var(--i) * .07s)}
+.base circle.c{fill:var(--ink)}
+.base circle.r{fill:none;stroke:var(--ink);stroke-width:1;opacity:0;animation:onda 1.6s ease-out .2s 2}
+.base text{font-family:var(--font);font-size:13px;font-weight:800;fill:var(--ink)}
+.puntini{fill:rgba(17,18,20,.13)}
+@keyframes traccia{from{stroke-dashoffset:var(--l)}}
+@keyframes compare{from{opacity:0;transform:translateY(3px)}}
+@keyframes onda{0%{opacity:.6;r:7}100%{opacity:0;r:30}}
+
+/* flotta: i mezzi in scala sulla stessa strada */
+.strada{display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1fr) minmax(0,1.5fr);gap:clamp(16px,3vw,40px);align-items:end;border-bottom:2px solid var(--ink);padding-bottom:0}
+.mezzo svg{display:block;width:100%;height:auto;overflow:visible}
+.mezzo svg .t{fill:var(--glass-strong);stroke:var(--ink);stroke-width:2;stroke-linejoin:round}
+.mezzo svg .v{fill:var(--ink)}
+.mezzo svg .ruota{fill:var(--ink)}
+.mezzo svg .cerchio{fill:#fff}
+.mezzi-testo{display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1fr) minmax(0,1.5fr);gap:clamp(16px,3vw,40px);margin-top:18px}
+.mezzi-testo h3{font-size:20px;font-weight:750}
+.mezzi-testo p{font-size:15px;color:var(--muted);margin-top:4px}
+
+/* magazzino */
+.mag{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(20px,4vw,56px);align-items:center}
+.mag ul{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:12px}
+.mag li{padding-left:22px;position:relative}
+.mag li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:8px;border-radius:2px;background:var(--ink)}
+.portale-mini{border-radius:26px;padding:18px}
+.portale-mini .testa{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px 6px 14px}
+.portale-mini .testa b{font-size:16px}
+.portale-mini .testa span{font-size:13px;color:var(--muted)}
+.portale-mini table{width:100%;border-collapse:collapse;font-size:14px}
+.portale-mini th{text-align:left;font-weight:600;color:var(--muted);font-size:12.5px;padding:8px 6px;border-bottom:1px solid var(--line)}
+.portale-mini td{padding:11px 6px;border-bottom:1px solid var(--line)}
+.portale-mini tr:last-child td{border-bottom:0}
+.stato{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--soft)}
+.stato.esce{background:var(--solid);color:var(--on-solid)}
+.portale-mini .piede{display:flex;justify-content:flex-end;padding-top:12px}
+.portale-mini .piede span{font-size:13px;font-weight:700;padding:9px 14px;border-radius:99px;background:var(--solid);color:var(--on-solid)}
+
+@media (max-width:900px){.mag,.prev{grid-template-columns:1fr}}
+@media (max-width:640px){
+  .strada,.mezzi-testo{grid-template-columns:1fr}
+  .strada{border-bottom:0;gap:0}
+  .mezzo{border-bottom:2px solid var(--ink);padding-top:18px}
+  .mezzo.m1 svg{width:46%}.mezzo.m2 svg{width:70%}
+  .mezzi-testo{display:none}
+  .mezzo .solo-tel{display:block;padding:12px 0 18px}
+  .portale-mini td:nth-child(3),.portale-mini th:nth-child(3){display:none}
+}
+.solo-tel{display:none}
+@media (max-width:640px){.citta text{font-size:17px}.base text{font-size:18px}.citta circle{r:5.5}.base circle.c{r:9}.giro{stroke-width:2.2}}
+.solo-tel h3{font-size:19px;font-weight:750}.solo-tel p{font-size:15px;color:var(--muted);margin-top:2px}

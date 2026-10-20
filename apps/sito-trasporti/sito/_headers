@@ -1,0 +1,15 @@
+# Intestazioni di sicurezza per Cloudflare Pages. Generato da siti/genera.mjs: non modificare a mano.
+# Lo script delle pagine è ammesso con la sua impronta (sha256); i dati strutturati (ld+json) non sono script eseguibili.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-Er3lxLfLJAgyX3XmpBT4oEq1T2vo6jUuOSAKQAjIlIw='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), geolocation=(), microphone=()
+  Cross-Origin-Opener-Policy: same-origin
+
+/config.js
+  Cache-Control: no-cache
+/*.html
+  Cache-Control: no-cache

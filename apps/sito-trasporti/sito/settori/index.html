@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Settori | Messina Autotrasporti</title>
+<meta name="description" content="Tecnologia, energia, banche, beverage, cosmetica ed e-commerce: come lavoriamo per ogni settore.">
+<meta name="theme-color" content="#f2f3f5">
+<meta property="og:title" content="Settori | Messina Autotrasporti">
+<meta property="og:description" content="Tecnologia, energia, banche, beverage, cosmetica ed e-commerce: come lavoriamo per ogni settore.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="it_IT">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111214'/%3E%3Ctext x='32' y='44' font-family='Arial' font-weight='900' font-size='34' text-anchor='middle' fill='%23fff'%3EM%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="/config.js"></script>
+<style>
+/* Siti pubblici Messina: stesso linguaggio dei programmi (bianco e nero, vetro leggero, Figtree). */
+:root{
+  --bg:#f2f3f5; --halo1:#e0e4eb; --halo2:#e9e9ee;
+  --ink:#111214; --muted:#5b5e66; --line:rgba(17,18,20,.10); --soft:rgba(17,18,20,.05);
+  --glass:rgba(255,255,255,.72); --glass-edge:rgba(255,255,255,.95); --glass-strong:rgba(255,255,255,.92);
+  --solid:#111214; --on-solid:#fff; --ok:#146c43; --ok-soft:#e7f5ec; --alert:#b42318; --alert-soft:#fdecea;
+  --shadow:0 1px 2px rgba(20,24,32,.04),0 18px 40px -24px rgba(20,24,32,.30);
+  --font:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --wrap:1200px; --gut:clamp(16px,4vw,40px);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:88px}
+body{margin:0;font-family:var(--font);font-size:17px;line-height:1.55;color:var(--ink);
+  background:radial-gradient(1000px 600px at 92% -10%,var(--halo1),transparent 65%),radial-gradient(800px 560px at -10% 40%,var(--halo2),transparent 60%),var(--bg);background-color:var(--bg)}
+img,svg{max-width:100%}
+a{color:inherit}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.03em}
+p{margin:0}
+:focus-visible{outline:2px solid var(--solid);outline-offset:3px;border-radius:6px}
+.wrap{max-width:var(--wrap);margin:0 auto;padding-left:max(var(--gut),env(safe-area-inset-left,0px));padding-right:max(var(--gut),env(safe-area-inset-right,0px))}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);border:1px solid var(--glass-edge);box-shadow:var(--shadow)}
+.muted{color:var(--muted)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:16px;font-weight:700;min-height:48px;padding:12px 22px;border-radius:999px;border:1px solid var(--solid);background:var(--solid);color:var(--on-solid);text-decoration:none;cursor:pointer}
+.btn.ghost{background:var(--glass-strong);color:var(--ink);border-color:var(--line)}
+.btn:hover{filter:brightness(1.25)}
+.btn.ghost:hover{filter:none;background:#fff}
+
+/* testata */
+.top{position:sticky;top:0;z-index:20;padding-top:env(safe-area-inset-top,0px)}
+.top .bar{display:flex;align-items:center;gap:20px;min-height:68px;margin-top:10px;padding:8px 8px 8px 20px;border-radius:999px}
+.logo{font-weight:900;font-size:20px;letter-spacing:-.04em;text-decoration:none;white-space:nowrap}
+.logo span{font-weight:500;letter-spacing:-.02em}
+.menu{display:flex;gap:2px;margin-left:auto}
+.menu a{font-size:15px;font-weight:600;text-decoration:none;padding:10px 14px;border-radius:999px}
+.menu a:hover{background:var(--soft)}
+.top .btn{min-height:44px;padding:10px 18px;font-size:15px}
+
+/* apertura */
+.hero{padding:clamp(40px,7vw,96px) 0 clamp(36px,5vw,64px)}
+.hero .g{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(24px,4vw,56px);align-items:center}
+.hero h1{font-size:clamp(44px,6.1vw,88px);font-weight:850;line-height:.95;letter-spacing:-.05em}
+.hero .sub{font-size:clamp(18px,1.6vw,21px);color:var(--muted);max-width:34ch;margin-top:22px}
+.hero .cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 28px;margin-top:40px;padding-top:22px;border-top:1px solid var(--line)}
+.facts b{display:block;font-size:clamp(17px,1.6vw,20px);line-height:1.25;letter-spacing:-.02em}
+.facts span{font-size:14px;color:var(--muted)}
+
+/* sezioni */
+section{padding:clamp(56px,8vw,112px) 0}
+.sh{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px 56px;align-items:end;margin-bottom:clamp(28px,4vw,48px)}
+.sh h2{font-size:clamp(32px,4.4vw,56px);font-weight:800;line-height:1.02}
+.sh p{color:var(--muted);max-width:52ch}
+.panel{border-radius:28px;padding:clamp(20px,3vw,36px)}
+
+/* elenco servizi: righe, non carte uguali */
+.servizi{border-radius:28px;overflow:hidden}
+.srv{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr) 168px;gap:16px 40px;align-items:start;padding:28px clamp(20px,3vw,36px);border-top:1px solid var(--line)}
+.srv:first-child{border-top:0}
+.srv h3{font-size:clamp(22px,2.2vw,28px);font-weight:750}
+.srv p{color:var(--muted);max-width:56ch}
+.srv ul{margin:10px 0 0;padding-left:18px;color:var(--ink);font-size:15px}
+.srv .tag{justify-self:end;font-size:13px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--glass-strong);white-space:nowrap}
+
+/* percorso: è davvero una sequenza */
+.passi{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));gap:0;counter-reset:p;border-radius:28px;overflow:hidden}
+.passi li{counter-increment:p;padding:26px 22px 28px;border-left:1px solid var(--line);position:relative}
+.passi li:first-child{border-left:0}
+.passi li::before{content:counter(p);display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:99px;background:var(--solid);color:var(--on-solid);font-weight:800;font-size:15px;margin-bottom:16px}
+.passi b{display:block;font-size:18px;letter-spacing:-.01em;margin-bottom:6px}
+.passi span{font-size:15px;color:var(--muted)}
+
+/* modulo */
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.form .w{grid-column:1/-1}
+.f{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+.f input,.f textarea,.f select{font:inherit;font-size:16px;font-weight:400;min-height:50px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--glass-strong);color:var(--ink);width:100%}
+.f textarea{min-height:120px;resize:vertical}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips label{display:inline-flex;align-items:center;font-size:15px;font-weight:600;min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--glass-strong);cursor:pointer}
+.chips input{position:absolute;opacity:0;width:1px;height:1px}
+.chips input:checked+span{color:var(--on-solid)}
+.chips label:has(input:checked){background:var(--solid);border-color:var(--solid);color:var(--on-solid)}
+.chips label:has(input:focus-visible){outline:2px solid var(--solid);outline-offset:2px}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.esito{grid-column:1/-1;border-radius:16px;padding:14px 16px;font-weight:600}
+.esito.ok{background:var(--solid);color:var(--on-solid)}
+.esito.ko{background:var(--alert-soft);color:var(--alert);box-shadow:inset 0 0 0 1px var(--alert)}
+.priv{grid-column:1/-1;font-size:13px;color:var(--muted)}
+
+/* piede */
+footer{padding:48px 0 calc(40px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);font-size:15px}
+footer .g{display:grid;grid-template-columns:1.5fr repeat(4,1fr);gap:28px}
+footer .chi span{display:block;margin-top:4px}
+footer .chi a{display:inline;padding:0}
+footer b{display:block;margin-bottom:8px}
+footer a{display:block;text-decoration:none;color:var(--muted);padding:4px 0}
+footer a:hover{color:var(--ink)}
+.legal{margin-top:28px;font-size:13px;color:var(--muted)}
+
+@media (max-width:900px){
+  .hero .g,.sh{grid-template-columns:1fr}
+  .srv{grid-template-columns:1fr}
+  .srv .tag{justify-self:start}
+  footer .g{grid-template-columns:1fr 1fr}
+}
+@media (max-width:760px){
+  .top .bar{gap:10px;padding-left:16px}
+  .passi{grid-template-columns:1fr}
+  .passi li{border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:34px 1fr;gap:4px 14px;padding:20px}
+  .passi li:first-child{border-top:0}
+  .passi li::before{grid-row:1/3;margin:0}
+  .form{grid-template-columns:1fr}
+  .facts{grid-template-columns:1fr 1fr}
+  footer .g{grid-template-columns:1fr}
+}
+@media (max-width:400px){
+  .logo{font-size:17px}
+  .top .bar{padding-left:14px;min-height:60px}
+  .top .btn{min-height:42px;padding:8px 14px;font-size:14px}
+  .logo{line-height:1.05}
+  .logo span{display:block;font-size:14px}
+}
+
+/* ===== pagine interne, menu, componenti ===== */
+.menu a[aria-current]{background:var(--solid);color:var(--on-solid)}
+.menu-util{display:flex;gap:2px;margin-left:6px;padding-left:8px;border-left:1px solid var(--line)}
+.menu-util a{color:var(--muted)}
+.apri{display:none;width:44px;height:44px;border-radius:99px;border:1px solid var(--line);background:var(--glass-strong);cursor:pointer;flex:none;position:relative}
+.apri i{position:absolute;left:13px;right:13px;height:2px;border-radius:2px;background:var(--ink);transition:transform .2s}
+.apri i:first-child{top:17px}.apri i:last-child{top:25px}
+.top.aperto .apri i:first-child{transform:translateY(4px) rotate(45deg)}.top.aperto .apri i:last-child{transform:translateY(-4px) rotate(-45deg)}
+@media (max-width:1100px){
+  .menu{display:none}
+  .apri{display:block}
+  .top .btn{margin-left:auto}
+  .top .bar{flex-wrap:wrap;transition:border-radius .2s}
+  .top.aperto .bar{border-radius:28px}
+  .top.aperto .menu{display:flex;flex-direction:column;order:5;flex-basis:100%;margin:4px 0 8px;gap:2px}
+  .top.aperto .menu a{font-size:17px;padding:12px 14px}
+  .top.aperto .menu-util{flex-direction:column;margin:6px 0 0;padding:6px 0 0;border-left:0;border-top:1px solid var(--line)}
+}
+.ph{padding:clamp(36px,6vw,80px) 0 clamp(28px,4vw,48px)}
+.ph h1{font-size:clamp(40px,5.6vw,76px);font-weight:850;line-height:.98;letter-spacing:-.045em;max-width:18ch}
+.ph .lead{font-size:clamp(18px,1.6vw,21px);color:var(--muted);max-width:52ch;margin-top:18px}
+.briciole{font-size:14px;color:var(--muted);margin-bottom:18px;display:flex;flex-wrap:wrap;gap:6px}
+.briciole a{text-decoration:none;color:var(--muted)}.briciole a:hover{color:var(--ink)}
+.h2{font-size:clamp(32px,4.4vw,56px);font-weight:800;line-height:1.02}
+.h3{font-size:22px;font-weight:750}
+.vai a,a.vai{font-weight:700;text-decoration:none;border-bottom:2px solid var(--ink);padding-bottom:1px}
+.srv .vai{margin-top:12px}
+.srv h3 a{text-decoration:none}
+.punti{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:12px}
+.punti li{padding-left:22px;position:relative}
+.punti li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:8px;border-radius:2px;background:var(--ink)}
+.azioni{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-radius:24px;overflow:hidden;margin-bottom:clamp(8px,2vw,16px)}
+.azioni a{display:flex;flex-direction:column;gap:4px;padding:20px 22px;text-decoration:none;border-left:1px solid var(--line)}
+.azioni a:first-child{border-left:0}
+.azioni a:hover{background:rgba(255,255,255,.7)}
+.azioni b{font-size:17px}.azioni span{font-size:14px;color:var(--muted)}
+.settori-strip{display:flex;flex-wrap:wrap;gap:10px}
+.settori-strip a,.settori-strip span{font-size:16px;font-weight:600;padding:12px 18px;border-radius:999px;border:1px solid var(--line);background:var(--glass-strong);text-decoration:none}
+.settori-strip a:hover{background:#fff}
+.banda{display:flex;align-items:center;justify-content:space-between;gap:24px 40px;flex-wrap:wrap;padding:clamp(24px,4vw,44px);border-radius:28px;border:1px solid var(--line);background:var(--glass-strong)}
+.banda h2{font-size:clamp(26px,3vw,36px);font-weight:800;line-height:1.08}
+.banda p{color:var(--muted);margin-top:10px;max-width:56ch}
+.tabella{border-radius:24px;overflow-x:auto}
+.tabella table{width:100%;border-collapse:collapse;font-size:16px;min-width:480px}
+.tabella th{text-align:left;font-size:14px;font-weight:600;color:var(--muted);padding:14px 20px;border-bottom:1px solid var(--line)}
+.tabella td{padding:14px 20px;border-bottom:1px solid var(--line);vertical-align:top}
+.tabella tr:last-child td{border-bottom:0}
+.faq{border-radius:24px;overflow:hidden}
+.faq details{border-top:1px solid var(--line)}
+.faq details:first-child{border-top:0}
+.faq summary{cursor:pointer;list-style:none;padding:20px 56px 20px 24px;font-weight:700;font-size:17px;position:relative}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"";position:absolute;right:24px;top:50%;width:10px;height:10px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(-70%) rotate(45deg);transition:transform .2s}
+.faq details[open] summary::after{transform:translateY(-30%) rotate(-135deg)}
+.faq details>div{padding:0 24px 22px;color:var(--muted);max-width:72ch}
+.faq details>div a{color:var(--ink)}
+.dati{display:grid;gap:0;margin:0;border-radius:24px;overflow:hidden;background:var(--glass-strong);border:1px solid var(--line)}
+.dati>div{display:grid;grid-template-columns:minmax(0,.4fr) minmax(0,1fr);gap:8px 24px;padding:16px 22px;border-top:1px solid var(--line)}
+.dati>div:first-child{border-top:0}
+.dati dt{font-weight:700}.dati dd{margin:0;color:var(--muted)}.dati dd a{color:var(--ink)}
+.storia{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));border-radius:28px;overflow:hidden}
+.storia>div{padding:24px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.storia>div:first-child{border-left:0}
+.storia b{font-size:28px;font-weight:850;letter-spacing:-.03em}.storia span{color:var(--muted);font-size:15px}
+.uffici{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr));gap:12px}
+.uffici>*{display:flex;flex-direction:column;gap:4px;padding:20px 22px;border-radius:20px;text-decoration:none}
+.uffici b{font-size:16px}.uffici a{font-weight:600;text-decoration:none;word-break:break-all}.uffici .muted{font-size:14px}
+.prosa{max-width:72ch}
+.prosa h2{font-size:22px;font-weight:750;margin:30px 0 8px}
+.prosa p{margin-top:10px}.prosa p+p{margin-top:14px}
+.bozza{border-radius:16px;padding:14px 16px;background:var(--alert-soft);color:var(--alert);font-weight:600;margin-bottom:8px}
+.prev{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(24px,4vw,56px);align-items:start}
+.prev h2{font-size:clamp(32px,4.4vw,56px);font-weight:800;line-height:1.02}
+.prev .lead{color:var(--muted);margin-top:16px;max-width:40ch}
+.contatti{margin-top:24px;display:grid;gap:14px;font-size:16px}
+.contatti b{display:block;font-size:13px;color:var(--muted);font-weight:600}
+.contatti a{font-weight:600}
+.form .w .btn{width:100%}
+.gruppo{border:0;padding:0;margin:0}.gruppo legend{padding:0;margin-bottom:6px}
+.priv{display:flex;gap:10px;align-items:flex-start}
+.priv input{width:20px;height:20px;margin:1px 0 0;flex:none}
+.traccia{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:clamp(24px,4vw,56px);align-items:start}
+.cerca-sped{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr) auto;gap:14px;align-items:end}
+.traccia-esito{grid-column:1/-1}
+.tl{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:0}
+.tl li{display:grid;grid-template-columns:22px 1fr auto;gap:12px;padding:12px 0;border-top:1px solid var(--line);align-items:start}
+.tl li:first-child{border-top:0}
+.tl li::before{content:"";width:12px;height:12px;border-radius:99px;margin-top:5px;background:var(--ink)}
+.tl li.dopo::before{background:transparent;box-shadow:inset 0 0 0 2px rgba(17,18,20,.25)}
+.tl li.dopo{color:var(--muted)}
+.tl small{color:var(--muted);font-size:14px}
+.mappa.solo{max-width:880px}
+@media (max-width:900px){.prev,.traccia{grid-template-columns:1fr}.azioni{grid-template-columns:1fr 1fr}.azioni a:nth-child(3){border-left:0}.azioni a:nth-child(n+3){border-top:1px solid var(--line)}}
+@media (max-width:760px){.cerca-sped{grid-template-columns:1fr}.dati>div{grid-template-columns:1fr}.storia>div{border-left:0;border-top:1px solid var(--line)}.storia>div:first-child{border-top:0}}
+@media (max-width:440px){.azioni{grid-template-columns:1fr}.azioni a{border-left:0!important;border-top:1px solid var(--line)}.azioni a:first-child{border-top:0}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+
+/* mappa dei giri: l'unico movimento della pagina */
+.mappa{border-radius:32px;padding:clamp(14px,2vw,22px);position:relative}
+.mappa svg{display:block;width:100%;height:auto}
+.mappa .cap{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:2px 6px 10px;font-size:14px}
+.mappa .cap b{font-size:15px}
+.giro{fill:none;stroke:var(--ink);stroke-width:1.6;stroke-linecap:round;stroke-dasharray:var(--l);stroke-dashoffset:0;animation:traccia 1.15s cubic-bezier(.6,.05,.25,1) backwards;animation-delay:calc(.35s + var(--i) * .07s)}
+.citta circle{fill:#fff;stroke:var(--ink);stroke-width:1.6}
+.citta text,.base text{paint-order:stroke;stroke:#f7f8fa;stroke-width:4px;stroke-linejoin:round}
+.citta text{font-family:var(--font);font-size:11.5px;font-weight:600;fill:var(--muted)}
+.citta{animation:compare .4s ease-out backwards;animation-delay:calc(1.2s + var(--i) * .07s)}
+.base circle.c{fill:var(--ink)}
+.base circle.r{fill:none;stroke:var(--ink);stroke-width:1;opacity:0;animation:onda 1.6s ease-out .2s 2}
+.base text{font-family:var(--font);font-size:13px;font-weight:800;fill:var(--ink)}
+.puntini{fill:rgba(17,18,20,.13)}
+@keyframes traccia{from{stroke-dashoffset:var(--l)}}
+@keyframes compare{from{opacity:0;transform:translateY(3px)}}
+@keyframes onda{0%{opacity:.6;r:7}100%{opacity:0;r:30}}
+
+/* flotta: i mezzi in scala sulla stessa strada */
+.strada{display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1fr) minmax(0,1.5fr);gap:clamp(16px,3vw,40px);align-items:end;border-bottom:2px solid var(--ink);padding-bottom:0}
+.mezzo svg{display:block;width:100%;height:auto;overflow:visible}
+.mezzo svg .t{fill:var(--glass-strong);stroke:var(--ink);stroke-width:2;stroke-linejoin:round}
+.mezzo svg .v{fill:var(--ink)}
+.mezzo svg .ruota{fill:var(--ink)}
+.mezzo svg .cerchio{fill:#fff}
+.mezzi-testo{display:grid;grid-template-columns:minmax(0,.62fr) minmax(0,1fr) minmax(0,1.5fr);gap:clamp(16px,3vw,40px);margin-top:18px}
+.mezzi-testo h3{font-size:20px;font-weight:750}
+.mezzi-testo p{font-size:15px;color:var(--muted);margin-top:4px}
+
+/* magazzino */
+.mag{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(20px,4vw,56px);align-items:center}
+.mag ul{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:12px}
+.mag li{padding-left:22px;position:relative}
+.mag li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:8px;border-radius:2px;background:var(--ink)}
+.portale-mini{border-radius:26px;padding:18px}
+.portale-mini .testa{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px 6px 14px}
+.portale-mini .testa b{font-size:16px}
+.portale-mini .testa span{font-size:13px;color:var(--muted)}
+.portale-mini table{width:100%;border-collapse:collapse;font-size:14px}
+.portale-mini th{text-align:left;font-weight:600;color:var(--muted);font-size:12.5px;padding:8px 6px;border-bottom:1px solid var(--line)}
+.portale-mini td{padding:11px 6px;border-bottom:1px solid var(--line)}
+.portale-mini tr:last-child td{border-bottom:0}
+.stato{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--soft)}
+.stato.esce{background:var(--solid);color:var(--on-solid)}
+.portale-mini .piede{display:flex;justify-content:flex-end;padding-top:12px}
+.portale-mini .piede span{font-size:13px;font-weight:700;padding:9px 14px;border-radius:99px;background:var(--solid);color:var(--on-solid)}
+
+@media (max-width:900px){.mag,.prev{grid-template-columns:1fr}}
+@media (max-width:640px){
+  .strada,.mezzi-testo{grid-template-columns:1fr}
+  .strada{border-bottom:0;gap:0}
+  .mezzo{border-bottom:2px solid var(--ink);padding-top:18px}
+  .mezzo.m1 svg{width:46%}.mezzo.m2 svg{width:70%}
+  .mezzi-testo{display:none}
+  .mezzo .solo-tel{display:block;padding:12px 0 18px}
+  .portale-mini td:nth-child(3),.portale-mini th:nth-child(3){display:none}
+}
+.solo-tel{display:none}
+@media (max-width:640px){.citta text{font-size:17px}.base text{font-size:18px}.citta circle{r:5.5}.base circle.c{r:9}.giro{stroke-width:2.2}}
+.solo-tel h3{font-size:19px;font-weight:750}.solo-tel p{font-size:15px;color:var(--muted);margin-top:2px}
+
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="bar glass" aria-label="Principale">
+      <a class="logo" href="/">Messina <span>Autotrasporti</span></a>
+      <div class="menu" id="menu">
+        <a href="/servizi/">Servizi</a><a href="/settori/" aria-current="page">Settori</a><a href="/flotta/">Flotta</a><a href="/azienda/">Azienda</a><a href="/contatti/">Contatti</a>
+        <span class="menu-util"><a href="/traccia/">Traccia</a><a href="#" data-link="portaleUrl">Area clienti</a></span>
+      </div>
+      <a class="btn" href="/preventivo/">Preventivo</a>
+      <button class="apri" type="button" aria-expanded="false" aria-controls="menu" aria-label="Menu"><i></i><i></i></button>
+    </nav>
+  </div>
+</header>
+<main><div class="ph"><div class="wrap">
+    <nav class="briciole" aria-label="Sei qui"><a href="/">Home</a> <span aria-hidden="true">/</span> <span>Settori</span></nav>
+    <h1>Settori</h1>
+    <p class="lead">Ogni settore ha le sue regole di consegna. Le conosciamo perché le seguiamo ogni giorno.</p>
+  </div></div><section><div class="wrap">
+    
+    <div class="servizi glass">
+  <div class="srv">
+    <h3>Tecnologia ed elettronica</h3>
+    <div><p>Distribuzione di prodotti di elettronica nel Nord Italia, con merce di alto valore tracciata collo per collo e consegne su appuntamento.</p></div>
+    <span class="tag">Seriali</span>
+  </div>
+  <div class="srv">
+    <h3>Energia e impianti</h3>
+    <div><p>Materiali per cantieri e sedi tecniche, con magazzino dedicato e seriali visibili al cliente 24 ore su 24.</p></div>
+    <span class="tag">Portale dal vivo</span>
+  </div>
+  <div class="srv">
+    <h3><a href="/servizi/logistica-it/">Banche e assicurazioni</a></h3>
+    <div><p>Rinnovi di telefoni e PC per migliaia di dipendenti, con etichette cespite, accessori per utente e resi.</p><p class="vai"><a href="/servizi/logistica-it/">Logistica IT</a></p></div>
+    <span class="tag">IMEI e cespiti</span>
+  </div>
+  <div class="srv">
+    <h3>Beverage</h3>
+    <div><p>Consegne a ristoranti, enoteche e privati con prenotazione, consegna al piano o in cantina.</p></div>
+    <span class="tag">Consegna in cantina</span>
+  </div>
+  <div class="srv">
+    <h3>Cosmetica e retail</h3>
+    <div><p>Rifornimento di negozi e corner con finestre orarie precise e consegna con sponda.</p></div>
+    <span class="tag">Punti vendita</span>
+  </div>
+  <div class="srv">
+    <h3>E-commerce</h3>
+    <div><p>Preparazione ordini, consegna al cliente finale e gestione dei resi dal nostro magazzino.</p></div>
+    <span class="tag">Resi</span>
+  </div></div>
+  </div></section><section style="padding-top:0"><div class="wrap"><div class="banda"><div><h2>Il vostro settore non c'è?</h2><p>Raccontateci cosa spedite: la maggior parte dei nostri servizi nasce dalla richiesta di un cliente.</p></div><a class="btn" href="/preventivo/">Chiedi un preventivo</a></div></div></section></main>
+<footer>
+  <div class="wrap">
+    <div class="g">
+      <div class="chi"><b>Messina Autotrasporti</b><span class="muted">Via Cascina Nuova 1, 20084 Lacchiarella (MI)</span><span class="muted">Tel. <a href="tel:+390292270155">02 9227 0155</a></span></div>
+      <div><b>Servizi</b><a href="/servizi/trasporto/">Distribuzione</a><a href="/servizi/magazzino/">Magazzino</a><a href="/servizi/logistica-it/">Logistica IT</a><a href="/servizi/giacenze-resi/">Giacenze e resi</a><a href="/flotta/">Flotta</a></div><div><b>Azienda</b><a href="/azienda/">Chi siamo</a><a href="/settori/">Settori</a><a href="/documenti/">Documenti</a><a href="/lavora-con-noi/">Lavora con noi</a><a href="#" data-link="corporationUrl">Messina Corporation</a></div><div><b>Supporto</b><a href="/traccia/">Traccia</a><a href="/preventivo/">Preventivo</a><a href="/ritiro/">Prenota un ritiro</a><a href="/domande/">Domande</a><a href="/contatti/">Contatti</a><a href="#" data-link="portaleUrl">Area clienti</a></div><div><b>Legale</b><a href="/condizioni/">Condizioni di trasporto</a><a href="/privacy/">Privacy</a><a href="/cookie/">Cookie</a><a href="/note-legali/">Note legali</a></div>
+    </div>
+    <p class="legal">Messina Autotrasporti S.r.l., Via Cascina Nuova 1, 20084 Lacchiarella (MI). P.IVA 09420230964. Iscritta all'Albo nazionale gestori ambientali, n. MI/062921.</p>
+  </div>
+</footer>
+<script>// Siti pubblici: menu, collegamenti dalla configurazione, moduli, tracciamento.
+// Pubblicato: ogni pagina è un file vero (/servizi/trasporto/). Anteprima (un solo file, dentro il pannello di prova):
+// tutte le pagine sono nello stesso documento e questo script le mostra una alla volta.
+(function () {
+  var cfg = window.MESSINA || {};
+  var incorporato = window.parent !== window;
+  var anteprima = document.body.hasAttribute('data-anteprima');
+
+  // menu su telefono e tablet
+  var top = document.querySelector('.top'), apri = document.querySelector('.apri');
+  function chiudiMenu() { if (top) { top.classList.remove('aperto'); apri && apri.setAttribute('aria-expanded', 'false'); } }
+  if (apri) apri.addEventListener('click', function () {
+    var on = !top.classList.contains('aperto');
+    top.classList.toggle('aperto', on); apri.setAttribute('aria-expanded', on ? 'true' : 'false');
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') chiudiMenu(); });
+
+  // collegamenti verso gli altri siti (negozio, area clienti, società sorella)
+  document.querySelectorAll('[data-link]').forEach(function (a) {
+    var u = cfg[a.getAttribute('data-link')];
+    if (u) a.setAttribute('href', u);
+  });
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a'); if (!a) return;
+    var l = a.getAttribute('data-link');
+    if (l && !cfg[l]) {
+      e.preventDefault();
+      if (incorporato) parent.postMessage({ tipo: 'messina-vai', dove: l }, '*');
+      return;
+    }
+    if (!anteprima) return;
+    var h = a.getAttribute('href') || '';
+    if (h.charAt(0) === '#' && h.length > 1) { chiudiMenu(); return; }      // ancora nella stessa pagina
+    if (h.charAt(0) !== '/') return;
+    e.preventDefault(); chiudiMenu();
+    vai(h);
+  });
+
+  // anteprima: una pagina alla volta
+  function vai(h) {
+    var parti = h.split('#'), path = parti[0] || '/', ancora = parti[1];
+    var pag = document.querySelector('main[data-path="' + path + '"]') || document.querySelector('main[data-path="/"]');
+    document.querySelectorAll('main[data-path]').forEach(function (m) { m.hidden = m !== pag; });
+    document.querySelectorAll('.menu a[href^="/"]').forEach(function (a) {
+      var p = a.getAttribute('href');
+      if (p !== '/' && path.indexOf(p) === 0) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    document.title = pag.getAttribute('data-titolo');
+    if (incorporato) parent.postMessage({ tipo: 'messina-pagina', path: path }, '*');
+    var el = ancora && pag.querySelector('#' + ancora);
+    if (el) el.scrollIntoView(); else window.scrollTo(0, 0);
+  }
+  if (anteprima) vai('/');
+
+  // moduli: preventivo, ritiro, candidatura, contatto, lotto
+  document.querySelectorAll('form[data-sito]').forEach(function (f) {
+    var esito = f.querySelector('.esito'), btn = f.querySelector('button[type=submit]'), testoBtn = btn.textContent;
+    function mostra(tipo, msg) { esito.hidden = false; esito.className = 'esito ' + tipo; esito.textContent = msg; esito.focus(); }
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!f.reportValidity()) return;
+      var d = new FormData(f), dettagli = {};
+      f.querySelectorAll('[data-dettaglio]').forEach(function (el) {
+        var k = el.getAttribute('data-dettaglio');
+        if (el.type === 'checkbox') { if (el.checked) (dettagli[k] = dettagli[k] || []).push(el.value); }
+        else if (el.value.trim()) dettagli[k] = el.value.trim();
+      });
+      var corpo = {
+        sito: f.getAttribute('data-sito'), tipo: f.getAttribute('data-tipo'), nome: d.get('nome'), azienda: d.get('azienda'), email: d.get('email'),
+        telefono: d.get('telefono'), note: d.get('note'), dettagli: dettagli, privacy: !!d.get('privacy'), sito_web: d.get('sito_web') || '',
+      };
+      btn.disabled = true; btn.textContent = 'Invio in corso';
+      var invio;
+      if (cfg.supabaseUrl && cfg.supabaseKey) {
+        invio = fetch(cfg.supabaseUrl + '/functions/v1/richiesta-sito', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: cfg.supabaseKey, Authorization: 'Bearer ' + cfg.supabaseKey },
+          body: JSON.stringify(corpo),
+        }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.errore || 'Invio non riuscito'); }); });
+      } else if (incorporato) {
+        parent.postMessage({ tipo: 'messina-sito', corpo: corpo }, '*');
+        invio = new Promise(function (ok) { setTimeout(ok, 450); });
+      } else {
+        invio = Promise.reject(new Error('Il modulo si attiva quando il sito è collegato. Nel frattempo scriveteci una mail.'));
+      }
+      invio.then(function () { f.reset(); mostra('ok', f.getAttribute('data-ok')); },
+        function (err) { mostra('ko', err.message || 'Invio non riuscito: riprovate o scriveteci una mail.'); })
+        .then(function () { btn.disabled = false; btn.textContent = testoBtn; });
+    });
+  });
+
+  // tracciamento: nell'anteprima mostra un esempio; pubblicato si attiva con il servizio di tracciamento del sistema
+  document.querySelectorAll('form[data-traccia]').forEach(function (f) {
+    var out = f.querySelector('.traccia-esito');
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!f.reportValidity()) return;
+      var n = String(new FormData(f).get('numero')).trim().replace(/[<>&"]/g, '');
+      out.hidden = false;
+      if (!incorporato && !anteprima) {
+        out.className = 'traccia-esito esito ko';
+        out.textContent = 'Il tracciamento online si attiva con il nuovo sistema. Nel frattempo trovate le spedizioni nell\'area clienti o chiamateci.';
+        return;
+      }
+      var fatta = /[02468]$/.test(n);
+      var righe = [['Ritirata', 'Lacchiarella (MI)', '08:10'], ['In magazzino', 'Controllata con lo scanner', '09:02'], ['Partita', 'Nel giro del mattino', '10:15'],
+        [fatta ? 'Consegnata' : 'In consegna', fatta ? 'Firmata, con foto della bolla e posizione' : 'Arrivo previsto entro le 13', fatta ? '11:42' : '']];
+      out.className = 'traccia-esito';
+      out.innerHTML = '<b style="font-size:18px">Spedizione ' + n + '</b><ol class="tl">' + righe.map(function (r, i) {
+        return '<li' + (!fatta && i === 3 ? ' class="dopo"' : '') + '><span></span><span><b>' + r[0] + '</b><br><small>' + r[1] + '</small></span><small>' + r[2] + '</small></li>';
+      }).join('').replace(/<li([^>]*)><span><\/span>/g, '<li$1>') + '</ol><p class="muted" style="font-size:14px;margin-top:8px">Esempio: nella prova ogni numero dà un risultato di prova.</p>';
+      out.focus();
+    });
+  });
+})();
+</script>
+</body>
+</html>

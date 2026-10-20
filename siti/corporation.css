@@ -1,0 +1,56 @@
+/* titolo più lungo dei Trasporti: un passo più piccolo per stare su quattro righe */
+.hero h1{font-size:clamp(42px,5.3vw,78px)}
+.hero .g{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+/* il portatile che si cancella: l'unico movimento della pagina */
+@property --p{syntax:'<integer>';inherits:true;initial-value:100}
+.pc{position:relative;margin:0;padding:0 5%}
+.pc .schermo{position:relative;border-radius:22px 22px 6px 6px;background:var(--ink);padding:12px;aspect-ratio:16/10.4;box-shadow:var(--shadow)}
+.pc .vetro{height:100%;border-radius:12px;background:linear-gradient(180deg,#fbfbfc,#eef0f3);padding:clamp(16px,3vw,30px);display:flex;flex-direction:column;justify-content:center;gap:14px;overflow:hidden}
+.pc .base{height:16px;margin:0 -5%;border-radius:0 0 22px 22px;background:linear-gradient(180deg,#d9dce2,#c4c8cf);position:relative}
+.pc .base::after{content:"";position:absolute;left:50%;top:0;width:18%;height:6px;transform:translateX(-50%);border-radius:0 0 8px 8px;background:#b4b8c0}
+.pc .riga{display:flex;justify-content:space-between;gap:10px;font-size:clamp(12px,1.2vw,14px);color:var(--muted)}
+.pc .riga b{color:var(--ink)}
+.pc .titolo{font-size:clamp(18px,2.1vw,26px);font-weight:800;letter-spacing:-.03em}
+.pc .barra{height:12px;border-radius:99px;background:rgba(17,18,20,.08);overflow:hidden}
+.pc .barra i{display:block;height:100%;width:calc(var(--p) * 1%);background:var(--ink);border-radius:99px}
+.pc .perc{font-size:clamp(34px,4.6vw,58px);font-weight:850;letter-spacing:-.05em;line-height:1;counter-reset:p var(--p)}
+.pc .perc::before{content:counter(p) "%"}
+.pc .fatto{display:flex;align-items:center;gap:10px;font-weight:700;font-size:clamp(13px,1.3vw,15px);padding:10px 12px;border-radius:12px;background:var(--solid);color:var(--on-solid);align-self:flex-start}
+.pc .fatto svg{flex:none}
+.pc .vetro{animation:cancella 2.6s cubic-bezier(.55,.1,.25,1) .5s backwards}
+.pc .fatto{animation:compare .45s ease-out 3.15s backwards}
+@keyframes cancella{from{--p:0}}
+@keyframes compare{from{opacity:0;transform:translateY(6px)}}
+
+/* gradi: A, B, C sono etichette vere */
+.gradi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-radius:28px;overflow:hidden}
+.grado{padding:clamp(22px,3vw,34px);border-left:1px solid var(--line)}
+.grado:first-child{border-left:0}
+.grado .l{font-size:clamp(64px,8vw,104px);font-weight:900;letter-spacing:-.06em;line-height:.9}
+.grado h3{font-size:22px;font-weight:750;margin-top:14px}
+.grado p{color:var(--muted);margin-top:6px;font-size:16px}
+.comune{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+.comune span{font-size:14px;font-weight:600;padding:8px 14px;border-radius:99px;border:1px solid var(--line);background:var(--glass-strong)}
+
+/* negozio */
+.compra{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(20px,4vw,56px);align-items:center;border-radius:32px;padding:clamp(24px,4vw,56px);background:var(--solid);color:var(--on-solid)}
+.compra h2{font-size:clamp(32px,4.4vw,56px);font-weight:800;line-height:1.02}
+.compra p{color:rgba(255,255,255,.72);margin-top:14px;max-width:46ch}
+.compra .btn{background:#fff;color:var(--ink);border-color:#fff}
+.compra .anche{font-size:15px;color:rgba(255,255,255,.72)}
+.compra .anche b{display:block;color:#fff;margin-bottom:6px}
+
+/* stage */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(20px,4vw,56px);align-items:center}
+.postazioni{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;padding:clamp(16px,2.4vw,26px);border-radius:26px}
+.postazioni i{aspect-ratio:1;border-radius:5px;background:var(--ink)}
+.postazioni i:nth-child(7n+3),.postazioni i:nth-child(11n+5){background:rgba(17,18,20,.16)}
+.postazioni figcaption{grid-column:1/-1;font-size:14px;color:var(--muted);padding-top:8px;display:flex;gap:16px;flex-wrap:wrap}
+.postazioni figcaption span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--ink);margin-right:6px;vertical-align:-1px}
+.postazioni figcaption span+span::before{background:rgba(17,18,20,.16)}
+
+.lotto{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(24px,4vw,56px);align-items:start}
+.lotto h2{font-size:clamp(32px,4.4vw,56px);font-weight:800;line-height:1.02}
+.lotto .lead{color:var(--muted);margin-top:16px;max-width:40ch}
+@media (max-width:900px){.compra,.stage,.lotto{grid-template-columns:1fr}}
+@media (max-width:700px){.gradi{grid-template-columns:1fr}.grado{border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:auto 1fr;gap:0 20px;align-items:start}.grado:first-child{border-top:0}.grado .l{grid-row:1/3;font-size:64px}.grado h3{margin-top:4px}}
