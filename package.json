@@ -1,0 +1,10 @@
+{
+  "name": "messina-sistema",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev -w apps/gestionale",
+    "build": "npm run build -w apps/gestionale",
+    "test:db": "node supabase/tests/run.mjs"
+  }
+}
