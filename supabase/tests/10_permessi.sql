@@ -13,6 +13,8 @@ begin
   raise exception 'TEST FALLITO (doveva essere bloccato): %', msg;
 end $$;
 
+grant execute on function pg_temp.come(uuid), pg_temp.verifica(boolean, text), pg_temp.deve_fallire(text, text) to public;
+
 -- Nessun login: non si vede niente ------------------------------------------
 set role anon;
 select pg_temp.deve_fallire('select count(*) from public.bolle', 'anon legge le bolle');
@@ -68,9 +70,9 @@ select pg_temp.verifica((select count(*) from public.tariffe) = 0, 'l''autista n
 select public.firma_fermata('51000000-0000-0000-0000-000000000001');
 select pg_temp.deve_fallire($$select public.chiudi_fermata('51000000-0000-0000-0000-000000000001', true)$$, 'consegna senza colli e foto');
 select public.scansiona_consegna('51000000-0000-0000-0000-000000000001', 'C-4-' || lpad(g::text, 3, '0')) from generate_series(1, 4) g;
-select pg_temp.verifica((public.foto_bolla('51000000-0000-0000-0000-000000000001', 'bolle/x.jpg', 12) ->> 'ok')::boolean = false, 'foto sfocata rifiutata');
+select pg_temp.verifica((public.foto_bolla('51000000-0000-0000-0000-000000000001', 'bolle/51000000-0000-0000-0000-000000000001/x.jpg', 12) ->> 'ok')::boolean = false, 'foto sfocata rifiutata');
 select pg_temp.deve_fallire($$select public.chiudi_fermata('51000000-0000-0000-0000-000000000001', true)$$, 'consegna con foto rifiutata');
-select pg_temp.verifica((public.foto_bolla('51000000-0000-0000-0000-000000000001', 'bolle/x.jpg', 80) ->> 'ok')::boolean, 'foto buona accettata');
+select pg_temp.verifica((public.foto_bolla('51000000-0000-0000-0000-000000000001', 'bolle/51000000-0000-0000-0000-000000000001/x.jpg', 80) ->> 'ok')::boolean, 'foto buona accettata');
 select public.aggiungi_accessorio('51000000-0000-0000-0000-000000000001', 'Sponda');
 select public.chiudi_fermata('51000000-0000-0000-0000-000000000001', true);
 select pg_temp.deve_fallire($$select public.chiudi_fermata('51000000-0000-0000-0000-000000000002', false)$$, 'mancata senza motivo');
@@ -88,14 +90,14 @@ select pg_temp.come('00000000-0000-0000-0000-000000000005');
 do $$
 declare r jsonb; v_ok uuid; v_ko uuid;
 begin
-  select mp.id into v_ok from public.missioni_posti mp join public.posti p on p.id = mp.posto_id where p.codice = 'S07-1-2';
-  select mp.id into v_ko from public.missioni_posti mp join public.posti p on p.id = mp.posto_id where p.codice = 'S07-2-2';
+  select id into v_ok from public.missioni_posti_app where posto = 'S07-1-2';
+  select id into v_ko from public.missioni_posti_app where posto = 'S07-2-2';
   perform public.scansiona_missione(v_ok, 'MN2B001'); perform public.scansiona_missione(v_ok, 'MN2B003');
   r := public.scansiona_missione(v_ok, 'MN2B002');
   if not (r ->> 'chiuso')::boolean then raise exception 'TEST FALLITO: il posto completo doveva chiudersi da solo'; end if;
   perform public.scansiona_missione(v_ko, 'DL4D001'); perform public.scansiona_missione(v_ko, 'HPXXX99');
   perform public.segnala_posto(v_ko);
-  if (select stato from public.missioni_posti where id = v_ko) <> 'Bloccato' then raise exception 'TEST FALLITO: doveva restare bloccato'; end if;
+  if (select stato from public.missioni_posti_app where id = v_ko) <> 'Bloccato' then raise exception 'TEST FALLITO: doveva restare bloccato'; end if;
   begin perform public.sblocca_posto(v_ko, 'boh'); raise exception 'X'; exception when others then
     if sqlerrm = 'X' then raise exception 'TEST FALLITO: il magazziniere non può sbloccare'; end if; end;
 end $$;
