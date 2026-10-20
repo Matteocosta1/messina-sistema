@@ -14,31 +14,41 @@ async function firmaValida(grezzo: string, header: string) {
   return v1.some((x) => uguali(x, hex));
 }
 
-servi(async (req, c) => {
-  if (!(await firmaValida(c._grezzo ?? '', req.headers.get('stripe-signature') ?? ''))) throw new Errore('Firma Stripe non valida', 400);
+servi(async (req, corpo) => {
+  // si verifica la firma sul testo ricevuto e si usa SOLO quel testo, riletto qui
+  const grezzo: string = corpo._grezzo ?? '';
+  if (!(await firmaValida(grezzo, req.headers.get('stripe-signature') ?? ''))) throw new Errore('Firma Stripe non valida', 400);
+  const c = JSON.parse(grezzo);
   if (c.type !== 'checkout.session.completed') return { ignorato: c.type };
   const s = c.data?.object;
   if (s?.payment_status !== 'paid') return { ignorato: 'non pagato' };
   const db = dbServizio();
-  if ((await db.get(`ordini?select=id&stripe_session=eq.${enc(s.id)}`)).length) return { gia: true };
-
-  const righe: [string, string, string, number][] = JSON.parse(s.metadata?.righe ?? '[]');
+  // righe: [modello, grado, ram, quantità, prezzo pagato per pezzo]
+  const righe: [string, string, string, number, number?][] = JSON.parse(s.metadata?.righe ?? '[]');
   const sped = s.collected_information?.shipping_details ?? s.shipping_details ?? {};
   const a = sped.address ?? {};
-  const [ordine] = await db.post('ordini?on_conflict=stripe_session', [{ canale: 'Sito', riferimento: s.id.slice(-10), stripe_session: s.id, email: s.customer_details?.email ?? s.customer_email,
+  // l'ordine nasce una volta sola (stripe_session unico); se Stripe ripete l'avviso si completa quello che manca
+  await db.post('ordini?on_conflict=stripe_session', [{ canale: 'Sito', riferimento: s.id.slice(-10), stripe_session: s.id, email: s.customer_details?.email ?? s.customer_email,
     cliente: sped.name ?? s.customer_details?.name, indirizzo: [a.line1, a.line2, `${a.postal_code ?? ''} ${a.city ?? ''}`.trim(), a.state].filter(Boolean).join(', '),
-    totale: (s.amount_total ?? 0) / 100, stato: 'Da preparare', entro: new Date(Date.now() + 86400000).toISOString() }], 'resolution=ignore-duplicates,return=representation');
-  if (!ordine) return { gia: true };
+    totale: (s.amount_total ?? 0) / 100, stato: 'Da preparare', entro: new Date(Date.now() + 86400000).toISOString() }], 'resolution=ignore-duplicates,return=minimal');
+  const [ordine] = await db.get(`ordini?select=id,device_id&stripe_session=eq.${enc(s.id)}`);
+  if (!ordine) throw new Errore('Ordine non registrato', 500);
+  const gia: any[] = await db.get(`vendite?select=device_id,device(modello,grado,ram)&ordine_id=eq.${ordine.id}`);
 
-  const presi: string[] = [];
-  for (const [modello, grado, ram, q] of righe) {
-    const dev = await db.get(`device?select=id,prezzo&stato=eq.Disponibile&siti=cs.{Sito}&modello=eq.${enc(modello)}&grado=eq.${enc(grado)}${ram ? `&ram=eq.${enc(ram)}` : ''}&order=prezzo.asc,caricato_il.asc&limit=${q}`);
+  const presi: string[] = gia.map((v) => v.device_id); const mancano: string[] = [];
+  for (const [modello, grado, ram, q, prezzo] of righe) {
+    const fatti = gia.filter((v) => v.device?.modello === modello && v.device?.grado === grado && (!ram || v.device?.ram === ram)).length;
+    let serve = q - fatti; if (serve <= 0) continue;
+    // stesse regole del catalogo: solo pezzi disponibili, sul sito e con il prezzo confermato da Vendite
+    const dev = await db.get(`device?select=id,prezzo&stato=eq.Disponibile&siti=cs.{Sito}&prezzo_confermato_da=not.is.null&modello=eq.${enc(modello)}&grado=eq.${enc(grado)}${ram ? `&ram=eq.${enc(ram)}` : ''}&order=prezzo.asc,caricato_il.asc&limit=${serve + 5}`);
     for (const d of dev) {
-      try { await db.post('vendite', [{ device_id: d.id, canale: 'Sito', prezzo: d.prezzo, commissione: 0, ordine_id: ordine.id }]); presi.push(d.id); }
+      if (serve <= 0) break;
+      try { await db.post('vendite', [{ device_id: d.id, canale: 'Sito', prezzo: prezzo ?? d.prezzo, commissione: 0, ordine_id: ordine.id }]); presi.push(d.id); serve--; }
       catch (e) { console.error('device già venduto', d.id, (e as Error).message); }
     }
-    if (dev.length < q) console.error(`Ordine ${ordine.id}: mancano ${q - dev.length} pezzi di ${modello} ${grado}`);
+    if (serve > 0) mancano.push(`${serve} × ${modello} grado ${grado}${ram ? ' ' + ram : ''}`);
   }
-  if (presi[0]) await db.patch(`ordini?id=eq.${ordine.id}`, { device_id: presi[0] });
+  await db.patch(`ordini?id=eq.${ordine.id}`, { ...(presi[0] && !ordine.device_id ? { device_id: presi[0] } : {}),
+    problema: mancano.length ? `Pagato ma non disponibile: ${mancano.join(', ')}. Da rimborsare o sostituire.` : null });
   return { ordine: ordine.id, device: presi.length };
 });

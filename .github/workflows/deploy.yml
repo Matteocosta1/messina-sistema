@@ -47,7 +47,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      # versioni bloccate dal package-lock.json (va creato una volta con «npm install» e messo su GitHub: vedi docs/SETUP.md)
+      - run: npm ci --no-audit --no-fund --ignore-scripts
       - name: config.js con i valori pubblici
         if: ${{ hashFiles(format('apps/{0}/build.mjs', matrix.app)) != '' }}
         env:

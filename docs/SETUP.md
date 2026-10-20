@@ -72,6 +72,8 @@ Poi, nel progetto:
 
 ## Fase 4 · Primo deploy
 
+0. **Versioni bloccate** (una volta sola, su un Mac con Node 22): nella cartella del progetto `npm install`, poi mettere su GitHub il file `package-lock.json` che si crea. Il deploy usa `npm ci`, che installa esattamente quelle versioni: senza il file il deploy si ferma apposta. Poi in GitHub → Settings → Code security attivare **Dependabot** (gratis), che segnala librerie e azioni da aggiornare e propone di bloccare le azioni al loro commit.
+
 1. GitHub → Settings → **Environments** → New environment `produzione` → «Required reviewers»: Matteo e Pier. Così nessun deploy parte senza un sì.
 2. Controllare che su GitHub ci siano:
    - **Secrets**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_DB_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`

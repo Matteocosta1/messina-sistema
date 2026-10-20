@@ -29,8 +29,9 @@ export function servi(gestore: (req: Request, corpo: any) => Promise<unknown>) {
     try {
       const testo = await req.text();
       let corpo: any = {};
-      if (testo) { try { corpo = JSON.parse(testo); } catch { corpo = { _grezzo: testo }; } }
-      (corpo as any)._grezzo ??= testo;
+      if (testo) { try { corpo = JSON.parse(testo); } catch { corpo = {}; } }
+      if (typeof corpo !== 'object' || corpo === null || Array.isArray(corpo)) corpo = {};
+      corpo._grezzo = testo;   // sempre il corpo vero: chi chiama non può sostituirlo
       return json(await gestore(req, corpo) ?? { ok: true });
     } catch (e) {
       const err = e instanceof Errore ? e : new Errore('Errore interno', 500);
