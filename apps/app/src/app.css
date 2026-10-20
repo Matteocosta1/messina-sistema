@@ -1,0 +1,7 @@
+/* Solo per l'App Messina sul telefono vero: la barra in basso per passare da una parte all'altra
+   (Consegne, Magazzino, Entrate, Badge) e l'avviso Offline. Il resto è il CSS del mockup. */
+.appvera.conbarra .pscr{padding-bottom:calc(90px + env(safe-area-inset-bottom,0px))}
+.barra{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));background:var(--glass);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
+.barra .chipbtn{min-height:44px;padding:0 16px}
+.offline{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:40}

@@ -1,0 +1,244 @@
+// Negozio online di Messina Corporation: identico al negozio del mockup approvato
+// (prova-messina.html, negozio()). Legge solo il catalogo pubblico e apre il pagamento Stripe.
+import '@messina/dati/prova-negozio';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import '@messina/ui/mockup.css';
+import '@messina/ui/produzione.css';
+import './negozio.css';
+import { collega, type Config } from '@messina/dati';
+import { motoreDiProva } from '@messina/dati/prova';
+import { Btn, Chip, Msg, Pill } from '@messina/ui';
+
+declare global { interface Window { MESSINA?: Config } }
+const db = collega(window.MESSINA, motoreDiProva);
+
+// ------------------------------------------------------------------ dati
+interface Riga { modello: string; marca: string; cpu: string | null; ram: string | null; disco: string | null; schermo: string | null; gpu: string | null; grado: string; prezzo: number; disponibili: number }
+interface Prodotto { slug: string; marca: string; modello: string; spec: string; righe: Riga[]; da: number }
+type Condizione = 'Discreto' | 'Buono' | 'Ottimo';
+const CONDIZIONI: Condizione[] = ['Discreto', 'Buono', 'Ottimo'];
+const GRADO: Record<Condizione, string> = { Ottimo: 'A', Buono: 'B', Discreto: 'C' };
+const GDESC: Record<Condizione, string> = {
+  Ottimo: 'Grado A: quasi impossibile distinguerlo da nuovo. Al massimo micro-segni visibili da vicino.',
+  Buono: 'Grado B: leggeri segni d’uso sulla scocca. Schermo e tastiera in ordine. Funziona al 100%.',
+  Discreto: 'Grado C: segni evidenti d’uso, possibile piccola ammaccatura. Funziona al 100%.',
+};
+const slug = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const configDi = (r: Riga) => `${r.ram ?? '—'} RAM · ${r.disco ?? '—'}`;
+const eur = (n: number) => '€ ' + n.toLocaleString('it-IT', { maximumFractionDigits: 2 });
+const cpuBreve = (c: string | null) => !c ? '' : /^i[3579]-/i.test(c) ? 'Intel ' + c.slice(0, 2) : c;
+
+function raggruppa(righe: Riga[]): Prodotto[] {
+  const m = new Map<string, Prodotto>();
+  for (const r of righe) {
+    if (!GRADO_INVERSO[r.grado]) continue;  // sul sito solo A, B e C
+    const k = r.marca + ' ' + r.modello;
+    if (!m.has(k)) m.set(k, { slug: slug(k), marca: r.marca, modello: r.modello, spec: [cpuBreve(r.cpu), r.schermo].filter(Boolean).join(' · '), righe: [], da: Infinity });
+    const p = m.get(k)!; p.righe.push(r); p.da = Math.min(p.da, r.prezzo);
+  }
+  return [...m.values()];
+}
+const GRADO_INVERSO: Record<string, Condizione> = { A: 'Ottimo', B: 'Buono', C: 'Discreto' };
+
+// ------------------------------------------------------------------ carrello (solo in questo browser)
+interface Voce { slug: string; nome: string; modello: string; marca: string; grado: string; ram: string | null; disco: string | null; det: string; p: number }
+const CK = 'messina.carrello';
+const leggiCarrello = (): Voce[] => { try { const v = JSON.parse(localStorage.getItem(CK) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+const salvaCarrello = (c: Voce[]) => { try { localStorage.setItem(CK, JSON.stringify(c)); } catch { /* il carrello resta in memoria */ } };
+
+// ------------------------------------------------------------------ icona del mockup
+const LAPTOP = <svg width="84" height="58" viewBox="0 0 64 44" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="10" y="4" width="44" height="28" rx="2" /><path d="M2 38h60l-4 4H6z" /></svg>;
+
+const leggiPercorso = () => decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+
+function App() {
+  const [percorso, setPercorso] = useState(leggiPercorso());
+  const [prodotti, setProdotti] = useState<Prodotto[] | null>(null);
+  const [errore, setErrore] = useState<string | null>(null);
+  const [carrello, setCarrello] = useState<Voce[]>(leggiCarrello);
+  const [brand, setBrand] = useState('Tutti');
+
+  useEffect(() => {
+    db.rpc<Riga[]>('catalogo').then((r) => setProdotti(raggruppa((r ?? []).map((x) => ({ ...x, prezzo: Number(x.prezzo), disponibili: Number(x.disponibili) })))),
+      () => setErrore('Il catalogo non si è caricato. Riprova tra poco.'));
+  }, []);
+  useEffect(() => {
+    const f = () => { setPercorso(leggiPercorso()); window.scrollTo(0, 0); };
+    window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f);
+  }, []);
+  const cambiaCarrello = useCallback((c: Voce[]) => { setCarrello(c); salvaCarrello(c); }, []);
+  const vai = (p: string) => { location.hash = '#/' + p; };
+
+  const [sez, arg] = percorso.split('/');
+  const prodotto = sez === 'p' ? prodotti?.find((p) => p.slug === arg) : undefined;
+
+  useEffect(() => {  // SEO: titolo e dati strutturati della pagina
+    document.title = prodotto ? `${prodotto.marca} ${prodotto.modello} ricondizionato · Messina Corporation` : sez === 'carrello' ? 'Carrello · Messina Corporation' : 'Messina Corporation · Portatili ricondizionati';
+    let s = document.getElementById('jsonld') as HTMLScriptElement | null;
+    if (!s) { s = document.createElement('script'); s.type = 'application/ld+json'; s.id = 'jsonld'; document.head.appendChild(s); }
+    const offerta = (p: Prodotto) => ({ '@type': 'AggregateOffer', priceCurrency: 'EUR', lowPrice: p.da, highPrice: Math.max(...p.righe.map((r) => r.prezzo)),
+      offerCount: p.righe.reduce((a, r) => a + r.disponibili, 0), availability: 'https://schema.org/InStock', itemCondition: 'https://schema.org/RefurbishedCondition' });
+    const prod = (p: Prodotto) => ({ '@type': 'Product', name: `${p.marca} ${p.modello}`, brand: { '@type': 'Brand', name: p.marca }, description: `${p.marca} ${p.modello} ricondizionato, ${p.spec}`,
+      url: location.origin + location.pathname + '#/p/' + p.slug, offers: offerta(p) });
+    s.textContent = JSON.stringify(prodotto ? { '@context': 'https://schema.org', ...prod(prodotto) }
+      : { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: (prodotti ?? []).map((p, i) => ({ '@type': 'ListItem', position: i + 1, item: prod(p) })) });
+  }, [prodotto, prodotti, sez]);
+
+  const head = (
+    <div className="shophead">
+      <button type="button" className="tab" style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-.03em' }} onClick={() => { setBrand('Tutti'); vai(''); }}>Messina Corporation</button>
+      <div className="row" style={{ gap: 4 }}>
+        <button type="button" className="tab" onClick={() => { setBrand('Tutti'); vai(''); }}>Portatili</button>
+        <button type="button" className="tab" onClick={() => { setBrand('Apple'); vai(''); }}>Apple</button>
+        <button type="button" className="tab" onClick={() => vai('aziende')}>Per aziende</button>
+      </div>
+      <Btn sm onClick={() => vai('carrello')}>{'Carrello · ' + carrello.length}</Btn>
+    </div>
+  );
+
+  let inner: React.ReactNode;
+  if (sez === 'p') inner = prodotti === null ? <Attesa /> : prodotto ? <Scheda p={prodotto} carrello={carrello} onCarrello={cambiaCarrello} vai={vai} /> : <Pagina titolo="Non trovato"><p>Questo computer non è più disponibile.</p><Btn ghost sm onClick={() => vai('')}>Tutti i portatili</Btn></Pagina>;
+  else if (sez === 'carrello') inner = <Carrello carrello={carrello} onCarrello={cambiaCarrello} vai={vai} />;
+  else if (sez === 'grazie') inner = <Grazie onSvuota={() => cambiaCarrello([])} vai={vai} />;
+  else if (sez === 'annullato') inner = <Pagina titolo="Pagamento annullato"><p className="muted">Nessun addebito. Il carrello è ancora qui.</p><Btn sm onClick={() => vai('carrello')}>Carrello</Btn></Pagina>;
+  else if (sez === 'aziende') inner = <Pagina titolo="Per aziende"><p className="muted">Lotti di portatili ricondizionati, fattura e consegna in tutta Italia. Scrivici e ti prepariamo un’offerta.</p><a className="btn" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }} href="mailto:vendite@[dominio]">Scrivi</a></Pagina>;
+  else if (sez === 'privacy' || sez === 'termini' || sez === 'resi') inner = <Pagina titolo={{ privacy: 'Privacy', termini: 'Termini', resi: 'Resi' }[sez]}><p className="muted">[Testo da inserire: lo prepara il consulente legale prima dell’apertura del negozio.]</p></Pagina>;
+  else inner = <Vetrina prodotti={prodotti} errore={errore} brand={brand} onBrand={setBrand} vai={vai} />;
+
+  return (
+    <div className="wrap">
+      <div className="glass shop">
+        {head}
+        {inner}
+        <footer className="shopfoot lbl">
+          <span>© Messina Corporation · P.IVA [da inserire]</span>
+          <span className="row" style={{ gap: 14 }}>
+            <a href="#/privacy">Privacy</a><a href="#/termini">Termini</a><a href="#/resi">Resi</a>
+          </span>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function Attesa() { return <div className="shopbody"><p className="lbl">Carico…</p></div>; }
+function Pagina(p: { titolo: string; children: React.ReactNode }) {
+  return <div className="shopbody" style={{ maxWidth: 760, margin: '0 auto' }}><h2 style={{ fontSize: 34, fontWeight: 900, letterSpacing: '-.04em', marginBottom: 16 }}>{p.titolo}</h2><div className="stack">{p.children}</div></div>;
+}
+
+function Vetrina(p: { prodotti: Prodotto[] | null; errore: string | null; brand: string; onBrand: (b: string) => void; vai: (s: string) => void }) {
+  const marche = ['Tutti', ...new Set((p.prodotti ?? []).map((x) => x.marca))];
+  const vis = (p.prodotti ?? []).filter((x) => p.brand === 'Tutti' || x.marca === p.brand);
+  return (
+    <div className="shopbody"><h1 className="shoph1">Messina Corporation</h1>
+      <div className="row" style={{ marginBottom: 18 }}>
+        {marche.map((x) => <Chip key={x} on={p.brand === x} onClick={() => p.onBrand(x)}>{x}</Chip>)}
+        <span className="lbl" style={{ marginLeft: 'auto' }}>{p.prodotti ? `${vis.length} ${vis.length === 1 ? 'modello' : 'modelli'}` : ''}</span>
+      </div>
+      {p.errore && <div className="warn">{p.errore}</div>}
+      {p.prodotti === null && !p.errore ? <p className="lbl">Carico…</p> : (
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(230px,1fr))' }}>
+          {vis.map((x) => (
+            <a key={x.slug} className="prod" href={'#/p/' + x.slug} style={{ color: 'inherit', textDecoration: 'none' }}>
+              <span className="ph">{LAPTOP}</span><span className="lbl">{x.marca}</span>
+              <b style={{ fontSize: 19, letterSpacing: '-.02em' }}>{x.modello}</b><span className="lbl">{x.spec}</span>
+              <span>da <b style={{ fontSize: 20 }}>{eur(x.da)}</b></span>
+            </a>
+          ))}
+          {p.prodotti && !vis.length && <p className="lbl">Nessun computer di questa marca in vendita adesso.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Scheda(p: { p: Prodotto; carrello: Voce[]; onCarrello: (c: Voce[]) => void; vai: (s: string) => void }) {
+  const configs = useMemo(() => [...new Set(p.p.righe.map(configDi))].sort(), [p.p]);
+  const riga = (cfg: string, g: Condizione) => {
+    const rr = p.p.righe.filter((r) => configDi(r) === cfg && r.grado === GRADO[g]);
+    if (!rr.length) return null;
+    return { ...rr[0], prezzo: Math.min(...rr.map((r) => r.prezzo)), disponibili: rr.reduce((a, r) => a + r.disponibili, 0) };
+  };
+  // si parte dalla scelta più comune del mockup: Buono, configurazione più venduta disponibile
+  const iniziale = (): [string, Condizione] => {
+    for (const g of ['Buono', 'Ottimo', 'Discreto'] as Condizione[]) for (const c of [...configs].reverse()) if (riga(c, g)) return [c, g];
+    return [configs[0], 'Buono'];
+  };
+  const [[cfg, g], setScelta] = useState<[string, Condizione]>(iniziale);
+  const [added, setAdded] = useState(false);
+  const r = riga(cfg, g);
+  const giaNelCarrello = p.carrello.filter((v) => v.slug === p.p.slug && v.grado === GRADO[g] && `${v.ram ?? '—'} RAM · ${v.disco ?? '—'}` === cfg).length;
+  const esaurito = !r || giaNelCarrello >= r.disponibili;
+  const scegliCfg = (c: string) => { setAdded(false); setScelta([c, riga(c, g) ? g : (CONDIZIONI.find((x) => riga(c, x)) ?? g)]); };
+  const add = () => {
+    if (added) return p.vai('carrello');
+    if (!r || esaurito) return;
+    p.onCarrello([...p.carrello, { slug: p.p.slug, nome: p.p.modello, modello: r.modello, marca: r.marca, grado: r.grado, ram: r.ram, disco: r.disco, det: `${g} · ${r.ram ?? '—'} RAM`, p: r.prezzo }]);
+    setAdded(true);
+  };
+  return (
+    <div className="shopbody"><div style={{ marginBottom: 14 }}><Btn ghost sm onClick={() => p.vai('')}>Tutti i portatili</Btn></div><div className="pdet">
+      <div className="ph" style={{ borderRadius: 24 }}>{LAPTOP}</div>
+      <div className="stack">
+        <div><div className="lbl">{p.p.marca}</div><h2 style={{ fontSize: 'clamp(28px,4vw,40px)', fontWeight: 900, letterSpacing: '-.04em', lineHeight: 1.05 }}>{p.p.modello}</h2><div className="muted">{p.p.spec}</div></div>
+        <div style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-.04em' }}>{r ? eur(r.prezzo) : '—'}</div>
+        <div><b>Condizioni</b>
+          <div className="gradebox" style={{ marginTop: 8 }}>
+            {CONDIZIONI.map((x) => { const rx = riga(cfg, x); return (
+              <button key={x} type="button" className={'gopt' + (g === x ? ' on' : '')} disabled={!rx} aria-pressed={g === x}
+                style={rx ? undefined : { opacity: .35, cursor: 'not-allowed' }} onClick={() => { setAdded(false); setScelta([cfg, x]); }}>
+                <span style={{ fontWeight: 700 }}>{x}</span><span style={{ fontSize: 18, fontWeight: 800 }}>{rx ? eur(rx.prezzo) : 'Esaurito'}</span>
+              </button>); })}
+          </div>
+          <p style={{ margin: '10px 0 0' }} className="muted">{GDESC[g]}</p>
+        </div>
+        <div><b>Memoria</b><div className="row" style={{ marginTop: 8 }}>{configs.map((c) => <Chip key={c} on={cfg === c} onClick={() => scegliCfg(c)}>{c}</Chip>)}</div></div>
+        <button type="button" className="bigbtn" onClick={add} disabled={!added && esaurito} style={!added && esaurito ? { opacity: .35, cursor: 'not-allowed' } : undefined}>
+          {added ? 'Aggiunto · vai al carrello' : esaurito ? 'Esaurito' : 'Aggiungi al carrello'}</button>
+        <div className="row"><Pill>Dati cancellati con metodo certificato</Pill><Pill>Garanzia [mesi]</Pill><Pill>Reso entro [giorni]</Pill></div>
+      </div></div></div>
+  );
+}
+
+function Carrello(p: { carrello: Voce[]; onCarrello: (c: Voce[]) => void; vai: (s: string) => void }) {
+  const [attesa, setAttesa] = useState(false);
+  const [errore, setErrore] = useState<string | null>(null);
+  const tot = p.carrello.reduce((a, c) => a + c.p, 0);
+  const paga = async () => {
+    setAttesa(true); setErrore(null);
+    try {
+      // il prezzo vero lo ricalcola la funzione sul server: qui si mandano solo le scelte
+      const righe = p.carrello.map((c) => ({ modello: c.modello, marca: c.marca, grado: c.grado, ram: c.ram, disco: c.disco }));
+      const r = await db.fn<{ url: string }>('stripe-checkout', { righe, email: null });
+      if (!r?.url) throw new Error('Il pagamento non è partito');
+      location.href = r.url;
+    } catch (e) { setErrore((e as Error).message); } finally { setAttesa(false); }
+  };
+  return (
+    <div className="shopbody" style={{ maxWidth: 760, margin: '0 auto' }}><h2 style={{ fontSize: 34, fontWeight: 900, letterSpacing: '-.04em', marginBottom: 16 }}>Carrello</h2>
+      {p.carrello.length ? (<>
+        {p.carrello.map((c, i) => (
+          <div key={i} className="pcard row between" style={{ padding: 16, marginBottom: 10 }}>
+            <div><b style={{ fontSize: 17 }}>{c.nome}</b><div className="lbl">{c.det}</div></div>
+            <div className="row"><b style={{ fontSize: 20 }}>{eur(c.p)}</b><Btn ghost sm onClick={() => p.onCarrello(p.carrello.filter((_, j) => j !== i))}>Togli</Btn></div>
+          </div>))}
+        <div className="row between" style={{ borderTop: '1px solid var(--line)', paddingTop: 14, marginTop: 6 }}><b>Totale</b><b style={{ fontSize: 28 }}>{eur(tot)}</b></div>
+        <div style={{ marginTop: 14 }} className="stack">
+          {errore && <div className="warn">{errore}</div>}
+          <button type="button" className="bigbtn" onClick={paga} disabled={attesa}>{attesa ? 'Un momento…' : 'Vai al pagamento'}</button>
+          {db.modo === 'prova' && <span className="lbl">Prova: il pagamento non è attivo, si apre la pagina di conferma.</span>}
+        </div>
+      </>) : (
+        <div className="pcard" style={{ padding: 24, textAlign: 'center' }}>Il carrello è vuoto. <div style={{ marginTop: 12 }}><Btn ghost sm onClick={() => p.vai('')}>Guarda i portatili</Btn></div></div>
+      )}
+    </div>
+  );
+}
+
+function Grazie({ onSvuota, vai }: { onSvuota: () => void; vai: (s: string) => void }) {
+  useEffect(() => { onSvuota(); }, [onSvuota]);
+  return <Pagina titolo="Grazie"><Msg>Ordine ricevuto: ti arriva la mail di conferma con la ricevuta. Spediamo entro [giorni].</Msg><div><Btn ghost sm onClick={() => vai('')}>Guarda i portatili</Btn></div></Pagina>;
+}
+
+createRoot(document.getElementById('root')!).render(<App />);

@@ -1,0 +1,66 @@
+# Pubblicazione a ogni push su main: prima il database e le funzioni, poi i siti su Cloudflare Pages.
+# Segreti (GitHub → Settings → Secrets and variables → Actions → Secrets):
+#   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+# Variabili (stessa pagina → Variables, valori pubblici): SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+jobs:
+  supabase:
+    runs-on: ubuntu-24.04
+    environment: produzione
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.48.3   # versione fissa: aggiornarla di proposito, non da sola
+      - run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+      - name: Migrazioni del database
+        run: supabase db push --include-all
+      - name: Edge Functions
+        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
+  siti:
+    needs: supabase
+    runs-on: ubuntu-24.04
+    environment: produzione
+    strategy:
+      matrix:
+        include:
+          - { app: gestionale, progetto: messina-gestionale-trasporti }
+          - { app: gestionale, progetto: messina-gestionale-corporation }
+          - { app: app,        progetto: messina-app }
+          - { app: portale,    progetto: messina-portale }
+          - { app: negozio,    progetto: messina-negozio }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: config.js con i valori pubblici
+        if: ${{ hashFiles(format('apps/{0}/build.mjs', matrix.app)) != '' }}
+        env:
+          URL: ${{ vars.SUPABASE_URL }}
+          CHIAVE: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          case "$CHIAVE" in sb_secret_*|*service_role*) echo "Questa è una chiave SEGRETA: qui va la publishable" && exit 1;; esac
+          printf 'window.MESSINA = { supabaseUrl: %s, supabaseKey: %s };\n' "\"$URL\"" "\"$CHIAVE\"" > apps/${{ matrix.app }}/config.js
+          node apps/${{ matrix.app }}/build.mjs
+      - name: Pubblica su Cloudflare Pages
+        if: ${{ hashFiles(format('apps/{0}/build.mjs', matrix.app)) != '' }}
+        uses: cloudflare/wrangler-action@v3.14.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/${{ matrix.app }}/dist --project-name=${{ matrix.progetto }} --branch=main

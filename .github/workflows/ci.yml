@@ -1,0 +1,39 @@
+# Controlli a ogni push e pull request: database (migrazioni + permessi) e build di tutte le app.
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  database:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: prova
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Migrazioni, seed e test dei permessi
+        env:
+          PGH: localhost
+          PGP: "5432"
+          PGPASSWORD: prova
+        run: bash supabase/tests/run.sh
+  app:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Build di tutte le app
+        run: |
+          for a in apps/*/; do
+            if [ -f "$a/build.mjs" ]; then echo "· $a"; node "$a/build.mjs"; fi
+          done

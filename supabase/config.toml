@@ -1,0 +1,42 @@
+# Configurazione Supabase CLI per il progetto Messina.
+# project_id: il «Reference ID» del progetto (Supabase → Project Settings → General). Non è un segreto.
+project_id = "XXXX-riferimento-progetto"
+
+[db]
+major_version = 17
+
+[auth]
+site_url = "https://gestionale.DOMINIO.it"
+additional_redirect_urls = ["https://corporation.DOMINIO.it", "https://app.DOMINIO.it", "https://portale.DOMINIO.it", "https://negozio.DOMINIO.it"]
+enable_signup = false          # gli account li crea solo la Direzione
+jwt_expiry = 3600
+
+[auth.mfa]
+max_enrolled_factors = 10
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+# Ogni funzione controlla da sé chi chiama (token dell'utente, chiave del lettore, firma Stripe
+# o segreto del cron): per questo la verifica automatica del JWT è spenta su tutte.
+# Serve anche perché le nuove chiavi «sb_publishable_…» non sono JWT.
+[functions.mail-outlook]
+verify_jwt = false
+[functions.crea-bolla]
+verify_jwt = false
+[functions.leggi-seriale]
+verify_jwt = false
+[functions.fatture-in-cloud]
+verify_jwt = false
+[functions.etichetta-spedizione]
+verify_jwt = false
+[functions.stripe-checkout]
+verify_jwt = false
+[functions.stripe-webhook]
+verify_jwt = false
+[functions.timbra-lettore]
+verify_jwt = false
+[functions.telepass-import]
+verify_jwt = false
+[functions.resoconto]
+verify_jwt = false
