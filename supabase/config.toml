@@ -42,3 +42,7 @@ verify_jwt = false
 verify_jwt = false
 [functions.richiesta-sito]
 verify_jwt = false
+[functions.satellitare-import]
+verify_jwt = false
+[functions.telecamere-evento]
+verify_jwt = false

@@ -5,3 +5,8 @@
   padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));background:var(--glass);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
 .barra .chipbtn{min-height:44px;padding:0 16px}
 .offline{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:40}
+
+/* scelta Bancale / Collo (magazzino) */
+.seg{display:flex;padding:4px;border-radius:14px;background:var(--soft);gap:4px}
+.seg button{flex:1;font:inherit;font-weight:700;font-size:16px;padding:10px;border:0;border-radius:10px;background:transparent;cursor:pointer;color:var(--ink)}
+.seg button.on{background:var(--solid);color:var(--on-solid)}

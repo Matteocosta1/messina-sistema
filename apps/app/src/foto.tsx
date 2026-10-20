@@ -54,11 +54,11 @@ export function Firma({ onFatto, onAnnulla }: { onFatto: (png: Blob) => void; on
   const pulisci = () => { const c = cv.current!; c.getContext('2d')!.clearRect(0, 0, c.width, c.height); setVuota(true); };
   return (
     <div className="stack" style={{ gap: 10 }}>
-      <canvas ref={cv} aria-label="Firma del cliente" style={{ width: '100%', height: 200, background: '#fff', borderRadius: 14, touchAction: 'none', boxShadow: 'inset 0 0 0 1px var(--line)' }} />
+      <canvas ref={cv} aria-label="Firma del cliente" style={{ width: '100%', height: 160, background: '#fff', borderRadius: 14, touchAction: 'none', boxShadow: 'inset 0 0 0 1px var(--line)' }} />
       <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-        <button type="button" className="bigbtn ghost" style={{ flex: 1 }} onClick={vuota ? onAnnulla : pulisci}>{vuota ? 'Annulla' : 'Rifai'}</button>
+        <button type="button" className="bigbtn ghost" style={{ flex: 1 }} onClick={vuota ? onAnnulla : pulisci}>Cancella</button>
         <button type="button" className="bigbtn" style={{ flex: 1, ...(vuota ? { opacity: .35, cursor: 'not-allowed' } : {}) }} disabled={vuota}
-          onClick={() => cv.current!.toBlob((b) => b && onFatto(b), 'image/png')}>Fatto</button>
+          onClick={() => cv.current!.toBlob((b) => b && onFatto(b), 'image/png')}>Conferma</button>
       </div>
     </div>
   );

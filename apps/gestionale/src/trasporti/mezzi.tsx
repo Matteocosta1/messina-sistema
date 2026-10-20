@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Btn, Chip, Pill } from '@messina/ui';
+import { Btn, Chip, Msg, Pill } from '@messina/ui';
 import { useApp, useAzione, useDati, oggiISO, meseISO, Mese, hm, giornoCorto, eur, Errore } from '../core';
 
 const fmt = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
@@ -8,14 +8,21 @@ const vicino = (d: string | null, giorni = 60) => !!d && new Date(d).getTime() -
 // ------------------------------------------------------------------ Mezzi
 const TIPI: [string, string][] = [['Sprinter', 'Sprinter'], ['Furgone', 'Furgoni'], ['Motrice', 'Motrici'], ['Tre assi', 'Tre assi'], ['Bilico', 'Bilici']];
 export function Mezzi() {
+  const { db } = useApp();
+  const az = useAzione();
   const [f, setF] = useState('Sprinter');
+  const [msg, setMsg] = useState('');
   const { dati } = useDati(async (d) => {
-    const [mezzi, giri] = await Promise.all([
+    const [mezzi, giri, autisti] = await Promise.all([
       d.from<any>('mezzi').select('*,dipendenti(nome)').order('targa'),
       d.from<any>('giri').select('mezzo_id,stato,dipendenti(nome)').eq('data', oggiISO()),
+      d.from<any>('dipendenti').select('id,nome').eq('azienda', 'trasporti').eq('mansione', 'Autista').eq('attivo', true).order('nome'),
     ]);
-    return { mezzi, giri };
+    return { mezzi, giri, autisti };
   }, []);
+  // autista fisso del mezzo: giri, Telepass e satellitare si collegano a lui
+  const fisso = (m: any, id: string) => az.esegui(() => db.from('mezzi').update({ autista_id: id || null }).eq('id', m.id))
+    .then((ok) => ok !== undefined && setMsg(id ? `${dati!.autisti.find((a: any) => a.id === id)?.nome} è l’autista fisso del mezzo ${m.targa}: giri, Telepass e satellitare si collegano a lui.` : `Il mezzo ${m.targa} non ha più un autista fisso.`));
   if (!dati) return null;
   const list = dati.mezzi.filter((m) => m.tipo === f);
   const scad = (m: any) => {
@@ -29,11 +36,16 @@ export function Mezzi() {
   const oggi = (m: any) => { if (m.stato !== 'Attivo') return 'Fermo'; const g = dati.giri.find((x) => x.mezzo_id === m.id); return g ? (g.stato === 'Rientrato' || g.stato === 'Chiuso' ? 'Rientrato' : g.stato === 'Partito' ? 'Partito' : 'In carico') : 'Libero'; };
   return (<>
     <div className="row">{TIPI.map(([k, l]) => <Chip key={k} on={f === k} onClick={() => setF(k)}>{l}</Chip>)}</div>
-    <div className="glass tbox"><table className="t"><thead><tr><th>Targa</th><th>Tipo</th><th>Sponda</th><th>Autista</th><th>Telepass</th><th>Scadenza</th><th>Oggi</th></tr></thead><tbody>
-      {list.length ? list.map((m) => { const o = oggi(m); const sc = scad(m); const giro = dati.giri.find((x) => x.mezzo_id === m.id);
-        return <tr key={m.id}><td><b>{m.targa}</b></td><td>{m.tipo}</td><td>{m.sponda ? 'Sì' : 'No'}</td><td>{giro?.dipendenti?.nome ?? m.dipendenti?.nome ?? '—'}</td><td>{m.telepass ?? '—'}</td>
+    {msg && <Msg>{msg}</Msg>}
+    <Errore testo={az.errore} />
+    <div className="glass tbox"><table className="t"><thead><tr><th>Targa</th><th>Tipo</th><th>Sponda</th><th>Autista</th><th>Telepass</th><th>Satellitare</th><th>Scadenza</th><th>Oggi</th></tr></thead><tbody>
+      {list.length ? list.map((m) => { const o = oggi(m); const sc = scad(m);
+        return <tr key={m.id}><td><b>{m.targa}</b></td><td>{m.tipo}</td><td>{m.sponda ? 'Sì' : 'No'}</td>
+          <td><select className="input" aria-label={'Autista fisso del mezzo ' + m.targa} value={m.autista_id ?? ''} disabled={az.inCorso} onChange={(e) => fisso(m, e.target.value)} style={{ padding: '6px 8px', minWidth: 130 }}>
+            <option value="">—</option>{dati.autisti.map((a: any) => <option key={a.id} value={a.id}>{a.nome}</option>)}</select></td>
+          <td>{m.telepass ?? '—'}</td><td>{m.satellitare ? <Pill tone="ok">Collegato</Pill> : <span className="lbl">—</span>}</td>
           <td>{vicino(m.revisione, 30) || vicino(m.assicurazione, 30) ? <span className="miss">{sc}</span> : sc}</td><td>{o === 'Fermo' ? <Pill tone="red">Fermo</Pill> : <Pill tone="dark">{o}</Pill>}</td></tr>; })
-        : <tr><td colSpan={7} className="lbl">Nessun mezzo di questo tipo.</td></tr>}
+        : <tr><td colSpan={8} className="lbl">Nessun mezzo di questo tipo.</td></tr>}
     </tbody></table></div>
   </>);
 }

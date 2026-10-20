@@ -61,7 +61,9 @@ export const T_NAV: Voce[] = [
   { id: 'mezzi', nome: 'Mezzi', ruoli: ['traffico', 'amministrazione'] },
   { id: 'autisti', nome: 'Autisti', ruoli: ['traffico', 'amministrazione'] },
   { id: 'telepass', nome: 'Telepass', ruoli: ['amministrazione', 'traffico'] },
+  { id: 'satellitare', nome: 'Satellitare', ruoli: [] },   // solo direzione
   { id: 'presenze', nome: 'Presenze', ruoli: ['amministrazione'] },
+  { id: 'telecamere', nome: 'Telecamere', ruoli: [] },     // solo direzione
 ];
 /** C_NAV del mockup */
 export const C_NAV: Voce[] = [
@@ -72,6 +74,7 @@ export const C_NAV: Voce[] = [
   { id: 'ordini', nome: 'Ordini', ruoli: ['vendite', 'magazzino'] },
   { id: 'stage', nome: 'Stage Computer', ruoli: ['vendite', 'stage'] },
   { id: 'stageTel', nome: 'Stage Cellulari', ruoli: ['vendite', 'stage'] },
+  { id: 'telecamere', nome: 'Telecamere', ruoli: [] },     // solo direzione: lo stesso capannone
 ];
 export function vociPer(io: Profilo): Voce[] {
   const menu = io.azienda === 'trasporti' ? T_NAV : C_NAV;

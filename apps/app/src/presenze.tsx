@@ -21,6 +21,7 @@ export function Presenze() {
   const [errore, setErrore] = useState<string | null>(null);
   const [left, setLeft] = useState(30 - Math.floor(Date.now() / 1000) % 30);
   const finestra = useRef(-1);
+  const [scelto, setScelto] = useState<'Entrata' | 'Uscita' | null>(null);
   const disp = dispositivo();
 
   const chiedi = async () => {
@@ -48,6 +49,9 @@ export function Presenze() {
   const { dati: stra } = useDati((d) => dip ? straordinari(d, dip.id, dip.ore_settimana ?? 40) : Promise.resolve(null), [dip?.id]);
   if (!dip) return <div className="pscr"><div className="ptitle">Badge</div><div className="lbl">Il tuo profilo non è collegato a un dipendente: chiedi all’amministrazione.</div></div>;
   const valide = (oggi ?? []).filter((x) => x.esito === 'Valida');
+  const dentro = valide.length > 0 && valide[valide.length - 1].verso === 'Entrata';
+  const prossimo = dentro ? 'Uscita' : 'Entrata';
+  const sel = scelto === prossimo ? scelto : null;   // registrata dal lettore: si torna al tasto successivo
   return (
     <div className="pscr">
       <div><div className="lbl">{dip.nome} · {dip.reparto ?? dip.mansione}</div><div className="ptitle">Badge</div></div>
@@ -56,7 +60,11 @@ export function Presenze() {
         <div className="lbl">Cambia tra <b id="qrleft">{left}</b> secondi · uno screenshot non funziona</div>
       </div>
       {errore && <Esito ok={false} titolo="Badge non attivo">{errore}</Esito>}
-      <div className="lbl" style={{ textAlign: 'center' }}>Avvicina il telefono al lettore all’ingresso · telefono registrato: {nomeTelefono(dip.nome)}</div>
+      <div className="lbl" style={{ textAlign: 'center' }}>{sel ? `${sel}: avvicina il telefono al lettore all’ingresso` : 'Premi Entrata o Uscita e avvicina il telefono al lettore'} · telefono registrato: {nomeTelefono(dip.nome)}</div>
+      <div className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
+        {(['Entrata', 'Uscita'] as const).map((v) => <button key={v} type="button" className={'bigbtn' + (sel === v ? '' : ' ghost')} style={{ flex: 1, ...(v === prossimo ? {} : { opacity: .35, cursor: 'not-allowed' }) }}
+          disabled={v !== prossimo} onClick={() => setScelto(v)}>{v}</button>)}
+      </div>
       <div className="pcard" style={{ padding: '12px 14px' }}><b>Oggi</b>{valide.length ? valide.map((x, i) => <div key={i} className="kvp" style={i === valide.length - 1 ? { border: 0 } : undefined}><span>{x.verso}</span><b>{hm(x.quando)}</b></div>)
         : <div className="lbl" style={{ marginTop: 4 }}>Nessuna timbratura ancora</div>}</div>
       <div className="pcard" style={{ padding: '12px 14px' }}><b><Mese /></b>

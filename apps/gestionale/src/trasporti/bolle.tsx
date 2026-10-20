@@ -133,7 +133,11 @@ export function Traffico() {
   if (!dati) return null;
   const assegnate = new Set(dati.giri.flatMap((g) => g.fermate.map((f: any) => f.bolla_id)));
   const libere = dati.bolle.filter((b) => !assegnate.has(b.id));
-  const proponi = () => az.esegui(() => db.rpc<number>('proponi_giri', { p_data: domani }).then((n) => setMsg(`Giri proposti: ${n} ${n === 1 ? 'spedizione assegnata' : 'spedizioni assegnate'}. Mauro e Nelson possono cambiare le fermate trascinandole.`)));
+  const proponi = () => az.esegui(() => db.rpc<number>('proponi_giri', { p_data: domani }).then((n) => setMsg(
+    `Cosa ha fatto il programma: ha preso le spedizioni di domani ancora da assegnare (${n}) e le ha divise tra i mezzi liberi, guardando portata, sponda e fasce orarie dei clienti, `
+    + 'poi ha messo le fermate di ogni mezzo nell’ordine più corto per un camion. Adesso controllate: se volete cambiare, trascinate una fermata da un giro all’altro. Quando va bene, premete «Conferma i giri».')));
+  const confermati = dati.giri.length > 0 && dati.giri.every((g) => g.confermato_il);
+  const conferma = () => az.esegui(() => db.rpc<number>('conferma_giri', { p_data: domani }).then(() => setMsg('Giri confermati: domattina ogni autista li trova già in ordine nella sua app.')));
   const sposta = (giro: any | null) => {
     if (!trascino) return;
     const ordine = giro ? Math.max(0, ...giro.fermate.map((f: any) => f.ordine)) + 1 : 0;
@@ -146,7 +150,9 @@ export function Traffico() {
   const zona = { onDragOver: (e: any) => e.preventDefault() };
   return (<>
     <div className="glass card row between"><span><b>Domani</b> <span className="lbl">{dati.bolle.length} spedizioni · {dati.mezzi.length} mezzi · pronto entro le 18:00</span></span>
-      <div className="row"><Btn onClick={proponi} disabled={az.inCorso || !libere.length}>{libere.length || !dati.giri.length ? 'Proponi i giri' : 'Giri proposti'}</Btn></div></div>
+      <div className="row">{libere.length ? <Btn onClick={proponi} disabled={az.inCorso}>Proponi i giri</Btn>
+        : confermati ? <Pill tone="ok">Giri confermati</Pill>
+        : <Btn onClick={conferma} disabled={az.inCorso || !dati.giri.length}>Conferma i giri</Btn>}</div></div>
     {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
     <div className="grid g4">
@@ -171,8 +177,8 @@ export function Traffico() {
 
 // ------------------------------------------------------------------ Giacenze
 export function Giacenze() {
-  const { db, vai } = useApp();
-  const [s, set] = useStato({ sel: '', msg: '', data: domaniISO(), prenota: false });
+  const { db } = useApp();
+  const [s, set] = useStato({ sel: '', msg: '', data: domaniISO(), ora: '', prenota: false, reso: false });
   const az = useAzione();
   const { dati } = useDati(async (d) => {
     const G = await d.from<any>('giacenze_aperte').select('*').order('dal', { ascending: false });
@@ -188,8 +194,15 @@ export function Giacenze() {
   const costoGiacenza = (g: any) => { const t = tar(g.cliente_id, 'Giacenza'); return !t ? 0 : t.unita === 'giorno' ? t.prezzo * Math.max(1, g.giorni) : t.prezzo; };
   const daPren = G.filter((g) => !g.riconsegna_il && (g.motivo !== 'Merce rifiutata' || g.richiesta)).length;
   const fmtT = (t: any) => t ? `${eur(t.prezzo)} ${t.unita === 'giorno' ? 'al giorno' : t.unita === 'spedizione' ? '' : 'a ' + t.unita}`.trim() : '[tariffa da inserire in Clienti]';
-  const prenota = () => az.esegui(() => db.rpc('prenota_riconsegna', { p_giacenza: cur.id, p_data: s.data })).then((ok) => ok && set({ msg: 'prenotata', prenota: false }));
-  const reso = () => az.esegui(() => db.from('giacenze').update({ chiusa_il: new Date().toISOString() }).eq('id', cur.id)).then((ok) => ok && set({ msg: 'reso' }));
+  const prenota = () => az.esegui(() => db.rpc('prenota_riconsegna', { p_giacenza: cur.id, p_data: s.data, p_ora: s.ora })).then((ok) => ok !== undefined && set({ msg: 'prenotata', prenota: false }));
+  const reso = () => az.esegui(() => db.rpc('reso_al_mittente', { p_giacenza: cur.id })).then((ok) => ok !== undefined && set({ msg: 'reso', reso: false }));
+  // un clic: la mail parte e la giacenza resta segnata «chiesta», il tasto non si ripete
+  const chiedi = () => az.esegui(async () => {
+    if (!cur.clienti?.email) throw new Error('Manca l’email del cliente: aggiungila in Clienti');
+    await db.fn('mail-outlook', { azione: 'scrivi', azienda: 'trasporti', a: cur.clienti.email, oggetto: `Spedizione ${cur.numero ?? ''} in giacenza`,
+      testo: `Buongiorno,\nla spedizione ${cur.numero ?? ''} per ${cur.destinatario ?? ''} non è stata consegnata (${cur.motivo.toLowerCase()}) ed è in giacenza nel nostro magazzino dal ${giornoCorto(cur.dal)}.\nLa giacenza costa ${fmtT(tar(cur.cliente_id, 'Giacenza'))}. Ci indicate in che giorno e a che ora riconsegnare?\nGrazie` });
+    return db.rpc('chiesta_al_cliente', { p_giacenza: cur.id });
+  }).then((ok) => ok !== undefined && set({ msg: 'chiesto' }));
   return (<>
     <div className="grid g4">
       <div className="glass card"><div className="lbl">Spedizioni in giacenza</div><div className="big">{G.length}</div><div className="lbl">merce tornata a Lacchiarella</div></div>
@@ -200,7 +213,7 @@ export function Giacenze() {
     {!cur ? <Msg>Nessuna spedizione in giacenza.</Msg> : <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
       <div className="glass" style={{ flex: '1 1 280px', padding: 8, minWidth: 0 }}>
         <div className="row between" style={{ padding: '8px 10px' }}><b>In magazzino</b><span className="lbl">{G.length} spedizioni</span></div>
-        <div className="list">{G.map((g) => <button key={g.id} type="button" className={'li' + (cur.id === g.id ? ' on' : '')} onClick={() => set({ sel: g.id, msg: '', prenota: false })}>
+        <div className="list">{G.map((g) => <button key={g.id} type="button" className={'li' + (cur.id === g.id ? ' on' : '')} onClick={() => set({ sel: g.id, msg: '', prenota: false, reso: false })}>
           <span className="row between" style={{ width: '100%' }}><b>{g.cliente}</b>{g.riconsegna_il ? <Pill tone="ok">Riconsegna prenotata</Pill> : g.richiesta ? <Pill tone="red">{'Chiede il ' + giornoCorto(g.richiesta.data).toLowerCase()}</Pill> : g.motivo === 'Merce rifiutata' ? <Pill>Decide il cliente</Pill> : <Pill tone="red">Da prenotare</Pill>}</span>
           <span className="lbl">{g.motivo} · {giornoCorto(g.dal)}</span></button>)}</div>
       </div>
@@ -212,7 +225,7 @@ export function Giacenze() {
           <div><div className="lbl">In giacenza dal</div><b>{giornoCorto(cur.dal)}</b></div>
           <div><div className="lbl">Giorni</div><b>{cur.giorni}</b></div>
           {cur.richiesta && <div className="bad"><div className="lbl">Il cliente chiede dal portale</div><b className="miss">{giornoCorto(cur.richiesta.data)}{cur.richiesta.nota ? ' · ' + cur.richiesta.nota : ''}</b></div>}
-          <div><div className="lbl">Riconsegna</div><b>{cur.riconsegna_il ? 'Prenotata · ' + giornoCorto(cur.riconsegna_il) : cur.motivo === 'Merce rifiutata' ? 'Il cliente decide: riconsegna o reso' : 'Da prenotare'}</b></div>
+          <div><div className="lbl">Riconsegna</div><b>{cur.riconsegna_il ? 'Prenotata · ' + giornoCorto(cur.riconsegna_il) : cur.chiesta_il ? 'Chiesta al cliente il ' + giornoCorto(cur.chiesta_il) + ' alle ' + hm(cur.chiesta_il) : cur.motivo === 'Merce rifiutata' ? 'Il cliente decide: riconsegna o reso' : 'Da prenotare'}</b></div>
         </div>
         <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
           <div className="lbl" style={{ marginBottom: 6 }}>Cosa paga il cliente, con la sua tariffa</div>
@@ -223,18 +236,22 @@ export function Giacenze() {
           </tbody></table></div>
           <div className="lbl" style={{ marginTop: 6 }}>Le tre voci vanno da sole in Fatturazione, collegate a questa spedizione.</div>
         </div>
-        {s.msg === 'chiesto' && <ScriviCliente a={cur.clienti?.email} oggetto={`Spedizione ${cur.numero ?? ''} in giacenza`} avviso="Mail al cliente pronta: avvisa della giacenza, del costo e chiede la data per la riconsegna."
-          testo={`Buongiorno,\nla spedizione ${cur.numero ?? ''} per ${cur.destinatario ?? ''} non è stata consegnata (${cur.motivo.toLowerCase()}) ed è in giacenza nel nostro magazzino dal ${giornoCorto(cur.dal)}.\nLa giacenza costa ${fmtT(tar(cur.cliente_id, 'Giacenza'))}. Ci indicate in che giorno riconsegnare?\nGrazie`} onChiudi={() => set({ msg: '' })} />}
-        {s.msg === 'prenotata' && <Msg azione="Vai al Traffico" onAzione={() => vai('traffico')}>Riconsegna prenotata: la spedizione è nei giri del giorno scelto e la riconsegna è già in fattura.</Msg>}
-        {s.msg === 'reso' && <Msg>Spedizione chiusa come reso al mittente.</Msg>}
-        {s.prenota && <div className="row"><label className="field"><span className="lbl">Giorno della riconsegna</span><input className="input" type="date" min={domaniISO()} value={s.data} onChange={(e) => set({ data: e.target.value })} /></label>
-          <Btn onClick={prenota} disabled={az.inCorso}>Conferma</Btn><Btn ghost onClick={() => set({ prenota: false })}>Annulla</Btn></div>}
+        {s.msg === 'chiesto' && <Msg>Mail inviata al cliente: lo avvisa della giacenza e del costo e chiede in che giorno riconsegnare. La sua risposta arriva in Mail.</Msg>}
+        {s.msg === 'prenotata' && <Msg>Riconsegna prenotata. La spedizione entra da sola nei giri di quel giorno e la riconsegna va in fattura.</Msg>}
+        {s.msg === 'reso' && <Msg>Reso confermato: la merce torna al mittente e la giacenza si chiude.</Msg>}
+        {s.prenota && <div className="row" style={{ alignItems: 'flex-end' }}><label className="field"><span className="lbl">Giorno</span><input className="input" type="date" min={oggiISO()} value={s.data} onChange={(e) => set({ data: e.target.value })} /></label>
+          <label className="field"><span className="lbl">Ora</span><select className="input" value={s.ora} onChange={(e) => set({ ora: e.target.value })}><option value="">Scegli</option>
+            {['08:00', '09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00'].map((h) => <option key={h}>{h}</option>)}</select></label>
+          <Btn onClick={prenota} disabled={az.inCorso || !s.data || !s.ora}>Conferma</Btn><Btn ghost onClick={() => set({ prenota: false })}>Annulla</Btn></div>}
+        {s.reso && <div className="glass card stack" style={{ gap: 8, padding: 14 }}><b>Reso al mittente</b>
+          <span>Il cliente decide di non riconsegnare: la merce torna a chi l’ha spedita, la giacenza si chiude e il cliente paga il viaggio di ritorno con la sua tariffa.</span>
+          <div className="row"><Btn onClick={reso} disabled={az.inCorso}>Conferma il reso</Btn><Btn ghost onClick={() => set({ reso: false })}>Annulla</Btn></div></div>}
         <Errore testo={az.errore} />
-        <div className="row">
-          {!cur.riconsegna_il && !s.prenota && <Btn onClick={() => set({ prenota: true, msg: '', data: cur.richiesta?.data ?? domaniISO() })}>Prenota la riconsegna</Btn>}
-          {!cur.riconsegna_il && <Btn ghost onClick={() => set({ msg: 'chiesto', prenota: false })}>Chiedi al cliente quando riconsegnare</Btn>}
-          <Btn ghost onClick={reso} disabled={az.inCorso}>Reso al mittente</Btn>
-        </div>
+        {!cur.riconsegna_il && <div className="row">
+          <Btn onClick={() => set({ prenota: !s.prenota, reso: false, msg: '', data: cur.richiesta?.data ?? domaniISO() })}>Prenota la riconsegna</Btn>
+          {cur.chiesta_il ? <Pill tone="ok">Mail inviata al cliente</Pill> : <Btn ghost onClick={chiedi} disabled={az.inCorso}>Chiedi al cliente quando riconsegnare</Btn>}
+          <Btn ghost onClick={() => set({ reso: !s.reso, prenota: false })}>Reso al mittente</Btn>
+        </div>}
       </div>
     </div>}
   </>);

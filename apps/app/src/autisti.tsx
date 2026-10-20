@@ -26,6 +26,7 @@ export function Autisti() {
   const [cur, setCur] = useState<string | null>(null);
   const [why, setWhy] = useState('');
   const [esito, setEsito] = useState<'rico' | 'dopo' | 'giac'>('giac');
+  const [conf, setConf] = useState<Record<string, { colli?: boolean; acc?: boolean }>>({});
   const vai = (s: Scr) => { setScr(s); window.scrollTo(0, 0); };
   if (errore) return <div className="pscr"><ErroreApp testo={errore} /></div>;
   if (g === null) return <div className="pscr"><div className="lbl">Carico il giro…</div></div>;
@@ -48,11 +49,14 @@ export function Autisti() {
     );
   }
   const idx = g.fermate.findIndex((x) => x.id === f.id);
-  if (scr === 'dett') return <Dettaglio f={f} idx={idx} onBack={() => vai('lista')} onConsegnato={() => vai('firma')} onMancata={() => vai('mancata')} />;
-  if (scr === 'firma') return <FotoBolla f={f} soglia={soglia ?? 35} onBack={() => vai('dett')} onFatto={() => vai('lista')} />;
+  const c = conf[f.id] ?? {};
+  const pronto = !!c.colli && !!c.acc && f.firmata;
+  if (scr === 'dett') return <Dettaglio f={f} idx={idx} conf={c} conferma={(k) => setConf((x) => ({ ...x, [f.id]: { ...x[f.id], [k]: true } }))}
+    onBack={() => vai('lista')} onAvanti={() => vai('firma')} />;
+  if (scr === 'firma') return <FotoBolla f={f} soglia={soglia ?? 35} pronto={pronto} onBack={() => vai('dett')} onFatto={() => vai('lista')} onMancata={() => vai('mancata')} />;
   if (scr === 'mancata') return (
     <div className="pscr">
-      <button type="button" className="back" onClick={() => vai('dett')}>Indietro</button>
+      <button type="button" className="back" onClick={() => vai('firma')}>Indietro</button>
       <div className="lbl">Passo 1 di 2</div>
       <div className="ptitle">Perché non è stata consegnata?</div>
       {MOTIVI.map((x) => <button key={x} type="button" className="bigbtn ghost" style={{ textAlign: 'left', fontSize: 17 }} onClick={() => { if (x.startsWith('Altro')) vai('nota'); else { setWhy(x); vai('merce'); } }}>{x}</button>)}
@@ -70,25 +74,25 @@ export function Autisti() {
   return <Esito f={f} why={why} esito={esito} onBack={() => vai('mancata')} onFatto={() => vai('lista')} db={db} />;
 }
 
-function Dettaglio({ f, idx, onBack, onConsegnato, onMancata }: { f: Fermata; idx: number; onBack: () => void; onConsegnato: () => void; onMancata: () => void }) {
+function Dettaglio({ f, idx, conf, conferma, onBack, onAvanti }: { f: Fermata; idx: number; conf: { colli?: boolean; acc?: boolean }; conferma: (k: 'colli' | 'acc') => void; onBack: () => void; onAvanti: () => void }) {
   const { db } = useApp();
   const scan = useScan();
   const az = useAzione();
-  const [accOk, setAccOk] = useState<Record<string, boolean>>({});
   const [accOpen, setAccOpen] = useState(false);
   const [firma, setFirma] = useState(false);
   const { dati: possibili } = useDati((d) => d.rpc<string[]>('accessori_possibili', { p_fermata: f.id }), [f.id]);
   const codici = useCodiciProva('fermata', f.id, f.letti);
   const accs = [...f.accessori, ...f.extra.filter((x) => !f.accessori.includes(x))];
-  const d1 = f.colli > 0 && f.letti >= f.colli, d2 = d1 && accs.every((x) => accOk[x]), d3 = d2 && f.firmata;
+  const letti = f.colli > 0 && f.letti >= f.colli;
+  const d1 = letti && !!conf.colli, d2 = d1 && !!conf.acc, d3 = d2 && f.firmata;
   const leggi = async (c: string) => { const r = await az.esegui(() => db.rpc<{ letti: number; totale: number }>('scansiona_consegna', { p_fermata: f.id, p_codice: c })); if (r) vibra(); return r; };
-  usePistola(d1 ? null : (c) => { leggi(c); });
+  usePistola(letti ? null : (c) => { leggi(c); });
   const scansiona = async () => {
-    let letti = f.letti;
-    while (letti < f.colli) {
-      const c = await scan(`Collo ${letti + 1} di ${f.colli}`, codici ?? undefined);
+    let n = f.letti;
+    while (n < f.colli) {
+      const c = await scan(`Collo ${n + 1} di ${f.colli}`, codici ?? undefined);
       if (!c) return;
-      const r = await leggi(c); if (r) letti = r.letti; else return;
+      const r = await leggi(c); if (r) n = r.letti; else return;
     }
   };
   const aggiungi = async (v: string) => { const p = await posizione(); await az.esegui(() => db.rpc('aggiungi_accessorio', { p_fermata: f.id, p_voce: v, p_lat: p?.lat ?? null, p_lng: p?.lng ?? null })); setAccOpen(false); };
@@ -101,6 +105,9 @@ function Dettaglio({ f, idx, onBack, onConsegnato, onMancata }: { f: Fermata; id
     <div className="pcard stack" style={{ padding: 14, gap: 10, ...(done ? { border: '2px solid var(--ok)', background: 'var(--ok-soft)' } : on ? { border: '2px solid var(--solid)' } : { opacity: .4, pointerEvents: 'none' }) }}>
       <div className="row" style={{ gap: 10, flexWrap: 'nowrap' }}><Num n={n} fatto={done} /><b style={{ fontSize: 20, color: done ? 'var(--ok)' : undefined }}>{t}</b></div>{body}</div>);
   const altri = (possibili ?? []).filter((x) => !accs.includes(x));
+  const Conferma = ({ ok, onClick }: { ok: boolean; onClick: () => void }) => <button type="button" className="bigbtn" onClick={onClick} {...(ok ? {} : off)}>Conferma</button>;
+  const righeAcc = accs.length ? accs.map((x) => <div key={x} className="pcard row between" style={{ padding: '12px 14px', fontSize: 17 }}>
+    <span>{x}</span><span className="lbl">{f.accessori.includes(x) ? 'in bolla' : 'aggiunto'}</span></div>) : <div className="lbl">Nessuno sulla bolla.</div>;
   return (
     <div className="pscr">
       <button type="button" className="back" onClick={onBack}>Consegne</button>
@@ -109,30 +116,29 @@ function Dettaglio({ f, idx, onBack, onConsegnato, onMancata }: { f: Fermata; id
           <a className="round" href={mappa} target="_blank" rel="noopener" aria-label="Navigatore per camion" style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'inherit' }}>{KI.pin()}</a></div>
         {f.note && <div style={{ marginTop: 6 }}><Pill tone="dark">{f.note}</Pill></div>}</div>
       <ErroreApp testo={az.errore} />
-      {blk(1, 'Colli', d1, true, d1 ? <div style={{ fontSize: 17 }}>{f.colli} colli · tutti scansionati</div> : <>
+      {blk(1, 'Colli', d1, true, d1 || letti ? <><div style={{ fontSize: 17 }}>{f.colli} colli · tutti scansionati</div>{!d1 && <Conferma ok onClick={() => conferma('colli')} />}</> : <>
         <div style={{ fontSize: 17 }}>{f.colli} colli da scaricare. Scansiona ogni collo.</div>
         {f.letti > 0 && <div className="lbl">{f.letti} di {f.colli} scansionati</div>}
-        <button type="button" className="bigbtn" onClick={scansiona} aria-label="Scansiona i colli" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{big30(KI.cam(30))}</button></>)}
-      {blk(2, 'Accessori', d2, d1, <>
-        {accs.length ? accs.map((x) => <button key={x} type="button" className="pcard row between" onClick={() => setAccOk((a) => ({ ...a, [x]: !a[x] }))}
-          style={{ padding: '12px 14px', font: 'inherit', fontSize: 17, cursor: 'pointer', textAlign: 'left', ...(accOk[x] ? { borderColor: 'var(--ok)' } : {}) }}>
-          <span>{x}</span><b style={accOk[x] ? { color: 'var(--ok)' } : undefined}>{accOk[x] ? '✓' : 'Tocca'}</b></button>) : <div className="lbl">Nessuno sulla bolla.</div>}
+        <button type="button" className="bigbtn ghost" onClick={scansiona} aria-label="Scansiona i colli" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{big30(KI.cam(30))}</button>
+        <Conferma ok={false} onClick={() => {}} /></>)}
+      {blk(2, 'Accessori', d2, d1, d2 ? righeAcc : <>
+        {righeAcc}
         <button type="button" className="chipbtn" style={{ alignSelf: 'flex-start', borderStyle: 'dashed' }} onClick={() => setAccOpen(!accOpen)}>+ Aggiungi</button>
         {accOpen && <><div className="row" style={{ gap: 6 }}>{altri.length ? altri.map((x) => <button key={x} type="button" className="chipbtn" onClick={() => aggiungi(x)}>{x}</button>)
           : <span className="lbl">Nessun altro accessorio previsto per questo cliente: avvisa l’ufficio.</span>}</div><div className="lbl">Va da solo in fattura.</div></>}
+        <Conferma ok onClick={() => { setAccOpen(false); conferma('acc'); }} />
       </>)}
-      {blk(3, 'Firma', d3, d2, d3 ? <div style={{ fontSize: 17 }}>Bolla firmata dal cliente</div> : firma
-        ? <Firma onFatto={firmata} onAnnulla={() => setFirma(false)} />
-        : <><div style={{ fontSize: 17 }}>Fai firmare la bolla al cliente.</div>
-          <button type="button" className="bigbtn" onClick={() => setFirma(true)} aria-label="Firmata" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{big30(KI.pen(30))}</button></>)}
+      {blk(3, 'Firma', d3, d2, d3 ? <div style={{ fontSize: 17 }}>Firmata dal cliente</div> : firma
+        ? <><div style={{ fontSize: 15 }}>Fai firmare il cliente qui sotto, con il dito.</div><Firma onFatto={firmata} onAnnulla={() => setFirma(false)} /></>
+        : <><div style={{ fontSize: 17 }}>Tocca e fai firmare il cliente.</div>
+          <button type="button" className="bigbtn" onClick={() => setFirma(true)} aria-label="Firma del cliente" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{big30(KI.pen(30))}</button></>)}
       <div style={{ flex: 1 }} />
-      <button type="button" className="bigbtn" onClick={onConsegnato} {...(d3 ? {} : off)}>Consegnato</button>
-      <button type="button" className="bigbtn ghost" onClick={onMancata} {...(d1 ? {} : off)}>Non consegnato</button>
+      <button type="button" className="bigbtn" onClick={onAvanti} {...(d1 ? {} : off)}>Avanti</button>
     </div>
   );
 }
 
-function FotoBolla({ f, soglia, onBack, onFatto }: { f: Fermata; soglia: number; onBack: () => void; onFatto: () => void }) {
+function FotoBolla({ f, soglia, pronto, onBack, onFatto, onMancata }: { f: Fermata; soglia: number; pronto: boolean; onBack: () => void; onFatto: () => void; onMancata: () => void }) {
   const { db } = useApp();
   const az = useAzione();
   const [stato, setStato] = useState<0 | 1 | 2>(f.foto ? 2 : 0);
@@ -161,7 +167,7 @@ function FotoBolla({ f, soglia, onBack, onFatto }: { f: Fermata; soglia: number;
     <div className="pscr">
       <button type="button" className="back" onClick={onBack}>Indietro</button>
       <div className="row" style={{ gap: 10, flexWrap: 'nowrap' }}><Num n={4} fatto={stato === 2} /><div className="ptitle">Bolla</div></div>
-      <div style={{ fontSize: 18 }}>Fai la foto alla bolla firmata.</div>
+      <div style={{ fontSize: 18 }}>Fai la foto alla bolla.</div>
       {analisi ? <div className="pcard" style={{ padding: 14 }}><b>Controllo la foto…</b></div>
         : stato === 0 ? scatta
         : stato === 1 ? <><div className="pcard row" style={{ padding: 12, gap: 12, flexWrap: 'nowrap', border: '2px solid var(--alert)', background: 'var(--alert-soft)' }}>{prev}
@@ -169,9 +175,11 @@ function FotoBolla({ f, soglia, onBack, onFatto }: { f: Fermata; soglia: number;
         : <div className="pcard row" style={{ padding: 12, gap: 12, flexWrap: 'nowrap', border: '2px solid var(--ok)', background: 'var(--ok-soft)' }}>{prev}
             <div><b style={{ color: 'var(--ok)', fontSize: 18 }}>✓ Foto buona</b><div style={{ fontSize: 14, marginTop: 2 }}>Salvata con ora e posizione.</div>{misura}</div></div>}
       <ErroreApp testo={az.errore} />
-      <div className="lbl">Se la foto è sfocata o buia diventa rossa: rifalla. Poi premi Conferma.</div>
+      <div className="lbl">Se la foto è sfocata o buia diventa rossa: rifalla.</div>
+      {stato === 2 && !pronto && <div className="lbl" style={{ color: 'var(--alert)', fontWeight: 600 }}>Per «Consegnato» servono anche Accessori e Firma confermati.</div>}
       <div style={{ flex: 1 }} />
-      <button type="button" className="bigbtn" onClick={conferma} {...(stato === 2 && !az.inCorso ? {} : off)}>Conferma</button>
+      <button type="button" className="bigbtn" onClick={conferma} {...(stato === 2 && pronto && !az.inCorso ? {} : off)}>Consegnato</button>
+      <button type="button" className="bigbtn ghost" onClick={onMancata} {...(stato === 2 && !az.inCorso ? {} : off)}>Non consegnato</button>
     </div>
   );
 }

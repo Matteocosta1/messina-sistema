@@ -10,6 +10,11 @@ interface Info { tipo: 'collo' | 'bancale'; codice: string; cliente: string; pos
 interface Uscita { bolla_id: string; numero: string | null; cliente: string; mezzo: string; autista: string; totale: number; caricati: number; colli: { codice: string; posto: string | null; caricato: boolean }[] }
 interface PostoMissione { id: string; missione_id: string; posto: string; stato: 'Da fare' | 'Fatto' | 'Bloccato' | 'Sbloccato'; elenco: { articolo: string; pezzi: number; letti: number }[]; pezzi: number; letti: number; extra: number }
 
+type Tipo = 'Bancale' | 'Collo';
+/** scelta Bancale / Collo in Entrata e Trasferisci */
+const Seg = ({ v, onChange }: { v: Tipo; onChange: (t: Tipo) => void }) => (
+  <div className="seg" role="tablist">{(['Bancale', 'Collo'] as const).map((x) => <button key={x} type="button" role="tab" aria-selected={v === x} className={v === x ? 'on' : ''} onClick={() => onChange(x)}>{x}</button>)}</div>);
+
 const Big = ({ label, sub, dark, onClick }: { label: string; sub?: string; dark?: boolean; onClick: () => void }) => (
   <button type="button" className={'bigbtn' + (dark ? '' : ' ghost')} style={{ textAlign: 'left', fontSize: 19 }} onClick={onClick}>{label}
     {sub && <span style={{ display: 'block', fontWeight: 500, fontSize: 13, opacity: .7, marginTop: 2 }}>{sub}</span>}</button>);
@@ -34,7 +39,7 @@ export function Magazzino() {
         <b style={{ color: 'var(--alert)' }}>Missione · {nomeMissione}</b><div style={{ fontSize: 14, marginTop: 2 }}>{done} di {tot} posti fatti. Tocca per {done ? 'riprendere' : 'iniziare'}.</div></button>}
       <Big label="Entrata" sub="Scarico dal camion e metto a posto" dark onClick={() => vai('entrata')} />
       <Big label="Uscita" sub="Preparo e carico una spedizione" onClick={() => vai('uscita')} />
-      <Big label="Trasferisci" sub="Cambio posto a un collo o a un bancale" onClick={() => vai('sposta')} />
+      <Big label="Trasferisci" sub="Cambio posto a un bancale o a un collo" onClick={() => vai('sposta')} />
       <Big label="Missioni" sub="Controlli mandati dall’ufficio" onClick={() => vai('conta')} />
     </div>
   );
@@ -44,35 +49,42 @@ function Entrata({ back }: { back: React.ReactNode }) {
   const { db } = useApp();
   const scan = useScan();
   const az = useAzione();
-  const [info, setInfo] = useState<Info | null>(null);   // ultimo collo letto, in attesa del posto
+  const [tipo, setTipo] = useState<Tipo>('Bancale');
+  const [info, setInfo] = useState<Info | null>(null);   // ultimo bancale o collo letto, in attesa del posto o del bancale
   const [bolla, setBolla] = useState<{ cliente: string; numero: string | null; totale: number; messi: number } | null>(null);
   const [step, setStep] = useState<0 | 1>(0);
-  const codici = useCodiciProva(step === 0 ? 'entrata' : 'posto', step === 0 ? null : info?.proposto ?? null, bolla?.messi);
+  const codici = useCodiciProva(step === 0 ? 'entrata' : tipo === 'Collo' ? 'su-bancale' : 'posto', step === 0 ? tipo : tipo === 'Collo' ? info?.codice ?? null : info?.proposto ?? null, bolla?.messi);
   const leggi = async (c: string) => {
     if (step === 0) {
       const i = await az.esegui(() => db.rpc<Info>('info_codice', { p_codice: c }));
       if (!i) return;
+      if (i.tipo !== (tipo === 'Bancale' ? 'bancale' : 'collo')) { az.setErrore(tipo === 'Bancale' ? 'Questo è un collo: scegli «Collo» sopra' : 'Questo è un bancale: scegli «Bancale» sopra'); vibra([80, 60, 80]); return; }
       setInfo(i); setStep(1); vibra();
       if (i.tipo === 'collo') setBolla({ cliente: i.cliente, numero: i.numero ?? null, totale: i.totale ?? 0, messi: i.messi ?? 0 });
     } else if (info) {
-      const r = await az.esegui(() => db.rpc<any>('metti_a_posto', { p_codice: info.codice, p_posto: c }));
+      const r = await az.esegui(() => tipo === 'Collo' ? db.rpc<any>('collo_su_bancale', { p_codice: info.codice, p_bancale: c }) : db.rpc<any>('metti_a_posto', { p_codice: info.codice, p_posto: c }));
       if (!r) return;
       vibra(); setStep(0);
       if (r.totale !== undefined) setBolla((b) => b ? { ...b, messi: r.messi, totale: r.totale } : b);
     }
   };
   usePistola((c) => { leggi(c); });
+  const cambia = (t: Tipo) => { setTipo(t); setStep(0); setInfo(null); az.setErrore(null); };
   const fin = !!bolla && bolla.totale > 0 && bolla.messi >= bolla.totale && step === 0;
+  const passo = tipo === 'Bancale' ? (step === 0 ? '1. Scansiona il bancale' : '2. Scansiona il posto') : (step === 0 ? '1. Scansiona il collo' : '2. Scansiona il bancale');
+  const aiuto = step === 0 ? (tipo === 'Bancale' ? 'Etichetta del bancale' : 'Etichetta della scatola')
+    : tipo === 'Collo' ? 'Il bancale dove appoggi la scatola, dello stesso cliente'
+    : info?.proposto ? <>Posto proposto: <b>{info.proposto}</b></> : 'Nessun posto libero proposto: scegli tu';
   return (
     <div className="pscr">{back}
-      <div><div className="lbl">{bolla ? `Bolla ${bolla.cliente}${bolla.numero ? ' ' + bolla.numero : ''} · ${bolla.totale} colli` : 'Scansiona il primo collo o bancale'}</div><div className="ptitle">Entrata</div></div>
+      <div><div className="lbl">{bolla ? `Bolla ${bolla.cliente}${bolla.numero ? ' ' + bolla.numero : ''} · ${bolla.totale} colli` : 'Scansiona il primo bancale o collo'}</div><div className="ptitle">Entrata</div></div>
       {bolla && <><div className="bar"><i style={{ width: (bolla.messi / Math.max(1, bolla.totale) * 100) + '%' }} /></div><div className="lbl">{bolla.messi} di {bolla.totale} colli messi a posto</div></>}
       <ErroreApp testo={az.errore} />
       {fin ? <><Esito ok titolo={`Bolla completa: ${bolla!.totale} su ${bolla!.totale}`}>Il cliente lo vede subito sul suo portale.</Esito>
           <button type="button" className="btn ghost" onClick={() => { setBolla(null); setInfo(null); }}>Nuova entrata</button></>
-        : <><div className="scanbox"><b style={{ fontSize: 18 }}>{step === 0 ? '1. Scansiona il bancale' : '2. Scansiona il posto'}</b>
-            <span className="lbl">{step === 0 ? 'Etichetta del bancale o del collo' : info?.proposto ? <>Posto proposto: <b>{info.proposto}</b></> : 'Nessun posto libero proposto: scegli tu'}</span></div>
-          <button type="button" className="bigbtn" onClick={async () => { const c = await scan(step === 0 ? 'Scansiona il bancale' : 'Scansiona il posto', codici); if (c) leggi(c); }}>{step === 0 ? 'Scansiona bancale' : 'Scansiona posto'}</button></>}
+        : <><Seg v={tipo} onChange={cambia} />
+          <div className="scanbox"><b style={{ fontSize: 18 }}>{passo}</b><span className="lbl">{aiuto}</span></div>
+          <button type="button" className="bigbtn" onClick={async () => { const c = await scan(passo.slice(3), codici); if (c) leggi(c); }}>{step === 0 ? `Scansiona ${tipo.toLowerCase()}` : tipo === 'Bancale' ? 'Scansiona posto' : 'Scansiona bancale'}</button></>}
     </div>
   );
 }
@@ -133,24 +145,35 @@ function Sposta({ back }: { back: React.ReactNode }) {
   const { db } = useApp();
   const scan = useScan();
   const az = useAzione();
+  const [tipo, setTipo] = useState<Tipo>('Bancale');
   const [info, setInfo] = useState<Info | null>(null);
   const [fatto, setFatto] = useState<{ cosa: string; da: string | null; a: string } | null>(null);
-  const codici = useCodiciProva(info ? 'posto' : 'trasferisci', info?.proposto ?? null);
+  const codici = useCodiciProva(info ? 'posto' : 'trasferisci', info ? info.proposto ?? null : tipo);
   const leggi = async (c: string) => {
-    if (!info) { const i = await az.esegui(() => db.rpc<Info>('info_codice', { p_codice: c })); if (i) { setInfo(i); vibra(); } return; }
-    const r = await az.esegui(() => db.rpc('metti_a_posto', { p_codice: info.codice, p_posto: c }));
-    if (r) { vibra(); setFatto({ cosa: `${info.tipo === 'bancale' ? 'Bancale' : 'Collo'} ${info.cliente}`, da: info.posto, a: c }); setInfo(null); }
+    if (!info) {
+      const i = await az.esegui(() => db.rpc<Info>('info_codice', { p_codice: c })); if (!i) return;
+      if (i.tipo !== (tipo === 'Bancale' ? 'bancale' : 'collo')) { az.setErrore(tipo === 'Bancale' ? 'Questo è un collo: scegli «Collo» sopra' : 'Questo è un bancale: scegli «Bancale» sopra'); vibra([80, 60, 80]); return; }
+      setInfo(i); vibra(); return;
+    }
+    // un collo va su un bancale (se il codice letto è un bancale) o in un posto
+    const suBancale = tipo === 'Collo' && /^B-/i.test(c);
+    const r = await az.esegui(() => suBancale ? db.rpc('collo_su_bancale', { p_codice: info.codice, p_bancale: c }) : db.rpc('metti_a_posto', { p_codice: info.codice, p_posto: c }));
+    if (r) { vibra(); setFatto({ cosa: `${tipo} ${info.cliente}`, da: info.posto, a: suBancale ? 'bancale ' + c : c }); setInfo(null); }
   };
   usePistola(fatto ? null : (c) => { leggi(c); });
+  const cambia = (t: Tipo) => { setTipo(t); setInfo(null); az.setErrore(null); };
+  const passo = !info ? `1. Scansiona il ${tipo.toLowerCase()}` : tipo === 'Bancale' ? '2. Scansiona il posto nuovo' : '2. Scansiona il bancale o il posto nuovo';
   return (
     <div className="pscr">{back}
       <div className="ptitle">Trasferisci</div>
       <ErroreApp testo={az.errore} />
       {fatto ? <><Esito ok titolo="Trasferito">{fatto.cosa} {fatto.da ? 'da ' + fatto.da + ' ' : ''}a {fatto.a}.</Esito>
           <button type="button" className="btn ghost" onClick={() => setFatto(null)}>Trasferisci un altro</button></>
-        : <><div className="scanbox"><b style={{ fontSize: 18 }}>{!info ? '1. Scansiona cosa trasferisci' : '2. Scansiona il posto nuovo'}</b>
-            <span className="lbl">{!info ? 'Collo o bancale' : `${info.tipo === 'bancale' ? 'Bancale' : 'Collo'} ${info.cliente}, adesso in ${info.posto ?? 'ricevimento'}`}</span></div>
-          <button type="button" className="bigbtn" onClick={async () => { const c = await scan(!info ? 'Scansiona il collo o il bancale' : 'Scansiona il posto', codici); if (c) leggi(c); }}>{!info ? 'Scansiona collo' : 'Scansiona posto'}</button></>}
+        : <><Seg v={tipo} onChange={cambia} />
+          <div className="scanbox"><b style={{ fontSize: 18 }}>{passo}</b>
+            <span className="lbl">{!info ? (tipo === 'Bancale' ? 'Etichetta del bancale' : 'Etichetta della scatola') : `${tipo} ${info.cliente}, adesso in ${info.posto ?? 'ricevimento'}`}</span></div>
+          <button type="button" className="bigbtn" onClick={async () => { const c = await scan(passo.slice(3), codici); if (c) leggi(c); }}>
+            {!info ? `Scansiona ${tipo.toLowerCase()}` : tipo === 'Bancale' ? 'Scansiona posto' : 'Scansiona bancale o posto'}</button></>}
     </div>
   );
 }

@@ -2,10 +2,11 @@
 import '@messina/dati/prova-corporation';
 import React, { useRef, useState } from 'react';
 import { Btn, Chip, Msg, Pill } from '@messina/ui';
+import { Telecamere } from '../telecamere';
 import { Shell, vociPer, useApp, useDati, useAzione, useStato, MailView, type Mail, Errore, hm, Mese, num, eur0, oggiISO, meseISO } from '../core';
 
 const LAPTOP = <svg width="84" height="58" viewBox="0 0 64 44" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="10" y="4" width="44" height="28" rx="2" /><path d="M2 38h60l-4 4H6z" /></svg>;
-const TITOLI: Record<string, string> = { home: 'Home', mail: 'Mail', lotti: 'Lotti', inv: 'Inventario', ordini: 'Ordini', stage: 'Stage Computer', stageTel: 'Stage Cellulari' };
+const TITOLI: Record<string, string> = { home: 'Home', mail: 'Mail', lotti: 'Lotti', inv: 'Inventario', ordini: 'Ordini', stage: 'Stage Computer', stageTel: 'Stage Cellulari', telecamere: 'Telecamere' };
 const giorniDa = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 const giornoLocale = (iso: string) => { const d = new Date(iso); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const quandoOrdine = (iso: string) => { const g = giornoLocale(iso), o = oggiISO(); if (g === o) return hm(iso);
@@ -24,7 +25,7 @@ export function Corporation() {
   const voci = vociPer(io);
   const s = voci.some((v) => v.id === sez) ? sez : 'home';
   const corpo = s === 'mail' ? <MailCorp onCerca={(q) => setRicerca({ sez: 'inv', q })} /> : s === 'lotti' ? <Lotti q={cerca} /> : s === 'inv' ? <Inventario q={cerca} />
-    : s === 'ordini' ? <Ordini q={cerca} /> : s === 'stage' ? <Stage /> : s === 'stageTel' ? <StageTel q={cerca} /> : <Home />;
+    : s === 'ordini' ? <Ordini q={cerca} /> : s === 'stage' ? <Stage /> : s === 'stageTel' ? <StageTel q={cerca} /> : s === 'telecamere' ? <Telecamere /> : <Home />;
   return <Shell voci={voci} titolo={TITOLI[s]} cerca={cerca} onCerca={setCerca}>{corpo}</Shell>;
 }
 

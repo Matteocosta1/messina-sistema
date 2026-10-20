@@ -108,10 +108,10 @@ estendiProva(({ t, rpc, funzioni }) => {
     const p = t.posti.find((x) => x.codice === a.p_posto && x.attivo); if (!p) throw new Error(`Posto ${a.p_posto} inesistente`);
     const b = t.bancali.find((x) => x.codice === a.p_codice && !x.uscito_il);
     if (bloccato(p.id) || (b && bloccato(b.posto_id))) throw new Error('Posto bloccato da una missione: prima lo sblocca l\'ufficio');
-    if (b) { const da = posto(b.posto_id); b.posto_id = p.id; registra(u, 'Trasferimento', b.codice, `${da ?? '—'} → ${p.codice}`); return { bancale: b.codice, posto: p.codice }; }
+    if (b) { const da = posto(b.posto_id); b.posto_id = p.id; t.colli.filter((k) => k.bancale_id === b.id).forEach((k) => { k.posto_id = p.id; }); registra(u, 'Trasferimento', b.codice, `${da ?? '—'} → ${p.codice}`); return { bancale: b.codice, posto: p.codice }; }
     const k = t.colli.find((x) => x.codice === a.p_codice); if (!k) throw new Error(`Codice sconosciuto: ${a.p_codice}`);
     if (bloccato(k.posto_id)) throw new Error('Posto bloccato da una missione: prima lo sblocca l\'ufficio');
-    const da = posto(k.posto_id); k.posto_id = p.id; k.letto_entrata ??= ora();
+    const da = posto(k.posto_id); k.posto_id = p.id; k.bancale_id = null; k.letto_entrata ??= ora();
     registra(u, da ? 'Trasferimento' : 'Entrata', 'Collo ' + k.codice, `${da ?? 'Ricevimento'} → ${p.codice}`);
     return { bolla: k.bolla_id, ...contaColli(k.bolla_id), posto: p.codice, da };
   };
@@ -129,6 +129,17 @@ estendiProva(({ t, rpc, funzioni }) => {
     if (a.p_fase === 'Entrata') k.letto_entrata ??= ora(); else if (a.p_fase === 'Carico') k.letto_carico ??= ora(); else throw new Error('Fase sconosciuta');
     registra(u, a.p_fase, 'Collo ' + a.p_codice, null);
     const c = t.colli.filter((x) => x.bolla_id === k.bolla_id); return { bolla: k.bolla_id, letti: c.filter((x) => a.p_fase === 'Entrata' ? x.letto_entrata : x.letto_carico).length, totale: c.length };
+  };
+  rpc.collo_su_bancale = (a, t2, u) => { magazzino(u);
+    const k = t.colli.find((x) => x.codice === a.p_codice); if (!k) throw new Error(`Codice sconosciuto: ${a.p_codice}`);
+    const b = t.bancali.find((x) => x.codice === a.p_bancale && !x.uscito_il); if (!b) throw new Error(`Bancale ${a.p_bancale} non trovato: scansiona l'etichetta del bancale`);
+    const bo = t.bolle.find((x) => x.id === k.bolla_id)!;
+    if (bo.cliente_id !== b.cliente_id) throw new Error(`Il bancale ${a.p_bancale} è di un altro cliente`);
+    if (bloccato(b.posto_id) || bloccato(k.posto_id)) throw new Error('Posto bloccato da una missione: prima lo sblocca l\'ufficio');
+    const da = k.bancale_id ? 'bancale ' + t.bancali.find((x) => x.id === k.bancale_id)?.codice : posto(k.posto_id);
+    k.bancale_id = b.id; k.posto_id = b.posto_id; k.letto_entrata ??= ora();
+    registra(u, da ? 'Trasferimento' : 'Entrata', 'Collo ' + k.codice, `${da ?? 'Ricevimento'} → bancale ${b.codice}`);
+    return { bolla: k.bolla_id, ...contaColli(k.bolla_id), bancale: b.codice, posto: posto(b.posto_id), da };
   };
   rpc.trasferisci = (a, t2, u) => { if (ruolo(u) !== 'magazzino') throw new Error('Bancale non trovato'); return rpc.metti_a_posto({ p_codice: a.p_bancale, p_posto: a.p_posto }, t2, u); };
   const mp = (id: string) => { const m = t.missioni_posti.find((x) => x.id === id); if (!m) throw new Error('Posto non trovato'); return m; };
@@ -195,10 +206,13 @@ function codiciProva(t: Tabelle, cosa: string, id: string | null): string[] {
   const liberi = t.posti.filter((p) => p.zona === 'Scaffale' && !t.bancali.some((b) => b.posto_id === p.id && !b.uscito_il) && !t.colli.some((k) => k.posto_id === p.id && !k.letto_carico)).map((p) => p.codice);
   switch (cosa) {
     case 'fermata': { const f = t.fermate.find((x) => x.id === id); return t.colli.filter((k) => k.bolla_id === f?.bolla_id && !k.letto_consegna).map((k) => k.codice); }
-    case 'entrata': return [...t.colli.filter((k) => k.bolla_id === 'b-0051' && !k.posto_id).map((k) => k.codice)];
+    case 'entrata': return id === 'Bancale' ? t.bancali.filter((b) => b.cliente_id === 'c-snam' && !b.uscito_il).slice(0, 3).map((b) => b.codice)
+      : [...t.colli.filter((k) => k.bolla_id === 'b-0051' && !k.posto_id).map((k) => k.codice)];
+    case 'su-bancale': { const k = t.colli.find((x) => x.codice === id); const c = t.bolle.find((b) => b.id === k?.bolla_id)?.cliente_id;
+      return t.bancali.filter((b) => b.cliente_id === c && !b.uscito_il).slice(0, 3).map((b) => b.codice); }
     case 'posto': return [...new Set([id, ...liberi.slice(0, 3)].filter(Boolean) as string[])];
     case 'uscita': return [...t.colli.filter((k) => k.bolla_id === id && !k.letto_carico).map((k) => k.codice), 'C07-001'];
-    case 'trasferisci': return [t.bancali.find((b) => b.cliente_id === 'c-lux')?.codice, 'C50-001'].filter(Boolean) as string[];
+    case 'trasferisci': return id === 'Collo' ? ['C50-001'] : [t.bancali.find((b) => b.cliente_id === 'c-lux')?.codice].filter(Boolean) as string[];
     case 'bancale': return t.bancali.filter((b) => b.cliente_id === 'c-corp' && !b.uscito_il).slice(0, 3).map((b) => b.codice);
     case 'missione': { const m = t.missioni_posti.find((x) => x.id === id); return [...(m?.attesi ?? []).filter((x: any) => !m!.letti.includes(x.codice)).map((x: any) => x.codice), 'HP9X099']; }
   }
