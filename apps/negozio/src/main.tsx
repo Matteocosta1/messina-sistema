@@ -77,12 +77,12 @@ function App() {
   const prodotto = sez === 'p' ? prodotti?.find((p) => p.slug === arg) : undefined;
 
   useEffect(() => {  // SEO: titolo e dati strutturati della pagina
-    document.title = prodotto ? `${prodotto.marca} ${prodotto.modello} ricondizionato · Messina Corporation` : sez === 'carrello' ? 'Carrello · Messina Corporation' : 'Messina Corporation · Portatili ricondizionati';
+    document.title = prodotto ? `${prodotto.marca} ${prodotto.modello} usato · Messina Corporation` : sez === 'carrello' ? 'Carrello · Messina Corporation' : 'Messina Corporation · Portatili usati';
     let s = document.getElementById('jsonld') as HTMLScriptElement | null;
     if (!s) { s = document.createElement('script'); s.type = 'application/ld+json'; s.id = 'jsonld'; document.head.appendChild(s); }
     const offerta = (p: Prodotto) => ({ '@type': 'AggregateOffer', priceCurrency: 'EUR', lowPrice: p.da, highPrice: Math.max(...p.righe.map((r) => r.prezzo)),
-      offerCount: p.righe.reduce((a, r) => a + r.disponibili, 0), availability: 'https://schema.org/InStock', itemCondition: 'https://schema.org/RefurbishedCondition' });
-    const prod = (p: Prodotto) => ({ '@type': 'Product', name: `${p.marca} ${p.modello}`, brand: { '@type': 'Brand', name: p.marca }, description: `${p.marca} ${p.modello} ricondizionato, ${p.spec}`,
+      offerCount: p.righe.reduce((a, r) => a + r.disponibili, 0), availability: 'https://schema.org/InStock', itemCondition: 'https://schema.org/UsedCondition' });
+    const prod = (p: Prodotto) => ({ '@type': 'Product', name: `${p.marca} ${p.modello}`, brand: { '@type': 'Brand', name: p.marca }, description: `${p.marca} ${p.modello} usato, ${p.spec}`,
       url: location.origin + location.pathname + '#/p/' + p.slug, offers: offerta(p) });
     s.textContent = JSON.stringify(prodotto ? { '@context': 'https://schema.org', ...prod(prodotto) }
       : { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: (prodotti ?? []).map((p, i) => ({ '@type': 'ListItem', position: i + 1, item: prod(p) })) });
@@ -107,7 +107,7 @@ function App() {
   else if (sez === 'carrello') inner = <Carrello carrello={carrello} onCarrello={cambiaCarrello} vai={vai} />;
   else if (sez === 'grazie') inner = <Grazie onSvuota={() => cambiaCarrello([])} vai={vai} />;
   else if (sez === 'annullato') inner = <Pagina titolo="Pagamento annullato"><p className="muted">Nessun addebito. Il carrello è ancora qui.</p><Btn sm onClick={() => vai('carrello')}>Carrello</Btn></Pagina>;
-  else if (sez === 'aziende') inner = <Pagina titolo="Per aziende"><p className="muted">Lotti di portatili ricondizionati, fattura e consegna in tutta Italia. Scrivici e ti prepariamo un’offerta.</p><a className="btn" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }} href="mailto:vendite@[dominio]">Scrivi</a></Pagina>;
+  else if (sez === 'aziende') inner = <Pagina titolo="Per aziende"><p className="muted">Lotti di portatili usati e testati, fattura e consegna in tutta Italia. Scrivici e ti prepariamo un’offerta.</p><a className="btn" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }} href="mailto:vendite@[dominio]">Scrivi</a></Pagina>;
   else if (sez === 'privacy' || sez === 'termini' || sez === 'resi') inner = <Pagina titolo={{ privacy: 'Privacy', termini: 'Termini', resi: 'Resi' }[sez]}><p className="muted">[Testo da inserire: lo prepara il consulente legale prima dell’apertura del negozio.]</p></Pagina>;
   else inner = <Vetrina prodotti={prodotti} errore={errore} brand={brand} onBrand={setBrand} vai={vai} />;
 
