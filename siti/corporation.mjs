@@ -22,6 +22,7 @@ const gradi = () => `<div class="gradi glass">
   <div class="grado"><div class="l">A</div><h3>Ottimo</h3><p>Quasi impossibile distinguerlo da nuovo. Al massimo micro-segni visibili da vicino.</p></div>
   <div class="grado"><div class="l">B</div><h3>Buono</h3><p>Leggeri segni d'uso sulla scocca. Schermo e tastiera in ordine.</p></div>
   <div class="grado"><div class="l">C</div><h3>Discreto</h3><p>Segni evidenti d'uso, possibile piccola ammaccatura.</p></div>
+  <div class="grado"><div class="l">D</div><h3>Scocca rotta</h3><p>Funziona al 100%, ma la scocca è rotta o ha danni estetici importanti.</p></div>
 </div>`;
 
 const postazioni = () => `<figure class="postazioni glass" style="margin:0" aria-label="Schema delle 60 postazioni dello stage">${'<i></i>'.repeat(60)}<figcaption><span>In lavorazione</span><span>Libere</span></figcaption></figure>`;
@@ -69,8 +70,8 @@ P2('', 'Messina Corporation', 'Ritiro di computer e telefoni aziendali dismessi,
 </div></div>
 <div class="wrap">${azioni([['valuta', 'Valuta un lotto', 'Offerta per i vostri dispositivi'], ['aziende/ritiro', 'Organizza un ritiro', 'Anche in più sedi'], ['aziende/cancellazione-dati', 'Cancellazione dei dati', 'Come funziona il rapporto'], ['', 'Compra un dispositivo', 'Nel nostro negozio', 'negozioUrl']])}</div>
 ${sezione('Per le aziende che rinnovano il parco IT.', 'Vi liberiamo dei dispositivi vecchi senza rischi sui dati, e vi diamo un valore per quelli che possono avere una seconda vita.', `<div class="servizi glass">${AZIENDE.map((r) => `<div class="srv"><h3><a href="${href(r.link)}">${r.t}</a></h3><div><p>${r.p}</p><p class="vai"><a href="${href(r.link)}">Scopri di più</a></p></div><span class="tag">${r.tag}</span></div>`).join('')}</div>`, 'aziende')}
-${sezione('Il percorso di ogni dispositivo.', 'Cinque passaggi, tracciati per numero di serie. In qualsiasi momento sappiamo dov\'è e cosa gli è stato fatto.', passi([['Ritiro', 'Registrato con il seriale.'], ['Cancellazione', 'Certificata, con rapporto.'], ['Test e grado', 'A, B o C secondo lo stato.'], ['Pronto', 'Pulito, testato, imballato.'], ['In vendita', 'Nel nostro negozio e online.']]), 'percorso', 'padding-top:0')}
-${sezione('Tre gradi, descritti senza giri di parole.', 'Il grado riguarda solo l\'aspetto. Tutti i dispositivi funzionano al 100% e hanno i dati cancellati.', gradi() + `<p class="vai" style="margin-top:18px"><a href="${href('gradi')}">Come assegniamo il grado</a></p>`, 'gradi', 'padding-top:0')}
+${sezione('Il percorso di ogni dispositivo.', 'Cinque passaggi, tracciati per numero di serie. In qualsiasi momento sappiamo dov\'è e cosa gli è stato fatto.', passi([['Ritiro', 'Registrato con il seriale.'], ['Cancellazione', 'Certificata, con rapporto.'], ['Test e grado', 'A, B, C o D secondo lo stato.'], ['Pronto', 'Pulito, testato, imballato.'], ['In vendita', 'Nel nostro negozio e online.']]), 'percorso', 'padding-top:0')}
+${sezione('Quattro gradi, descritti senza giri di parole.', 'Il grado riguarda solo l\'aspetto. Tutti i dispositivi funzionano al 100% e hanno i dati cancellati.', gradi() + `<p class="vai" style="margin-top:18px"><a href="${href('gradi')}">Come assegniamo il grado</a></p>`, 'gradi', 'padding-top:0')}
 <section style="padding-top:0"><div class="wrap"><div class="compra">
   <div><h2>Portatili usati, testati e garantiti.</h2><p>Nel nostro negozio trovate i dispositivi usciti dal percorso, con grado, foto e garanzia. Pagamento sicuro e spedizione con Messina Autotrasporti.</p><p style="margin-top:24px"><a class="btn" href="#" data-link="negozioUrl">Vai al negozio</a></p></div>
   <div class="anche"><b>Ci trovate anche su</b>${MARKET.map(([n]) => n).join(', ').replace(/, ([^,]*)$/, ' e $1')}. <a href="${href('dove-comprare')}" style="color:#fff">Dove comprare</a></div>
@@ -130,7 +131,7 @@ P2('aziende/stage', 'Stage di formattazione', 'Stage da 60 postazioni in rete pe
   ]), '', 'padding-top:0'));
 
 // ======================= ACQUISTI =======================
-P2('gradi', 'Gradi', 'Come assegniamo il grado A, B o C ai dispositivi usati di Messina Corporation e cosa controlliamo su ognuno.',
+P2('gradi', 'Gradi', 'Come assegniamo il grado A, B, C o D ai dispositivi usati di Messina Corporation e cosa controlliamo su ognuno.',
   intest([[null, 'Gradi']], 'Gradi', 'Il grado dice com\'è fuori. Dentro, tutti i dispositivi hanno superato gli stessi controlli.') +
   sezione('', '', gradi()) +
   sezione('Cosa controlliamo su ogni dispositivo.', 'Sono dispositivi usati, non ricondizionati: non montiamo pezzi presi da altri computer.', `<div class="tabella glass"><table><thead><tr><th>Controllo</th><th>Cosa verifichiamo</th></tr></thead><tbody>

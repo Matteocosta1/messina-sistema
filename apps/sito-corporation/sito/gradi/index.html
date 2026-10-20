@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gradi | Messina Corporation</title>
-<meta name="description" content="Come assegniamo il grado A, B o C ai dispositivi usati di Messina Corporation e cosa controlliamo su ognuno.">
+<meta name="description" content="Come assegniamo il grado A, B, C o D ai dispositivi usati di Messina Corporation e cosa controlliamo su ognuno.">
 <meta name="theme-color" content="#f2f3f5">
 <meta property="og:title" content="Gradi | Messina Corporation">
-<meta property="og:description" content="Come assegniamo il grado A, B o C ai dispositivi usati di Messina Corporation e cosa controlliamo su ognuno.">
+<meta property="og:description" content="Come assegniamo il grado A, B, C o D ai dispositivi usati di Messina Corporation e cosa controlliamo su ognuno.">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="it_IT">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111214'/%3E%3Ctext x='32' y='44' font-family='Arial' font-weight='900' font-size='34' text-anchor='middle' fill='%23fff'%3EM%3C/text%3E%3C/svg%3E">
@@ -262,7 +262,7 @@ footer a:hover{color:var(--ink)}
 @keyframes compare{from{opacity:0;transform:translateY(6px)}}
 
 /* gradi: A, B, C sono etichette vere */
-.gradi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-radius:28px;overflow:hidden}
+.gradi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-radius:28px;overflow:hidden}
 .grado{padding:clamp(22px,3vw,34px);border-left:1px solid var(--line)}
 .grado:first-child{border-left:0}
 .grado .l{font-size:clamp(64px,8vw,104px);font-weight:900;letter-spacing:-.06em;line-height:.9}
@@ -292,6 +292,7 @@ footer a:hover{color:var(--ink)}
 .lotto h2{font-size:clamp(32px,4.4vw,56px);font-weight:800;line-height:1.02}
 .lotto .lead{color:var(--muted);margin-top:16px;max-width:40ch}
 @media (max-width:900px){.compra,.stage,.lotto{grid-template-columns:1fr}}
+@media (max-width:980px){.gradi{grid-template-columns:1fr 1fr}.grado:nth-child(3){border-left:0}.grado:nth-child(n+3){border-top:1px solid var(--line)}}
 @media (max-width:700px){.gradi{grid-template-columns:1fr}.grado{border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:auto 1fr;gap:0 20px;align-items:start}.grado:first-child{border-top:0}.grado .l{grid-row:1/3;font-size:64px}.grado h3{margin-top:4px}}
 
 </style>
@@ -320,6 +321,7 @@ footer a:hover{color:var(--ink)}
   <div class="grado"><div class="l">A</div><h3>Ottimo</h3><p>Quasi impossibile distinguerlo da nuovo. Al massimo micro-segni visibili da vicino.</p></div>
   <div class="grado"><div class="l">B</div><h3>Buono</h3><p>Leggeri segni d'uso sulla scocca. Schermo e tastiera in ordine.</p></div>
   <div class="grado"><div class="l">C</div><h3>Discreto</h3><p>Segni evidenti d'uso, possibile piccola ammaccatura.</p></div>
+  <div class="grado"><div class="l">D</div><h3>Scocca rotta</h3><p>Funziona al 100%, ma la scocca è rotta o ha danni estetici importanti.</p></div>
 </div>
   </div></section><section style="padding-top:0"><div class="wrap">
     <div class="sh"><h2>Cosa controlliamo su ogni dispositivo.</h2><p>Sono dispositivi usati, non ricondizionati: non montiamo pezzi presi da altri computer.</p></div>
