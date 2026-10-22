@@ -4,10 +4,11 @@ import React, { useRef, useState } from 'react';
 import { Btn, Chip, Msg, Pill } from '@messina/ui';
 import { Telecamere } from '../telecamere';
 import { Richieste } from './richieste';
+import { Presenze } from '../trasporti/presenze';
 import { Shell, vociPer, useApp, useDati, useAzione, useStato, MailView, type Mail, Errore, hm, Mese, num, eur0, oggiISO, meseISO } from '../core';
 
 const LAPTOP = <svg width="84" height="58" viewBox="0 0 64 44" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="10" y="4" width="44" height="28" rx="2" /><path d="M2 38h60l-4 4H6z" /></svg>;
-const TITOLI: Record<string, string> = { home: 'Home', mail: 'Mail', lotti: 'Lotti', inv: 'Inventario', ordini: 'Ordini', stage: 'Stage Computer', stageTel: 'Stage Cellulari', ricambi: 'Ricambi', richieste: 'Richieste', telecamere: 'Telecamere' };
+const TITOLI: Record<string, string> = { home: 'Home', mail: 'Mail', lotti: 'Lotti', inv: 'Inventario', ordini: 'Ordini', stage: 'Stage Computer', stageTel: 'Stage Cellulari', ricambi: 'Ricambi', richieste: 'Richieste', presenze: 'Presenze', telecamere: 'Telecamere' };
 const giorniDa = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 const giornoLocale = (iso: string) => { const d = new Date(iso); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const quandoOrdine = (iso: string) => { const g = giornoLocale(iso), o = oggiISO(); if (g === o) return hm(iso);
@@ -23,10 +24,11 @@ export function Corporation() {
   const [ricerca, setRicerca] = useState({ sez: '', q: '' });
   const cerca = ricerca.sez === sez ? ricerca.q : '';
   const setCerca = (q: string) => setRicerca({ sez, q });
-  const voci = vociPer(io);
+  const { dati: presenze } = useDati((db) => db.rpc<boolean>('vede_presenze', { p_azienda: 'corporation' }), []);
+  const voci = vociPer(io).filter((v) => v.id !== 'presenze' || presenze);
   const s = voci.some((v) => v.id === sez) ? sez : 'home';
   const corpo = s === 'mail' ? <MailCorp onCerca={(q) => setRicerca({ sez: 'inv', q })} /> : s === 'lotti' ? <Lotti q={cerca} /> : s === 'inv' ? <Inventario q={cerca} />
-    : s === 'ordini' ? <Ordini q={cerca} /> : s === 'stage' ? <Stage /> : s === 'stageTel' ? <StageTel q={cerca} /> : s === 'ricambi' ? <Ricambi q={cerca} /> : s === 'richieste' ? <Richieste /> : s === 'telecamere' ? <Telecamere /> : <Home />;
+    : s === 'ordini' ? <Ordini q={cerca} /> : s === 'stage' ? <Stage /> : s === 'stageTel' ? <StageTel q={cerca} /> : s === 'ricambi' ? <Ricambi q={cerca} /> : s === 'richieste' ? <Richieste /> : s === 'presenze' ? <Presenze tab={percorso.split('/')[1]} /> : s === 'telecamere' ? <Telecamere /> : <Home />;
   return <Shell voci={voci} titolo={TITOLI[s]} cerca={cerca} onCerca={setCerca}>{corpo}</Shell>;
 }
 
@@ -136,7 +138,7 @@ function MailCorp({ onCerca }: { onCerca: (v: string) => void }) {
 
 // ------------------------------------------------------------------ Lotti
 function Lotti({ q }: { q: string }) {
-  const { db } = useApp();
+  const { db, io } = useApp();
   const [sel, setSel] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
   const file = useRef<HTMLInputElement>(null);
@@ -176,7 +178,7 @@ function Lotti({ q }: { q: string }) {
     {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
     <input ref={file} type="file" multiple accept=".pdf,image/*,.xml,.xlsx,.csv" hidden onChange={(e) => carica(e.target.files)} />
-    <div className="row"><Btn onClick={() => file.current?.click()} disabled={az.inCorso || !cur}>Carica fattura d’acquisto e DDT</Btn><span className="lbl">Il programma confronta i seriali del DDT con l’archivio dei PC lavorati.{cur ? ` Lotto scelto: ${cur.codice}.` : ''}</span></div>
+    {io.ruolo !== 'commercialista' && <div className="row"><Btn onClick={() => file.current?.click()} disabled={az.inCorso || !cur}>Carica fattura d’acquisto e DDT</Btn><span className="lbl">Il programma confronta i seriali del DDT con l’archivio dei PC lavorati.{cur ? ` Lotto scelto: ${cur.codice}.` : ''}</span></div>}
   </>);
 }
 

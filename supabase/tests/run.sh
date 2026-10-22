@@ -6,7 +6,7 @@ DB="${DB:-messina_test}"
 P="psql -h ${PGH:-/tmp/pgtest} -p ${PGP:-54329} -U postgres -v ON_ERROR_STOP=1 -q"
 $P -c "drop database if exists $DB" -c "create database $DB"
 $P -d $DB -f tests/00_supabase_stub.sql
-for f in migrations/*.sql; do echo "· $f"; $P -d $DB -f "$f"; done
+for f in migrations/*.sql; do echo "· $f"; $P -1 -d $DB -f "$f"; done   # una transazione per file, come Supabase
 echo "· seed"; $P -d $DB -f seed.sql
 for t in tests/[1-9]*.sql; do echo "· $t"; $P -d $DB -f "$t"; done
 echo "OK: migrazioni, seed e test passati"

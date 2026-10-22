@@ -10,3 +10,4 @@ import './prova-portale';
 import './prova-negozio';
 import './prova-corporation';
 import './prova-fatture';
+import './prova-accessi';

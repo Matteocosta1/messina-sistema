@@ -12,10 +12,7 @@
 --  · nota di credito; anagrafica completa per la fattura elettronica
 -- =====================================================================
 
-alter type public.unita_tariffa add value if not exists 'km';
-alter type public.unita_tariffa add value if not exists 'mese';
-alter type public.stato_fattura add value if not exists 'Annullata';
-alter type public.stato_fattura add value if not exists 'Stornata';
+-- valori nuovi degli elenchi: 20261022000150_valori_nuovi.sql
 
 -- ------------------------------------------------------------------ Anagrafica per la fattura elettronica
 alter table public.clienti

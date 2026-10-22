@@ -186,7 +186,7 @@ Prima con le chiavi **test** (`sk_test_…`, carta 4242 4242 4242 4242), poi con
 Gli account li crea solo la Direzione: la registrazione libera è spenta.
 
 1. Supabase → Authentication → Users → **Add user → Send invitation**, con l'email aziendale della persona.
-2. SQL Editor, una riga per persona (azienda `trasporti` o `corporation`, ruolo tra `direzione`, `amministrazione`, `commerciale`, `bolle`, `traffico`, `magazzino`, `autista`, `vendite`, `stage`):
+2. SQL Editor, una riga per persona (azienda `trasporti` o `corporation`, ruolo tra `direzione`, `amministrazione`, `commerciale`, `bolle`, `traffico`, `magazzino`, `autista`, `vendite`, `stage`, `commercialista`):
 
 ```sql
 insert into public.profili (id, azienda, ruolo, nome)
@@ -201,6 +201,18 @@ Per gli autisti e il magazzino serve anche il collegamento alla scheda dipendent
 `update public.dipendenti set profilo_id = (select id from auth.users where email = '…') where nome = '…';`
 
 I clienti del portale hanno ruolo `cliente` e il loro `cliente_id`.
+
+**Chi lavora in tutte e due le società** (Matteo, Pier, i genitori, il commercialista): il profilo parte in una società, poi si aggiunge l'accesso all'altra. Nel gestionale compare il pulsante per passare da una all'altra; si lavora sempre in una alla volta, così i dati non si mescolano.
+
+```sql
+insert into public.accessi (profilo_id, azienda, ruolo)
+select id, 'corporation', 'vendite' from auth.users where email = 'matteo@dominio';
+```
+
+Ruoli in più rispetto all'elenco sopra: `commercialista` (legge fatture, incassi, lotti e vendite delle due società; niente telecamere, satellitare, presenze o modifiche).
+**Riepiloghi presenze**: li vede solo chi ha il permesso, per ogni società (all'inizio Angela e la madre; la direzione no):
+`update public.accessi set riepiloghi_presenze = true where profilo_id = (select id from auth.users where email = '…') and azienda = 'trasporti';`
+Dopo il primo avvio la direzione di una società può dare o togliere gli accessi alla sua società con `imposta_accesso` (mai il ruolo di direzione).
 
 ## Fase 7 · Da «Prova» a dati veri
 

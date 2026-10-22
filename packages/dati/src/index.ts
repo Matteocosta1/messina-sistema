@@ -171,6 +171,8 @@ function dividi(s: string) {
 export type FunzioniProva = Record<string, (corpo: any, t: Tabelle, utente: string | null) => unknown>;
 /** regole del database rifatte in prova: ricevono la riga prima e dopo la modifica (prima = null se è nuova) e possono rifiutarla */
 export type RegoleProva = Record<string, (prima: Record<string, any> | null, dopo: Record<string, any>, t: Tabelle, utente: string | null) => void>;
+/** in prova, le righe che l'utente può vedere (come le regole RLS del database) */
+export type FiltriProva = Record<string, (riga: Record<string, any>, t: Tabelle, utente: string | null) => boolean>;
 /** chiave della sessione di prova: ogni programma della pagina «Prova programma Messina» ha la sua (nome della cornice) */
 export function chiaveProva() {
   let nome = '';
@@ -242,7 +244,7 @@ function linkProva(t: Tabelle, bucket: string, percorso: string) {
   return URL.createObjectURL(new Blob([html], { type: 'text/html' }));
 }
 
-export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: Record<string, string>, viste: (t: Tabelle) => void = () => {}, funzioni: FunzioniProva = {}, regole: RegoleProva = {}): Motore {
+export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: Record<string, string>, viste: (t: Tabelle) => void = () => {}, funzioni: FunzioniProva = {}, regole: RegoleProva = {}, filtri: FiltriProva = {}): Motore {
   let io: string | null = null;
   try { io = sessionStorage.getItem(chiaveProva()); } catch { io = null; }
   const pausa = () => new Promise((r) => setTimeout(r, 80));
@@ -287,7 +289,8 @@ export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: R
       const prima = q.metodo === 'GET' ? '' : pagina.impronta();
       if (q.metodo === 'GET') viste(t);
       const tab = t[q.tabella] ?? (t[q.tabella] = []);
-      let righe = tab.filter((r) => q.filtri.every((f) => passa(r, f)));
+      const vede = filtri[q.tabella];
+      let righe = tab.filter((r) => q.filtri.every((f) => passa(r, f)) && (!vede || vede(r, t, io)));
       if (q.metodo === 'PATCH') {
         const nuove = righe.map((r) => { const d = { ...r, ...(q.corpo as object) }; regole[q.tabella]?.(r, d, t, io); return d; });
         righe.forEach((r, i) => Object.assign(r, nuove[i]));

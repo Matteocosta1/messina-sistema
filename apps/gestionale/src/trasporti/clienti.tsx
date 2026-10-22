@@ -201,7 +201,8 @@ const pillStato = (f: any) => f.stato === 'Pronta' ? <Pill tone="dark">Pronta</P
   : f.stato === 'Da controllare' ? <Pill tone="red">Da controllare</Pill> : <Pill>{f.stato}</Pill>;
 
 export function Fatturazione() {
-  const { db } = useApp();
+  const { db, io } = useApp();
+  const sola = io.ruolo === 'commercialista';   // il commercialista legge, non cambia
   const az = useAzione();
   const [mese, setMese] = useState(meseISO());
   const [msg, setMsg] = useState('');
@@ -219,14 +220,14 @@ export function Fatturazione() {
     .then((ok) => ok && setMsg(`${lista.length === 1 ? 'Fattura inviata' : lista.length + ' fatture inviate'} a Fatture in Cloud, che le manda allo SdI. L’esito arriva da solo in questa pagina.`));
   const esiti = () => az.prendi(() => db.fn<any>('fatture-in-cloud', { azione: 'esiti' })).then((r) => r && setMsg(`Esiti aggiornati: ${r.scartate ? r.scartate + ' scartate dallo SdI, da correggere' : 'nessuno scarto'}.`));
   const cur = dati.find((f) => f.id === aperta);
-  if (cur) return <Dettaglio f={cur} onChiudi={(t) => { setAperta(null); if (t) setMsg(t); }} />;
+  if (cur) return <Dettaglio f={cur} sola={sola} onChiudi={(t) => { setAperta(null); if (t) setMsg(t); }} />;
   return (<>
     <div className="row between">
       <div className="row">{[mesePrima(), meseISO()].map((m) => <Chip key={m} on={mese === m} onClick={() => { setMese(m); setMsg(''); }}>{nomeMese(m)}</Chip>)}</div>
-      <div className="row"><Btn onClick={chiudi} disabled={az.inCorso}>Chiudi mese</Btn>
+      {!sola && <div className="row"><Btn onClick={chiudi} disabled={az.inCorso}>Chiudi mese</Btn>
         {pronte.length > 0 && <Btn onClick={() => invia(pronte)} disabled={az.inCorso}>Invia</Btn>}
         <Btn ghost onClick={esiti} disabled={az.inCorso}>Esiti</Btn>
-        <Btn ghost onClick={() => setNuova(!nuova)}>{nuova ? 'Chiudi' : 'Nuova'}</Btn></div>
+        <Btn ghost onClick={() => setNuova(!nuova)}>{nuova ? 'Chiudi' : 'Nuova'}</Btn></div>}
     </div>
     {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
@@ -255,10 +256,10 @@ function NuovaFattura({ onFatto }: { onFatto: (id: string) => void }) {
 }
 
 /** una fattura: righe (modificabili prima dell'invio), bolle collegate, passaggi di stato */
-function Dettaglio({ f, onChiudi }: { f: any; onChiudi: (msg?: string) => void }) {
+function Dettaglio({ f, sola, onChiudi }: { f: any; sola: boolean; onChiudi: (msg?: string) => void }) {
   const { db, vai } = useApp();
   const az = useAzione();
-  const aperta = APERTE.includes(f.stato);
+  const aperta = APERTE.includes(f.stato) && !sola;
   const [righe, setRighe] = useState<any[] | null>(null);
   const [motivo, setMotivo] = useState<{ cosa: 'annulla' | 'nota'; testo: string } | null>(null);
   const [msg, setMsg] = useState('');
@@ -316,7 +317,7 @@ function Dettaglio({ f, onChiudi }: { f: any; onChiudi: (msg?: string) => void }
       {modificata && <span className="lbl">I totali si aggiornano quando salvi: li calcola il programma dalle righe.</span>}
       {msg && <Msg>{msg}</Msg>}
       <Errore testo={az.errore} />
-      {motivo ? <div className="stack" style={{ gap: 8 }}>
+      {sola ? null : motivo ? <div className="stack" style={{ gap: 8 }}>
         <label className="field"><span className="lbl">{motivo.cosa === 'annulla' ? 'Perché la annulli' : 'Motivo della nota di credito'}</span><input className="input" value={motivo.testo} onChange={(e) => setMotivo({ ...motivo, testo: e.target.value })} /></label>
         <div className="row"><Btn onClick={conferma} disabled={!motivo.testo.trim() || az.inCorso}>Conferma</Btn><Btn ghost onClick={() => setMotivo(null)}>Annulla</Btn></div></div>
       : <div className="row">

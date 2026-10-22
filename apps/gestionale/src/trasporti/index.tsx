@@ -17,7 +17,8 @@ export function Trasporti() {
   const [cerca, setCerca] = useState('');
   const [sez, sotto] = percorso.split('/');
   const { dati: an } = useDati((db) => db.from<any>('anomalie').select('sezione'), []);
-  const voci = vociPer(io).map((v) => v.id === 'anomalie' ? { ...v, badge: an?.length ?? 0 } : v);
+  const { dati: presenze } = useDati((db) => db.rpc<boolean>('vede_presenze', { p_azienda: 'trasporti' }), []);
+  const voci = vociPer(io).filter((v) => v.id !== 'presenze' || presenze).map((v) => v.id === 'anomalie' ? { ...v, badge: an?.length ?? 0 } : v);
   const id = voci.some((v) => v.id === sez) ? sez : 'home';
   const [titolo, setTitolo] = useState<string | null>(null);
   const nome = T_NAV.find((v) => v.id === id)!.nome;

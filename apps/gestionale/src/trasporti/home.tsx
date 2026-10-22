@@ -45,7 +45,8 @@ export function Home() {
     .map(([k, d]) => `${m.tipo} ${m.targa}: ${k} il ${new Date(d).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}`));
   // «Da guardare oggi»: le anomalie raggruppate più quello che va fatto oggi
   const voci: [string, string, string, 'red' | 'dark' | undefined][] = [];
-  for (const s of SEZ) {
+  // le anomalie le vedono solo gli amministratori (e la direzione), come nel database
+  for (const s of io.ruolo === 'amministrazione' || capo ? SEZ : []) {
     const l = dati.an.filter((a) => a.sezione === s);
     if (l.length === 1) voci.push([l[0].cosa, l[0].dove, s, PILL[s]]);
     else if (l.length > 1) voci.push([`${l.length} anomalie in ${s}`, 'anomalie/' + s, s, PILL[s]]);
@@ -61,11 +62,11 @@ export function Home() {
       <div className="glass card"><div className="lbl">Consegnate al primo tentativo</div><div className="big">{primo === null ? '—' : primo + '%'}</div><div className="lbl">obiettivo 97%</div></div>
       <div className="glass card"><div className="lbl">Bolle da confermare</div><div className="big">{num(dati.nuove.length)}</div><div className="lbl">{mancanti === 1 ? '1 con dati mancanti' : mancanti + ' con dati mancanti'}</div></div>
     </div>
-    <div className="grid g4">
+    {(capo || io.ruolo === 'amministrazione' || io.ruolo === 'commercialista') && <div className="grid g4">
       <div className="glass card"><div className="lbl">Fatturato oggi</div><div className="big">{eur0(dati.inc.fatturato_oggi)}</div><div className="lbl">bolle di oggi × tariffe</div></div>
       <div className="glass card"><div className="lbl">Fatturato {Mese().toLowerCase()}</div><div className="big">{eur0(dati.inc.fatturato_mese)}</div><div className="lbl">dal 1° {Mese().toLowerCase()}</div></div>
       <div className="glass card"><div className="lbl">Incassato</div><div className="big">{eur0(dati.inc.incassato_mese)}</div><div className="lbl">{nPag === 1 ? '1 fattura pagata' : nPag + ' fatture pagate'}</div></div>
-    </div>
+    </div>}
     <div className="grid g2">
       <div className="glass card"><h3 style={{ fontSize: 18, marginBottom: 8 }}>Resoconto del mattino</h3>
         <p style={{ margin: '0 0 8px' }}>{dati.res?.giorno === oggiISO() ? dati.res.testo : 'Il resoconto di oggi non è ancora arrivato.'}</p>

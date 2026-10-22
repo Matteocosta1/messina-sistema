@@ -3,7 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import type { Db } from '@messina/dati';
 import { Badge, Btn, Msg, Pill, Search, KI } from '@messina/ui';
 
-export type Ruolo = 'direzione' | 'amministrazione' | 'commerciale' | 'bolle' | 'traffico' | 'magazzino' | 'autista' | 'vendite' | 'stage' | 'cliente';
+export type Ruolo = 'direzione' | 'amministrazione' | 'commerciale' | 'bolle' | 'traffico' | 'magazzino' | 'autista' | 'vendite' | 'stage' | 'cliente' | 'commercialista';
 export interface Profilo { id: string; azienda: 'trasporti' | 'corporation'; ruolo: Ruolo; nome: string; cliente_id: string | null }
 
 interface Ctx { db: Db; io: Profilo; vai: (p: string) => void; percorso: string; aggiorna: () => void; giro: number }
@@ -57,7 +57,7 @@ export interface Voce { id: string; nome: string; ruoli?: Ruolo[]; badge?: numbe
 /** T_NAV del mockup, con chi può vedere ogni sezione */
 export const T_NAV: Voce[] = [
   { id: 'home', nome: 'Home' },
-  { id: 'anomalie', nome: 'Anomalie' },
+  { id: 'anomalie', nome: 'Anomalie', ruoli: ['amministrazione'] },
   { id: 'mail', nome: 'Mail', ruoli: ['bolle', 'commerciale', 'traffico'] },
   { id: 'bolle', nome: 'Bolle', ruoli: ['bolle', 'traffico'] },
   { id: 'traffico', nome: 'Traffico', ruoli: ['traffico'] },
@@ -65,7 +65,7 @@ export const T_NAV: Voce[] = [
   { id: 'giacenze', nome: 'Giacenze', ruoli: ['bolle', 'traffico'] },
   { id: 'clienti', nome: 'Clienti', ruoli: ['commerciale', 'amministrazione', 'bolle'] },
   { id: 'preventivi', nome: 'Preventivi', ruoli: ['commerciale'] },
-  { id: 'fatture', nome: 'Fatturazione', ruoli: ['amministrazione'] },
+  { id: 'fatture', nome: 'Fatturazione', ruoli: ['amministrazione', 'commercialista'] },
   { id: 'mezzi', nome: 'Mezzi', ruoli: ['traffico', 'amministrazione'] },
   { id: 'autisti', nome: 'Autisti', ruoli: ['traffico', 'amministrazione'] },
   { id: 'telepass', nome: 'Telepass', ruoli: ['amministrazione', 'traffico'] },
@@ -77,13 +77,14 @@ export const T_NAV: Voce[] = [
 export const C_NAV: Voce[] = [
   { id: 'home', nome: 'Home' },
   { id: 'mail', nome: 'Mail', ruoli: ['vendite', 'stage'] },
-  { id: 'lotti', nome: 'Lotti', ruoli: ['vendite', 'amministrazione'] },
+  { id: 'lotti', nome: 'Lotti', ruoli: ['vendite', 'amministrazione', 'commercialista'] },
   { id: 'inv', nome: 'Inventario' },
   { id: 'ordini', nome: 'Ordini', ruoli: ['vendite', 'magazzino'] },
   { id: 'richieste', nome: 'Richieste', ruoli: ['vendite'] },
   { id: 'stage', nome: 'Stage Computer', ruoli: ['vendite', 'stage'] },
   { id: 'stageTel', nome: 'Stage Cellulari', ruoli: ['vendite', 'stage'] },
   { id: 'ricambi', nome: 'Ricambi', ruoli: ['vendite', 'stage', 'magazzino', 'amministrazione'] },
+  { id: 'presenze', nome: 'Presenze', ruoli: ['amministrazione'] },   // e solo con il permesso dei riepiloghi
   { id: 'telecamere', nome: 'Telecamere', ruoli: [] },     // solo direzione: lo stesso capannone
 ];
 export function vociPer(io: Profilo): Voce[] {
@@ -96,6 +97,10 @@ const dataLunga = () => { const s = new Date().toLocaleDateString('it-IT', { wee
 /** shell(company, navList, cur, act, title, body) del mockup */
 export function Shell(p: { voci: Voce[]; titolo: string; cerca: string; onCerca: (v: string) => void; children: React.ReactNode }) {
   const { io, vai, percorso, db } = useApp();
+  // chi lavora in tutte e due le società passa dall'una all'altra: una alla volta, così non si mescolano
+  const { dati: aziende } = useDati((d) => d.rpc<{ azienda: string; ruolo: string }[]>('mie_aziende').then((r) => r ?? [], () => []), []);
+  const [errAz, setErrAz] = useState<string | null>(null);
+  const passa = (a: string) => db.rpc('cambia_azienda', { p_azienda: a }).then(() => { location.hash = '#/home'; location.reload(); }, (e) => setErrAz((e as Error).message));
   const company = io.azienda === 'trasporti' ? 'Autotrasporti' : 'Corporation';
   const cur = percorso.split('/')[0] || 'home';
   const nav = useRef<HTMLElement>(null);
@@ -108,6 +113,8 @@ export function Shell(p: { voci: Voce[]; titolo: string; cerca: string; onCerca:
       <div className="gest">
         <nav className="side glass" aria-label={'Sezioni ' + company} ref={nav}>
           <div className="co"><b>MESSINA</b><span className="lbl">{company}</span></div>
+          {aziende && aziende.length > 1 && <div className="row" style={{ gap: 4, padding: '0 6px 8px' }}>{aziende.filter((a) => a.azienda !== io.azienda).map((a) =>
+            <button key={a.azienda} type="button" className="chipbtn" onClick={() => passa(a.azienda)}>{a.azienda === 'trasporti' ? 'Autotrasporti' : 'Corporation'}</button>)}{errAz && <span className="miss">{errAz}</span>}</div>}
           {p.voci.map((n) => (
             <button key={n.id} type="button" className={'nav' + (cur === n.id ? ' on' : '')} aria-current={cur === n.id ? 'page' : undefined}
               onClick={() => vai(n.id)}>{n.nome}<Badge n={n.badge ?? 0} /></button>

@@ -23,7 +23,8 @@ servi(async (req, c) => {
   }
 
   if (c.azione === 'scrivi') {
-    if (c.azienda !== io.azienda && io.ruolo !== 'direzione') throw new Errore('Casella di un’altra società', 403);
+    // si scrive solo dalla casella della società in cui si lavora (anche la direzione: le due società non si mescolano)
+    if (c.azienda !== io.azienda) throw new Errore('Casella di un’altra società: passa prima a quella società', 403);
     const a = String(c.a ?? '').trim(), oggetto = String(c.oggetto ?? '').trim();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a)) throw new Errore('Indirizzo non valido');
     if (!oggetto) throw new Errore('Manca l’oggetto');

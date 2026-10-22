@@ -1,6 +1,6 @@
 // Dati di PROVA (finti) per vedere tutte le schermate senza Supabase.
 // Sono gli stessi esempi del mockup approvato, messi nella forma delle tabelle vere.
-import { motoreProva, type Tabelle, type Relazioni, type RpcProva, type FunzioniProva, type RegoleProva } from './index';
+import { motoreProva, type Tabelle, type Relazioni, type RpcProva, type FunzioniProva, type RegoleProva, type FiltriProva } from './index';
 
 const ora = (h: number, m = 0, giorni = 0) => { const d = new Date(); d.setDate(d.getDate() - giorni); d.setHours(h, m, 0, 0); return d.toISOString(); };
 const oreFa = (h: number) => new Date(Date.now() - h * 3600000).toISOString();
@@ -10,7 +10,7 @@ const id = (p: string, n: number) => `${p}-${String(n).padStart(4, '0')}`;
 export const UTENTI_PROVA: Record<string, string> = {
   'direzione@prova.messina': 'u-dir', 'amministrazione@prova.messina': 'u-amm', 'bolle@prova.messina': 'u-bol',
   'traffico@prova.messina': 'u-tra', 'magazzino@prova.messina': 'u-mag', 'autista@prova.messina': 'u-aut',
-  'commerciale@prova.messina': 'u-com', 'vendite@prova.messina': 'u-ven', 'stage@prova.messina': 'u-sta', 'snam@prova.messina': 'u-snam', 'econocom@prova.messina': 'u-eco',
+  'commerciale@prova.messina': 'u-com', 'studio@prova.messina': 'u-cms', 'vendite@prova.messina': 'u-ven', 'stage@prova.messina': 'u-sta', 'snam@prova.messina': 'u-snam', 'econocom@prova.messina': 'u-eco',
 };
 export const ELENCO_PROVA: { email: string; nome: string; dove: string }[] = [
   { email: 'direzione@prova.messina', nome: 'Direzione', dove: 'Autotrasporti' },
@@ -18,6 +18,7 @@ export const ELENCO_PROVA: { email: string; nome: string; dove: string }[] = [
   { email: 'bolle@prova.messina', nome: 'Gabriele', dove: 'Ufficio bolle' },
   { email: 'traffico@prova.messina', nome: 'Mauro', dove: 'Traffico' },
   { email: 'commerciale@prova.messina', nome: 'Gianluca', dove: 'Commerciale' },
+  { email: 'studio@prova.messina', nome: 'Commercialista', dove: 'Studio' },
   { email: 'magazzino@prova.messina', nome: 'Magazziniere 1', dove: 'Magazzino' },
   { email: 'autista@prova.messina', nome: 'Autista 1', dove: 'Autisti' },
   { email: 'vendite@prova.messina', nome: 'Vendite', dove: 'Corporation' },
@@ -34,6 +35,7 @@ function dati(): Tabelle {
     { id: 'u-bol', azienda: 'trasporti', ruolo: 'bolle', nome: 'Gabriele', cliente_id: null },
     { id: 'u-tra', azienda: 'trasporti', ruolo: 'traffico', nome: 'Mauro', cliente_id: null },
     { id: 'u-com', azienda: 'trasporti', ruolo: 'commerciale', nome: 'Gianluca', cliente_id: null },
+    { id: 'u-cms', azienda: 'trasporti', ruolo: 'commercialista', nome: 'Commercialista', cliente_id: null },
     { id: 'u-mag', azienda: 'trasporti', ruolo: 'magazzino', nome: 'Magazziniere 1', cliente_id: null },
     { id: 'u-aut', azienda: 'trasporti', ruolo: 'autista', nome: 'Autista 1', cliente_id: null },
     { id: 'u-ven', azienda: 'corporation', ruolo: 'vendite', nome: 'Vendite', cliente_id: null },
@@ -308,8 +310,8 @@ function viste(t: Tabelle) {
     const e = tt.filter((x) => x.verso === 'Entrata').map((x) => x.quando).sort()[0] ?? null; const u = tt.filter((x) => x.verso === 'Uscita').map((x) => x.quando).sort().pop() ?? null;
     let stato = 'Presente'; if (!e) stato = d.nome === 'Autista 4' ? 'Ferie' : 'Assente';
     else if (d.inizio) { const [hh, mm] = d.inizio.split(':').map(Number); const min = (new Date(e).getHours() * 60 + new Date(e).getMinutes()) - (hh * 60 + mm); if (min > 5) stato = `Ritardo · ${min} min`; }
-    return { dipendente_id: d.id, nome: d.nome, reparto: d.reparto, ore_settimana: d.ore_settimana, inizio: d.inizio, entrata: e, uscita: u, stato }; });
-  t.presenze_mese = t.dipendenti.map((d, i) => ({ dipendente_id: d.id, nome: d.nome, contratto: d.contratto, ore_settimana: d.ore_settimana,
+    return { dipendente_id: d.id, azienda: d.azienda, nome: d.nome, reparto: d.reparto, ore_settimana: d.ore_settimana, inizio: d.inizio, entrata: e, uscita: u, stato }; });
+  t.presenze_mese = t.dipendenti.map((d, i) => ({ dipendente_id: d.id, azienda: d.azienda, nome: d.nome, contratto: d.contratto, ore_settimana: d.ore_settimana,
     ore: [168, 152, 160, 158, 164, 160, 161, 170, 160, 166, 160][i] ?? 160, ritardi: [0, 1, 4, 0, 0, 0, 2, 0, 0, 1, 0][i] ?? 0, minuti_ritardo: [0, 3, 74, 0, 0, 0, 22, 0, 0, 5, 0][i] ?? 0,
     uscite_anticipate: [0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0][i] ?? 0, minuti_in_meno: [0, 0, 15, 40, 0, 0, 0, 0, 0, 0, 0][i] ?? 0,
     uscite_mancanti: t.timbrature.filter((x) => x.dipendente_id === d.id && x.verso === 'Entrata' && x.quando.slice(0, 10) < oggi()
@@ -356,7 +358,7 @@ const RPC: RpcProva = {
 
 // Ogni app può aggiungere i suoi dati, le sue funzioni e le sue relazioni di prova
 // con estendiProva(...) in un file suo (es. prova-app.ts), importato prima di motoreDiProva().
-type Estensione = (x: { t: Tabelle; rpc: RpcProva; rel: Relazioni; funzioni: FunzioniProva; viste: ((t: Tabelle) => void)[]; regole: RegoleProva }) => void;
+type Estensione = (x: { t: Tabelle; rpc: RpcProva; rel: Relazioni; funzioni: FunzioniProva; viste: ((t: Tabelle) => void)[]; regole: RegoleProva; filtri: FiltriProva }) => void;
 const estensioni: Estensione[] = [];
 export function estendiProva(f: Estensione) { estensioni.push(f); }
 
@@ -445,8 +447,8 @@ const REGOLE: RegoleProva = {
 };
 
 export function motoreDiProva() {
-  const t = dati(); const rpc = { ...RPC }; const rel = { ...REL }; const funzioni = { ...FUNZIONI }; const regole = { ...REGOLE }; const altre: ((t: Tabelle) => void)[] = [];
-  for (const e of estensioni) e({ t, rpc, rel, funzioni, viste: altre, regole });
-  return motoreProva(t, rel, rpc, UTENTI_PROVA, (x) => { viste(x); altre.forEach((f) => f(x)); }, funzioni, regole);
+  const t = dati(); const rpc = { ...RPC }; const rel = { ...REL }; const funzioni = { ...FUNZIONI }; const regole = { ...REGOLE }; const altre: ((t: Tabelle) => void)[] = []; const filtri: FiltriProva = {};
+  for (const e of estensioni) e({ t, rpc, rel, funzioni, viste: altre, regole, filtri });
+  return motoreProva(t, rel, rpc, UTENTI_PROVA, (x) => { viste(x); altre.forEach((f) => f(x)); }, funzioni, regole, filtri);
 }
 export { dati as datiDiProva, RPC as rpcDiProva };
