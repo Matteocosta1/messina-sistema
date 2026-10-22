@@ -2,7 +2,7 @@
 // «chiesta al cliente», reso al mittente, satellitare e telecamere. Stessi controlli e messaggi del database.
 import { estendiProva } from './prova';
 
-const oggi = () => new Date().toISOString().slice(0, 10);
+const oggi = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const alle = (h: number, m = 0) => { const d = new Date(); d.setHours(h, m, 0, 0); return d.toISOString(); };
 
 estendiProva(({ t, rpc, rel, viste }) => {

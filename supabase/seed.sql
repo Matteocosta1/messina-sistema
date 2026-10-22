@@ -217,3 +217,7 @@ insert into public.ordini (canale, riferimento, cliente, stato, entro, device_id
 alter table public.device disable trigger device_regole;
 update public.device set prezzo_confermato_da = '00000000-0000-0000-0000-000000000008' where stato = 'Disponibile';
 alter table public.device enable trigger device_regole;
+
+-- dati di prova: accordo e autorizzazione già scritti (nel sistema vero li scrive la Direzione in Impostazioni)
+update public.impostazioni set valore = '{"satellitare": {"tipo": "Accordo sindacale", "data": "2026-01-15", "rif": "[riferimento di prova]"}, "telecamere": {"tipo": "Autorizzazione Ispettorato", "data": "2025-06-10", "rif": "[riferimento di prova]"}}'
+ where chiave = 'controllo_lavoratori';

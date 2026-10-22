@@ -138,6 +138,22 @@ select cron.schedule('messina-file-asset', '55 21 * * *', $$select public.salva_
 
 L'invio del file su un server del cliente (FTP o SFTP) si aggiunge quando il cliente dà indirizzo e accesso.
 
+### Ferie e pulizia notturna
+
+- `messina-ferie` (il primo del mese alle 3, UTC): ferie e permessi maturano in dodicesimi da quanto spetta l'anno a ciascuno (Presenze → Ferie → «Cambia»).
+- `messina-pulizia` (ogni notte): chiama la funzione `pulizia`, che cancella posizioni del satellitare e foto delle telecamere più vecchie del tempo scelto dalla Direzione (vuoto = non cancella niente). Le timbrature non si toccano.
+
+Le crea la migrazione `20261022000800_orari_presenze.sql` se `pg_cron` è già acceso. Se l'avete acceso dopo, nel **SQL Editor** una volta:
+
+```sql
+select cron.schedule('messina-ferie', '0 3 1 * *', $$select public.matura_ferie()$$);
+select cron.schedule('messina-pulizia', '30 2 * * *', $$select public.chiama_funzione('pulizia')$$);
+```
+
+### Satellitare e telecamere: prima l'accordo
+
+Per legge (art. 4 dello Statuto dei lavoratori) satellitare e telecamere, che controllano anche il lavoro delle persone, servono un accordo sindacale o un'autorizzazione dell'Ispettorato del lavoro. Finché la Direzione non scrive tipo, data e riferimento (nelle pagine Satellitare e Telecamere, «Scrivi»), il database non accetta posizioni né foto. Lì stesso si sceglie dopo quanto si cancellano.
+
 ### Claude (lettura mail, bolle, seriali, resoconto)
 
 - `ANTHROPIC_API_KEY`: **a pagamento a consumo**, senza canone. Si caricano crediti in anticipo e Haiku 5.5 costa 0,10 $ per milione di token in entrata e 0,50 $ in uscita. Si crea su [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) con l'account `it@dominio`. In Limits conviene fissare un tetto di spesa mensile.

@@ -80,11 +80,12 @@ estendiProva(({ t, rpc, viste, regole }) => {
       if (v.iva == null) v.iva = ivaMargine(Number(v.prezzo), tt.device.find((d) => d.id === v.device_id)?.costo ?? 0);
       v.netto = r2(Number(v.prezzo) - Number(v.commissione ?? 0) - Number(v.spese) - Number(v.iva)); v.incassato = v.netto;
     }
-    const oggi = new Date().toISOString().slice(0, 10), mese = oggi.slice(0, 7);
+    const gL = (iso: string) => new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const oggi = gL(new Date().toISOString()), mese = oggi.slice(0, 7);
     const val = (v: any) => Number(v.netto) - Number(v.rimborso ?? 0);
     tt.incassi_corporation = [{
-      incassato_oggi: r2(tt.vendite.filter((v) => v.venduto_il.slice(0, 10) === oggi).reduce((s, v) => s + val(v), 0)),
-      incassato_mese: r2(tt.vendite.filter((v) => v.venduto_il.slice(0, 7) === mese).reduce((s, v) => s + val(v), 0) + 14820),
+      incassato_oggi: r2(tt.vendite.filter((v) => gL(v.venduto_il) === oggi).reduce((s, v) => s + val(v), 0)),
+      incassato_mese: r2(tt.vendite.filter((v) => gL(v.venduto_il).slice(0, 7) === mese).reduce((s, v) => s + val(v), 0) + 14820),
     }];
     tt.lotti_conti = tt.lotti.map((l) => {
       const dev = tt.device.filter((d) => d.lotto_id === l.id).map((d) => d.id);

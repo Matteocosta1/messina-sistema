@@ -62,7 +62,9 @@ export interface Db {
   post<T = any>(tabella: string, righe: unknown, prefer?: string): Promise<T[]>;
   patch<T = any>(percorso: string, dati: unknown): Promise<T[]>;
   rpc<T = any>(fn: string, args?: unknown): Promise<T>;
+  del(percorso: string): Promise<void>;
   carica(bucket: string, percorso: string, dati: Blob | Uint8Array, tipo: string): Promise<void>;
+  togli(bucket: string, percorsi: string[]): Promise<void>;
   scarica(bucket: string, percorso: string): Promise<{ dati: Uint8Array; tipo: string }>;
 }
 
@@ -79,6 +81,10 @@ function client(token: string, chiave: string): Db {
     post: (t, righe, prefer = 'return=representation') => chiama(`${base}/rest/v1/${t}`, { method: 'POST', headers: h({ Prefer: prefer }), body: JSON.stringify(righe) }).then((x) => x ?? []),
     patch: (p, d) => chiama(`${base}/rest/v1/${p}`, { method: 'PATCH', headers: h({ Prefer: 'return=representation' }), body: JSON.stringify(d) }),
     rpc: (fn, args = {}) => chiama(`${base}/rest/v1/rpc/${fn}`, { method: 'POST', headers: h(), body: JSON.stringify(args) }),
+    async del(p) { await chiama(`${base}/rest/v1/${p}`, { method: 'DELETE', headers: h({ Prefer: 'return=minimal' }) }); },
+    async togli(bucket, percorsi) {
+      if (percorsi.length) await chiama(`${base}/storage/v1/object/${bucket}`, { method: 'DELETE', headers: h(), body: JSON.stringify({ prefixes: percorsi }) });
+    },
     async carica(bucket, percorso, dati, tipo) {
       await chiama(`${base}/storage/v1/object/${bucket}/${percorso}`, { method: 'POST', headers: { apikey: chiave, Authorization: `Bearer ${token}`, 'Content-Type': tipo, 'x-upsert': 'true' }, body: dati as BodyInit });
     },
@@ -184,3 +190,16 @@ export async function graph(percorso: string, init: RequestInit = {}): Promise<a
 }
 
 export const casella = (azienda: string) => segreto(azienda === 'corporation' ? 'MS_CASELLA_CORPORATION' : 'MS_CASELLA_TRASPORTI');
+
+/** giorno italiano (aaaa-mm-gg): il server lavora in UTC */
+export const oggiRoma = (d = new Date()) => d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+/** l'istante UTC della mezzanotte italiana di un giorno (aaaa-mm-gg) */
+export function mezzanotteRoma(giorno: string): string {
+  const utc = new Date(giorno + 'T00:00:00Z');
+  const ore = Number(utc.toLocaleString('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false })) % 24;   // 1 d'inverno, 2 d'estate
+  return new Date(utc.getTime() - ore * 3600000).toISOString();
+}
+/** satellitare e telecamere: solo con l'accordo sindacale o l'autorizzazione dell'Ispettorato scritti dalla Direzione */
+export async function permessoControllo(db: Db, cosa: 'satellitare' | 'telecamere'): Promise<boolean> {
+  return await db.rpc<boolean>('controllo_permesso', { p_cosa: cosa });
+}

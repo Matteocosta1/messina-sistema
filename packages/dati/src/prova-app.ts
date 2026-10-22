@@ -188,7 +188,7 @@ estendiProva(({ t, rpc, funzioni }) => {
     t.badge_usati.push({ badge_id: b.id, finestra: Number(w) });
     const ult = t.timbrature.filter((x) => x.dipendente_id === b.dipendente_id && x.esito === 'Valida').sort((x, y) => x.quando < y.quando ? 1 : -1)[0];
     if (ult && Date.now() - new Date(ult.quando).getTime() < 60000) return { ok: false, motivo: 'Già timbrato' };
-    const verso = ult?.verso === 'Entrata' && ult.quando.slice(0, 10) === oggi() ? 'Uscita' : 'Entrata';
+    const verso = ult?.verso === 'Entrata' && new Date(ult.quando).toDateString() === new Date().toDateString() ? 'Uscita' : 'Entrata';
     t.timbrature.push({ id: t.timbrature.length + 1000, dipendente_id: b.dipendente_id, quando: ora(), verso, esito: 'Valida', motivo: null, lettore: c.lettore });
     return { ok: true, verso, nome: t.dipendenti.find((d) => d.id === b.dipendente_id)?.nome };
   };

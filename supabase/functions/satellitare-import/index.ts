@@ -3,7 +3,7 @@
 // TODO fornitore: il nome si saprà dall'azienda. `scaricaPosizioni` va scritta sulla sua documentazione
 // (Webfleet, Verizon Connect e simili hanno un'API a pagamento o inclusa nel contratto: va chiesta al fornitore).
 // Le regole del confronto sono qui sotto e non dipendono dal fornitore.
-import { servi, soloCron, dbServizio, segreto, Errore } from '../_comune/mod.ts';
+import { servi, soloCron, dbServizio, segreto, Errore, oggiRoma, mezzanotteRoma, permessoControllo } from '../_comune/mod.ts';
 
 interface Posizione { codice: string; quando: string; lat: number; lng: number; velocita: number | null; motore: boolean | null }
 
@@ -17,7 +17,8 @@ const MOTORE_MIN = 10;        // motore acceso da fermo più di così
 servi(async (req) => {
   soloCron(req);
   const db = dbServizio();
-  const oggi = new Date().toISOString().slice(0, 10);
+  if (!(await permessoControllo(db, 'satellitare'))) return { ok: false, motivo: 'Manca l\'accordo sindacale o l\'autorizzazione dell\'Ispettorato: la Direzione lo scrive in Impostazioni' };
+  const oggi = oggiRoma(), dalle = mezzanotteRoma(oggi);
   const mezzi = await db.get('mezzi?select=id,targa,satellitare,autista_id&satellitare=not.is.null');
   const perCodice = new Map(mezzi.map((m: any) => [m.satellitare, m]));
   const pos = await scaricaPosizioni();
@@ -26,7 +27,7 @@ servi(async (req) => {
 
   let anomalie = 0;
   for (const m of mezzi as any[]) {
-    const punti = await db.get<any>(`sat_posizioni?select=quando,lat,lng,velocita,motore&mezzo_id=eq.${m.id}&quando=gte.${oggi}T00:00:00Z&order=quando`);
+    const punti = await db.get<any>(`sat_posizioni?select=quando,lat,lng,velocita,motore&mezzo_id=eq.${m.id}&quando=gte.${encodeURIComponent(dalle)}&order=quando`);
     if (!punti.length) continue;
     const [giro] = await db.get<any>(`giri?select=id,autista_id,fermate(ordine,lat,lng)&mezzo_id=eq.${m.id}&data=eq.${oggi}`);
     const fermate: [number, number][] = (giro?.fermate ?? []).filter((f: any) => f.lat != null).sort((a: any, b: any) => a.ordine - b.ordine).map((f: any) => [f.lat, f.lng]);

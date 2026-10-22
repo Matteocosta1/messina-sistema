@@ -265,8 +265,9 @@ const REL: Relazioni = {
   giacenze: { bolle: 'bolla_id' },
 };
 
-const oggi = () => new Date().toISOString().slice(0, 10);
-const mese = () => new Date().toISOString().slice(0, 7);
+const gLoc = (iso: string) => { const d = new Date(iso); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };   // giorno italiano (il browser è in Italia)
+const oggi = () => gLoc(new Date().toISOString());
+const mese = () => oggi().slice(0, 7);
 
 /** le viste del database, ricalcolate in memoria */
 function viste(t: Tabelle) {
@@ -290,7 +291,7 @@ function viste(t: Tabelle) {
     incassato_mese: t.fatture.filter((f) => f.stato === 'Pagata').reduce((s, f) => s + f.imponibile, 0) + 9600,
   }];
   t.incassi_corporation = [{
-    incassato_oggi: t.vendite.filter((v) => v.venduto_il.slice(0, 10) === oggi()).reduce((s, v) => s + v.incassato, 0),
+    incassato_oggi: t.vendite.filter((v) => gLoc(v.venduto_il) === oggi()).reduce((s, v) => s + v.incassato, 0),
     incassato_mese: t.vendite.reduce((s, v) => s + v.incassato, 0) + 14820,
   }];
   t.lotti_conti = t.lotti.map((l) => {
@@ -303,10 +304,10 @@ function viste(t: Tabelle) {
   t.giacenze_aperte = t.giacenze.filter((x) => !x.chiusa_il).map((x) => { const b = t.bolle.find((y) => y.id === x.bolla_id)!;
     return { id: x.id, bolla_id: b.id, numero: b.numero, cliente: cli(b.cliente_id), destinatario: b.destinatario, indirizzo: b.indirizzo, citta: b.citta, motivo: x.motivo, dal: x.dal,
       giorni: Math.round((Date.now() - new Date(x.dal).getTime()) / 86400000), riconsegna_il: x.riconsegna_il }; });
-  t.telepass_passaggi = t.telepass.map((p) => { const m = t.mezzi.find((x) => x.id === p.mezzo_id)!; const giro = t.giri.find((x) => x.mezzo_id === m.id && x.data === p.quando.slice(0, 10));
+  t.telepass_passaggi = t.telepass.map((p) => { const m = t.mezzi.find((x) => x.id === p.mezzo_id)!; const giro = t.giri.find((x) => x.mezzo_id === m.id && x.data === gLoc(p.quando));
     const aut = t.dipendenti.find((d) => d.id === (giro?.autista_id ?? m.autista_id))?.nome ?? '—'; const h = new Date(p.quando).getHours();
-    return { ...p, targa: m.targa, tipo: m.tipo, autista: aut, controllo: !giro && p.quando.slice(0, 10) !== oggi() ? 'Giorno senza giro' : (h < 5 || h >= 21 ? 'Fuori orario' : null) }; });
-  t.presenze_oggi = t.dipendenti.map((d) => { const tt = t.timbrature.filter((x) => x.dipendente_id === d.id && x.esito === 'Valida' && x.quando.slice(0, 10) === oggi());
+    return { ...p, targa: m.targa, tipo: m.tipo, autista: aut, controllo: !giro && gLoc(p.quando) !== oggi() ? 'Giorno senza giro' : (h < 5 || h >= 21 ? 'Fuori orario' : null) }; });
+  t.presenze_oggi = t.dipendenti.map((d) => { const tt = t.timbrature.filter((x) => x.dipendente_id === d.id && x.esito === 'Valida' && gLoc(x.quando) === oggi());
     const e = tt.filter((x) => x.verso === 'Entrata').map((x) => x.quando).sort()[0] ?? null; const u = tt.filter((x) => x.verso === 'Uscita').map((x) => x.quando).sort().pop() ?? null;
     let stato = 'Presente'; if (!e) stato = d.nome === 'Autista 4' ? 'Ferie' : 'Assente';
     else if (d.inizio) { const [hh, mm] = d.inizio.split(':').map(Number); const min = (new Date(e).getHours() * 60 + new Date(e).getMinutes()) - (hh * 60 + mm); if (min > 5) stato = `Ritardo · ${min} min`; }
@@ -314,9 +315,9 @@ function viste(t: Tabelle) {
   t.presenze_mese = t.dipendenti.map((d, i) => ({ dipendente_id: d.id, azienda: d.azienda, nome: d.nome, contratto: d.contratto, ore_settimana: d.ore_settimana,
     ore: [168, 152, 160, 158, 164, 160, 161, 170, 160, 166, 160][i] ?? 160, ritardi: [0, 1, 4, 0, 0, 0, 2, 0, 0, 1, 0][i] ?? 0, minuti_ritardo: [0, 3, 74, 0, 0, 0, 22, 0, 0, 5, 0][i] ?? 0,
     uscite_anticipate: [0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0][i] ?? 0, minuti_in_meno: [0, 0, 15, 40, 0, 0, 0, 0, 0, 0, 0][i] ?? 0,
-    uscite_mancanti: t.timbrature.filter((x) => x.dipendente_id === d.id && x.verso === 'Entrata' && x.quando.slice(0, 10) < oggi()
-      && !t.timbrature.some((u) => u.dipendente_id === d.id && u.verso === 'Uscita' && u.quando.slice(0, 10) === x.quando.slice(0, 10))
-      && !t.correzioni.some((k) => k.dipendente_id === d.id && k.giorno === x.quando.slice(0, 10))).length }));
+    uscite_mancanti: t.timbrature.filter((x) => x.dipendente_id === d.id && x.verso === 'Entrata' && gLoc(x.quando) < oggi()
+      && !t.timbrature.some((u) => u.dipendente_id === d.id && u.verso === 'Uscita' && gLoc(u.quando) === gLoc(x.quando))
+      && !t.correzioni.some((k) => k.dipendente_id === d.id && k.giorno === gLoc(x.quando))).length }));
   const st = t.stage_pc;
   t.stage_oggi = [{ ricevuti: 430, formattati: st.filter((x) => x.esito === 'Formattato').length + 370, in_corso: st.filter((x) => x.esito === 'In corso').length, falliti: st.filter((x) => x.esito === 'Fallito').length, in_vendita: 38,
     ricevuti_mese: 8640, formattati_mese: 8512, falliti_mese: 41, in_vendita_mese: 612 }];
@@ -331,9 +332,9 @@ function viste(t: Tabelle) {
   t.missioni_posti.filter((m) => m.stato === 'Bloccato').forEach((m) => A.push({ sezione: 'Missioni', cosa: `${t.posti.find((p) => p.id === m.posto_id)!.codice} bloccato: ${m.mancanti.length + m.extra.length} pezzi non tornano`, chi: 'Ufficio', da: m.aggiornato_il, dove: 'magazzino/missioni', rif: m.id }));
   t.bolle.filter((b) => b.stato === 'Nuova' && b.dati_mancanti.length).forEach((b) => A.push({ sezione: 'Bolle', cosa: `${cli(b.cliente_id)} · manca ${b.dati_mancanti.join(', ').toLowerCase()}`, chi: t.profili.find((p) => p.id === b.operatore_id)?.nome ?? 'Ufficio bolle', da: b.creata_il, dove: 'bolle', rif: b.id }));
   t.timbrature.filter((x) => x.esito === 'Rifiutata' && !t.allarmi_gestiti.some((a) => a.timbratura_id === x.id)).forEach((x) => A.push({ sezione: 'Presenze', cosa: `${t.dipendenti.find((d) => d.id === x.dipendente_id)?.nome ?? 'Sconosciuto'} · ${x.motivo}`, chi: 'Direzione', da: x.quando, dove: 'presenze/allarmi', rif: String(x.id) }));
-  t.timbrature.filter((e) => e.esito === 'Valida' && e.verso === 'Entrata' && e.quando.slice(0, 10) < oggi()
-    && !t.timbrature.some((u) => u.dipendente_id === e.dipendente_id && u.verso === 'Uscita' && u.quando.slice(0, 10) === e.quando.slice(0, 10))
-    && !t.correzioni.some((k) => k.dipendente_id === e.dipendente_id && k.giorno === e.quando.slice(0, 10)))
+  t.timbrature.filter((e) => e.esito === 'Valida' && e.verso === 'Entrata' && gLoc(e.quando) < oggi()
+    && !t.timbrature.some((u) => u.dipendente_id === e.dipendente_id && u.verso === 'Uscita' && gLoc(u.quando) === gLoc(e.quando))
+    && !t.correzioni.some((k) => k.dipendente_id === e.dipendente_id && k.giorno === gLoc(e.quando)))
     .forEach((e) => A.push({ sezione: 'Presenze', cosa: `${t.dipendenti.find((d) => d.id === e.dipendente_id)?.nome} · uscita non timbrata il ${e.quando.slice(8, 10)}/${e.quando.slice(5, 7)}`, chi: 'Amministrazione', da: e.quando, dove: 'presenze/correzioni', rif: String(e.id) }));
   t.fatture.filter((f) => f.stato === 'Da controllare').forEach((f) => A.push({ sezione: 'Fatturazione', cosa: `${cli(f.cliente_id)} · fattura da controllare: ${f.problema}`, chi: 'Amministrazione', da: f.creata_il, dove: 'fatture', rif: f.id }));
   t.telepass_passaggi.filter((p) => p.controllo && !t.telepass_controllati.some((k) => k.telepass_id === p.id)).forEach((p) => A.push({ sezione: 'Telepass', cosa: `${p.autista} · ${p.entrata} → ${p.uscita} · ${p.controllo.toLowerCase()}`, chi: 'Direzione', da: p.quando, dove: 'telepass', rif: p.id }));
@@ -379,7 +380,7 @@ const FUNZIONI: FunzioniProva = {
     if (!f || !['Pronta', 'Inviata'].includes(f.stato)) throw new Error(`Fattura «${f?.stato}»: si invia solo quando è Pronta`);
     if (f.stato === 'Pronta') { f.stato = 'Inviata'; f.inviata_il = new Date().toISOString(); }
     if (!f.numero) f.numero = 'FPR ' + (100 + t.fatture.filter((x) => x.numero).length) + '/' + new Date().getFullYear().toString().slice(2);
-    f.data ??= new Date().toISOString().slice(0, 10); f.iva = Math.round(Number(f.imponibile ?? 0) * 22) / 100;   // IVA 22% calcolata da Fatture in Cloud
+    f.data ??= oggi(); f.iva = Math.round(Number(f.imponibile ?? 0) * 22) / 100;   // IVA 22% calcolata da Fatture in Cloud
     f.fic_id ??= 'FIC-' + Math.floor(Math.random() * 900000 + 100000); f.sdi_inviata_il ??= new Date().toISOString();   // come la funzione vera: documento creato e mandato allo SdI
     return { numero: f?.numero }; },
   'mail-outlook': (c, t) => {
@@ -442,7 +443,7 @@ const REGOLE: RegoleProva = {
     if (b.stato === 'Pronta' && !t.righe_fattura.some((r) => r.fattura_id === b.id)) throw new Error('Fattura senza righe');
     if (b.stato === 'Pronta' && b.problema) throw new Error('Fattura da controllare: ' + b.problema);
     if (b.stato === 'Inviata') b.inviata_il = new Date().toISOString();
-    if (b.stato === 'Pagata') b.pagata_il ??= new Date().toISOString().slice(0, 10);
+    if (b.stato === 'Pagata') b.pagata_il ??= oggi();
   },
 };
 

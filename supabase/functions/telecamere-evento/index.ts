@@ -5,13 +5,14 @@
 //  · { azione: 'foto', storico_id, telecamera, jpeg }      → foto della scansione, collegata al movimento
 //  · { azione: 'avviso', telecamera, tipo, descrizione, grave?, jpeg? } → avviso (es. persona nel piazzale di notte)
 //  · { azione: 'stato', telecamere: [{ nome, zona?, jpeg? }] }        → elenco e ultima immagine di ogni telecamera
-import { servi, dbServizio, segreto, uguali, Errore } from '../_comune/mod.ts';
+import { servi, dbServizio, segreto, uguali, Errore, permessoControllo } from '../_comune/mod.ts';
 
 const MAX_FOTO = 1_500_000;   // byte: le foto vanno ridotte in capannone prima di mandarle
 
 servi(async (req, c) => {
   if (!uguali(req.headers.get('x-telecamere-chiave') ?? '', segreto('TELECAMERE_CHIAVE'))) throw new Errore('Chiave delle telecamere non valida', 403);
   const db = dbServizio();
+  if (!(await permessoControllo(db, 'telecamere'))) throw new Errore('Manca l\'autorizzazione per le telecamere: la Direzione la scrive in Impostazioni', 403);
   const foto = (b64: unknown) => {
     if (typeof b64 !== 'string' || !b64) return null;
     const bin = Uint8Array.from(atob(b64), (x) => x.charCodeAt(0));

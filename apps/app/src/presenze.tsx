@@ -71,11 +71,13 @@ export function Presenze() {
         <div className="lbl" style={{ textAlign: 'center' }}>Prova: «Lettore» fa quello che fa il lettore all'ingresso quando legge il QR.</div>
       </>}
       {esitoProva && <div className="lbl" style={{ textAlign: 'center' }}>{esitoProva}</div>}
+      {codice && <>
       <div className="lbl" style={{ textAlign: 'center' }}>{sel ? `${sel}: avvicina il telefono al lettore all’ingresso` : 'Premi Entrata o Uscita e avvicina il telefono al lettore'} · telefono registrato: {nomeTelefono(dip.nome)}</div>
       <div className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
         {(['Entrata', 'Uscita'] as const).map((v) => <button key={v} type="button" className={'bigbtn' + (sel === v ? '' : ' ghost')} style={{ flex: 1, ...(v === prossimo ? {} : { opacity: .35, cursor: 'not-allowed' }) }}
           disabled={v !== prossimo} onClick={() => setScelto(v)}>{v}</button>)}
       </div>
+      </>}
       <div className="pcard" style={{ padding: '12px 14px' }}><b>Oggi</b>{valide.length ? valide.map((x, i) => <div key={i} className="kvp" style={i === valide.length - 1 ? { border: 0 } : undefined}><span>{x.verso}</span><b>{hm(x.quando)}</b></div>)
         : <div className="lbl" style={{ marginTop: 4 }}>Nessuna timbratura ancora</div>}</div>
       <div className="pcard" style={{ padding: '12px 14px' }}><b><Mese /></b>

@@ -13,3 +13,4 @@ import './prova-fatture';
 import './prova-accessi';
 import './prova-magazzino';
 import './prova-asset';
+import './prova-orari';

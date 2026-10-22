@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Btn, Msg, Pill } from '@messina/ui';
 import { useApp, useAzione, useDati, hm, giornoCorto, Errore } from './core';
+import { Permesso } from './permesso';
 
 /** immagine privata dello storage «telecamere» (link firmato, a tempo) */
 function Foto({ percorso, className, alt }: { percorso: string | null | undefined; className?: string; alt: string }) {
@@ -34,6 +35,7 @@ export function Telecamere() {
     <span className="cam-ora">{c.ultimo_contatto ? hm(c.ultimo_contatto) : '—'}</span>{grande ? null : null}</>;
   return (<>
     <div className="glass card row between" style={{ padding: '12px 16px' }}><span><b>Visibile solo alla Direzione</b> <span className="lbl">Tiziano, Sara, Matteo e Pierpaolo. Il commercialista vede i numeri, non le immagini.</span></span><Pill tone="dark">Rete separata</Pill></div>
+    <Permesso cosa="telecamere" />
     <Errore testo={az.errore} />
     {!dati.cam.length ? <Msg>Nessuna telecamera collegata. Si attiva quando il computer in capannone, vicino al registratore, è collegato (docs/SETUP.md, Telecamere).</Msg>
       : <div className="camgrid">{dati.cam.map((c) => <button key={c.id} type="button" className={'tcam' + (sel === c.id ? ' on' : '')} onClick={() => setSel(sel === c.id ? null : c.id)}>{tile(c)}</button>)}</div>}

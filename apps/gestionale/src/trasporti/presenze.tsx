@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Btn, Chip, Msg, Pill, Warn, Badge } from '@messina/ui';
-import { useApp, useAzione, useDati, hm, quando, Mese, meseNome, oggiISO, Errore } from '../core';
+import { useApp, useAzione, useDati, useStato, hm, quando, Mese, meseNome, oggiISO, Errore } from '../core';
 
-const TABS: [string, string][] = [['oggi', 'Oggi'], ['correzioni', 'Correzioni'], ['allarmi', 'Allarmi'], ['riep', 'Riepiloghi'], ['ferie', 'Ferie'], ['mese', Mese()]];
+const TABS: [string, string][] = [['oggi', 'Oggi'], ['correzioni', 'Correzioni'], ['allarmi', 'Allarmi'], ['riep', 'Riepiloghi'], ['ferie', 'Ferie'], ['telefoni', 'Telefoni'], ['mese', Mese()]];
 
 // ------------------------------------------------------------------ conti del mese dalle timbrature
 const isoLoc = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -47,22 +47,24 @@ export function Presenze({ tab }: { tab?: string }) {
   const { vai } = useApp();
   const t = TABS.some(([k]) => k === tab) ? tab! : 'oggi';
   const { dati } = useDati(async (d) => {
-    const [an, allarmi, gestiti] = await Promise.all([
+    const [an, allarmi, gestiti, tel] = await Promise.all([
       d.from<any>('anomalie').select('*').eq('sezione', 'Presenze'),
       d.from<any>('timbrature').select('id').eq('esito', 'Rifiutata').gte('quando', new Date(Date.now() - 30 * 86400000).toISOString()),
       d.from<any>('allarmi_gestiti').select('timbratura_id'),
+      d.from<any>('telefoni_da_approvare').select('id').then((x) => x, () => [] as any[]),
     ]);
     const g = new Set(gestiti.map((x) => String(x.timbratura_id)));
-    return { nFix: an.filter((a) => a.dove === 'presenze/correzioni').length, nAll: allarmi.filter((a) => !g.has(String(a.id))).length };
+    return { nFix: an.filter((a) => a.dove === 'presenze/correzioni').length, nAll: allarmi.filter((a) => !g.has(String(a.id))).length, nTel: tel.length };
   }, []);
   if (!dati) return null;
   return (<>
-    <div className="row">{TABS.map(([k, l]) => <Chip key={k} on={t === k} onClick={() => vai('presenze/' + k)}>{l}{k === 'correzioni' && <Badge n={dati.nFix} />}{k === 'allarmi' && <Badge n={dati.nAll} />}</Chip>)}</div>
+    <div className="row">{TABS.map(([k, l]) => <Chip key={k} on={t === k} onClick={() => vai('presenze/' + k)}>{l}{k === 'correzioni' && <Badge n={dati.nFix} />}{k === 'allarmi' && <Badge n={dati.nAll} />}{k === 'telefoni' && <Badge n={dati.nTel} />}</Chip>)}</div>
     {t === 'oggi' && <Oggi nFix={dati.nFix} />}
     {t === 'correzioni' && <Correzioni />}
     {t === 'allarmi' && <Allarmi n={dati.nAll} />}
     {t === 'riep' && <Riepiloghi />}
     {t === 'ferie' && <Ferie />}
+    {t === 'telefoni' && <Telefoni />}
     {t === 'mese' && <MeseTab nFix={dati.nFix} />}
     <p className="lbl" style={{ margin: 0 }}>Ognuno timbra con il badge virtuale sul suo telefono, passandolo sul lettore all’ingresso. Il QR cambia ogni 30 secondi, così una foto o uno screenshot non servono a timbrare per un collega.</p>
   </>);
@@ -122,6 +124,7 @@ function Allarmi({ n }: { n: number }) {
     const [A, g] = await Promise.all([
       d.from<any>('timbrature').select('*,dipendenti(nome)').eq('esito', 'Rifiutata').gte('quando', new Date(Date.now() - 30 * 86400000).toISOString()).order('quando', { ascending: false }),
       d.from<any>('allarmi_gestiti').select('timbratura_id'),
+      d.from<any>('telefoni_da_approvare').select('id').then((x) => x, () => [] as any[]),
     ]);
     return { A, g: new Set(g.map((x) => String(x.timbratura_id))) };
   }, []);
@@ -175,19 +178,63 @@ function Riepiloghi() {
 }
 
 function Ferie() {
+  const { db } = useApp();
+  const az = useAzione();
   const anno = new Date().getFullYear();
-  const { dati } = useDati((d) => d.from<any>('ferie').select('*,dipendenti(nome)').eq('anno', anno), []);
+  const [s, set] = useStato({ mod: '' as string, ferie: '', permessi: '', assunto: '', msg: '' });
+  const { dati } = useDati(async (d) => {
+    const [F, D] = await Promise.all([
+      d.from<any>('ferie').select('*').eq('anno', anno),
+      d.from<any>('dipendenti').select('id,nome,assunto_il,ferie_anno,permessi_anno').eq('attivo', true).order('nome'),
+    ]);
+    return { F, D };
+  }, []);
   if (!dati) return null;
-  const n = (x: any) => Number(x).toLocaleString('it-IT');
+  const n = (x: any) => Number(x ?? 0).toLocaleString('it-IT');
+  const salva = (id: string) => az.esegui(() => db.from('dipendenti').update({ ferie_anno: s.ferie === '' ? null : Number(s.ferie.replace(',', '.')),
+    permessi_anno: s.permessi === '' ? null : Number(s.permessi.replace(',', '.')), assunto_il: s.assunto || null }).eq('id', id))
+    .then((ok) => ok && set({ mod: '', msg: 'Salvato: ferie e permessi rifatti fino al mese scorso.' }));
+  const inp = (v: string, k: 'ferie' | 'permessi', l: string) => <input className="input" style={{ width: 70, minHeight: 32, padding: '4px 8px' }} inputMode="decimal" aria-label={l} value={v} onChange={(e) => set({ [k]: e.target.value } as any)} />;
   return (<>
-    <div className="glass tbox"><table className="t nw" style={{ minWidth: 900 }}><thead><tr><th>Dipendente</th><th>Ferie maturate</th><th>Godute</th><th>Restano</th><th>Permessi spettanti</th><th>Usati</th><th>Restano</th><th>Da guardare</th></tr></thead><tbody>
-      {[...dati].sort((a, b) => (a.dipendenti?.nome ?? '').localeCompare(b.dipendenti?.nome ?? '')).map((f) => {
-        const nota = Number(f.ferie_godute) < 10 && new Date().getMonth() >= 8 ? 'Meno di 2 settimane godute quest’anno: va pianificato entro dicembre' : '';
-        return <tr key={f.dipendente_id}><td><b>{f.dipendenti?.nome}</b></td><td>{n(f.ferie_maturate)} gg</td><td>{n(f.ferie_godute)} gg</td><td><b>{n(f.ferie_maturate - f.ferie_godute)} gg</b></td>
-          <td>{n(f.permessi_spettanti)} h</td><td>{n(f.permessi_usati)} h</td><td><b>{n(f.permessi_spettanti - f.permessi_usati)} h</b></td><td>{nota ? <span className="miss">{nota}</span> : <span className="lbl">—</span>}</td></tr>; })}
-      {!dati.length && <tr><td colSpan={8} className="lbl">Ferie di quest’anno non ancora caricate.</td></tr>}
+    {s.msg && <Msg>{s.msg}</Msg>}
+    <Errore testo={az.errore} />
+    <div className="glass tbox"><table className="t nw" style={{ minWidth: 1100 }}><thead><tr><th>Dipendente</th><th>L’anno</th><th>Ferie maturate</th><th>Godute</th><th>Restano</th><th>Permessi spettanti</th><th>Usati</th><th>Restano</th><th>Da guardare</th><th /></tr></thead><tbody>
+      {dati.D.map((d) => {
+        const f = dati.F.find((x) => x.dipendente_id === d.id);
+        const nota = !d.ferie_anno ? 'Manca quanto spetta l’anno (contratto)' : f && Number(f.ferie_godute) < 10 && new Date().getMonth() >= 8 ? 'Meno di 2 settimane godute quest’anno: va pianificato entro dicembre' : '';
+        return <tr key={d.id}><td><b>{d.nome}</b>{d.assunto_il && <div className="lbl">dal {new Date(d.assunto_il + 'T12:00:00').toLocaleDateString('it-IT')}</div>}</td>
+          <td>{s.mod === d.id ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>{inp(s.ferie, 'ferie', 'Ferie l’anno in giorni')} gg {inp(s.permessi, 'permessi', 'Permessi l’anno in ore')} h
+            <input className="input" type="date" style={{ minHeight: 32, padding: '4px 8px' }} aria-label="Assunto il" value={s.assunto} onChange={(e) => set({ assunto: e.target.value })} /></span>
+            : d.ferie_anno != null || d.permessi_anno != null ? `${n(d.ferie_anno)} gg · ${n(d.permessi_anno)} h` : <span className="lbl">—</span>}</td>
+          <td>{f ? n(f.ferie_maturate) + ' gg' : '—'}</td><td>{f ? n(f.ferie_godute) + ' gg' : '—'}</td><td><b>{f ? n(f.ferie_maturate - f.ferie_godute) + ' gg' : '—'}</b></td>
+          <td>{f ? n(f.permessi_spettanti) + ' h' : '—'}</td><td>{f ? n(f.permessi_usati) + ' h' : '—'}</td><td><b>{f ? n(f.permessi_spettanti - f.permessi_usati) + ' h' : '—'}</b></td>
+          <td>{nota ? <span className="miss">{nota}</span> : <span className="lbl">—</span>}</td>
+          <td>{s.mod === d.id ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><Btn sm onClick={() => salva(d.id)} disabled={az.inCorso}>Salva</Btn><Btn ghost sm onClick={() => set({ mod: '' })}>Annulla</Btn></span>
+            : <Btn ghost sm onClick={() => set({ mod: d.id, ferie: d.ferie_anno == null ? '' : String(d.ferie_anno), permessi: d.permessi_anno == null ? '' : String(d.permessi_anno), assunto: d.assunto_il ?? '', msg: '' })}>Cambia</Btn>}</td></tr>; })}
+      {!dati.D.length && <tr><td colSpan={10} className="lbl">Nessun dipendente.</td></tr>}
     </tbody></table></div>
-    <p className="lbl" style={{ margin: 0 }}>Si aggiorna da solo ogni mese. Per legge almeno 4 settimane di ferie l’anno: 2 da godere nell’anno, le altre entro i 18 mesi dopo. I permessi dipendono dal contratto collettivo: i numeri qui sono di esempio finché non sappiamo quale applicate.</p>
+    <p className="lbl" style={{ margin: 0 }}>Ferie e permessi maturano da soli il primo di ogni mese, un dodicesimo di quanto spetta l’anno (dal mese di assunzione, se entro il 15). Quanto spetta lo dice il contratto collettivo di ciascuno. Per legge almeno 4 settimane di ferie l’anno: 2 da godere nell’anno, le altre entro i 18 mesi dopo.</p>
+  </>);
+}
+
+// Telefoni del badge: il primo telefono e ogni cambio li approva l'amministrazione (così nessuno registra il badge sul telefono di un altro)
+function Telefoni() {
+  const { db } = useApp();
+  const az = useAzione();
+  const [msg, setMsg] = useState('');
+  const { dati } = useDati((d) => d.from<any>('telefoni_da_approvare').select('*').order('creato_il'), []);
+  if (!dati) return null;
+  const decidi = (t: any, ok: boolean) => az.esegui(() => db.rpc('approva_telefono', { p_badge: t.id, p_ok: ok }))
+    .then((x) => x && setMsg(ok ? `${t.nome}: telefono approvato${t.cambio ? ', quello vecchio non timbra più' : ''}.` : `${t.nome}: richiesta rifiutata.`));
+  return (<>
+    {msg && <Msg>{msg}</Msg>}
+    <Errore testo={az.errore} />
+    <div className="glass tbox"><table className="t nw"><thead><tr><th>Dipendente</th><th>Richiesta</th><th>Quando</th><th /></tr></thead><tbody>
+      {dati.length ? dati.map((t) => <tr key={t.id}><td><b>{t.nome}</b></td><td>{t.cambio ? 'Cambio telefono' : 'Primo telefono'}</td><td className="lbl">{quando(t.creato_il)}</td>
+        <td><span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><Btn sm onClick={() => decidi(t, true)} disabled={az.inCorso}>Approva</Btn><Btn ghost sm onClick={() => decidi(t, false)} disabled={az.inCorso}>Rifiuta</Btn></span></td></tr>)
+        : <tr><td colSpan={4} className="lbl">Nessun telefono da approvare.</td></tr>}
+    </tbody></table></div>
+    <p className="lbl" style={{ margin: 0 }}>Prima di approvare, chiedete al dipendente se il telefono è il suo: dopo, il badge funziona solo lì.</p>
   </>);
 }
 

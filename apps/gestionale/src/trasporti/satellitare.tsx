@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Btn, Msg, Pill } from '@messina/ui';
 import { useApp, useAzione, useDati, oggiISO, hm, Errore } from '../core';
+import { Permesso } from '../permesso';
 
 type P = [number, number];
 /** la mappa del giro: previsto tratteggiato, fatto pieno (verde se in regola, rosso se ci sono anomalie) */
@@ -46,6 +47,7 @@ export function Satellitare() {
   const litri = G.filter((g) => g.litri != null);
   const vista = (id: string) => az.esegui(() => db.rpc('anomalia_vista', { p_id: id }));
   return (<>
+    <Permesso cosa="satellitare" />
     <div className="grid g4">
       <div className="glass card"><div className="lbl">Mezzi in giro</div><div className="big">{G.length}</div><div className="lbl">posizione dal satellitare</div></div>
       <div className="glass card"><div className="lbl">Km oggi</div><div className="big">{Math.round(kmF)}</div><div className="lbl">{kmP ? `previsti ${Math.round(kmP)}` : 'previsti: servono le fermate del giro'}</div></div>
