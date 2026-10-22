@@ -219,7 +219,7 @@ Il deploy si rifiuta di partire se in `SUPABASE_PUBLISHABLE_KEY` trova una chiav
 - [ ] Vault: `progetto_url` e `cron_segreto` inseriti
 - [ ] GitHub: ambienti `prova`, `produzione` (approvazione di Matteo e Pier, solo `main`) e `backup`; Secrets e Variables in ognuno
 - [ ] Un accesso al gestionale con un utente di direzione chiede il codice; senza codice non si vede niente
-- [ ] Deploy riuscito: 5 siti online, ognuno sul suo sottodominio
+- [ ] Deploy riuscito: 7 siti online (gestionale Trasporti e Corporation, app, portale, negozio, i due siti vetrina), ognuno sul suo indirizzo
 - [ ] Gestionali raggiungibili solo dopo il login Microsoft (Zero Trust)
 - [ ] Backup: un file `.dump.age` in R2 e una prova di ripristino su `messina-prova`, con la chiave privata age
 - [ ] Segreti delle funzioni inseriti per i servizi già attivi; le funzioni rispondono senza «Manca il segreto…»
