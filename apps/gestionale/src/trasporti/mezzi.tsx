@@ -22,7 +22,7 @@ export function Mezzi() {
   }, []);
   // autista fisso del mezzo: giri, Telepass e satellitare si collegano a lui
   const fisso = (m: any, id: string) => az.esegui(() => db.from('mezzi').update({ autista_id: id || null }).eq('id', m.id))
-    .then((ok) => ok !== undefined && setMsg(id ? `${dati!.autisti.find((a: any) => a.id === id)?.nome} è l’autista fisso del mezzo ${m.targa}: giri, Telepass e satellitare si collegano a lui.` : `Il mezzo ${m.targa} non ha più un autista fisso.`));
+    .then((ok) => ok && setMsg(id ? `${dati!.autisti.find((a: any) => a.id === id)?.nome} è l’autista fisso del mezzo ${m.targa}: giri, Telepass e satellitare si collegano a lui.` : `Il mezzo ${m.targa} non ha più un autista fisso.`));
   if (!dati) return null;
   const list = dati.mezzi.filter((m) => m.tipo === f);
   const scad = (m: any) => {

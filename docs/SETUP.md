@@ -158,7 +158,8 @@ Va controllato quale piano avete: l'accesso alle API e la fattura elettronica di
 
 1. [Fatture in Cloud → Impostazioni → Applicazioni collegate](https://secure.fattureincloud.it/) → crea un'applicazione con «token manuale», permessi *Documenti emessi* (lettura e scrittura) e *Fatturazione elettronica*. In alternativa, [developers.fattureincloud.it](https://developers.fattureincloud.it).
 2. Se Autotrasporti e Corporation sono due aziende su Fatture in Cloud, servono due token: `FIC_ACCESS_TOKEN_TRASPORTI` / `FIC_COMPANY_ID_TRASPORTI` e `FIC_ACCESS_TOKEN_CORPORATION` / `FIC_COMPANY_ID_CORPORATION`. Se l'azienda è una sola, bastano `FIC_ACCESS_TOKEN` e `FIC_COMPANY_ID`.
-3. `FIC_IVA_ID`: l'id dell'aliquota 22% del vostro account (Impostazioni → Aliquote IVA, oppure lo leggo io dalla risposta dell'API la prima volta).
+3. Aliquote IVA: per ogni azienda l'id dell'aliquota 22% nel suo account (Impostazioni → Aliquote IVA), `FIC_IVA_ID_TRASPORTI` e `FIC_IVA_ID_CORPORATION` (con una sola azienda basta `FIC_IVA_ID`). Le altre si aggiungono solo se servono, con lo stesso nome più l'aliquota o la natura: `FIC_IVA_ID_TRASPORTI_10`, `FIC_IVA_ID_TRASPORTI_N3_1` (non imponibile), `FIC_IVA_ID_CORPORATION_MARGINE` (usato a regime del margine). Se una fattura usa un'aliquota che manca, l'invio si ferma e dice quale aggiungere.
+4. Esiti dello SdI: ogni ora il programma chiede a Fatture in Cloud com'è andata ogni fattura inviata. Se lo SdI la scarta, torna «Da controllare» con il motivo da guardare in Fatture in Cloud.
 
 ### Stripe (negozio online)
 

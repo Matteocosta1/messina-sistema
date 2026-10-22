@@ -1,4 +1,4 @@
-// Moduli dei siti pubblici: preventivo, ritiro, candidatura e contatto (Autotrasporti); lotto e contatto (Corporation).
+// Moduli dei siti pubblici: preventivo, ritiro, candidatura e contatto (Autotrasporti); lotto, contatto e aziende (Corporation e negozio).
 // Nessun accesso richiesto: per questo la funzione controlla tutto da sé (campo esca, lunghezze, limiti per ora)
 // e scrive solo una riga in «mail», nella cartella giusta per il tipo di modulo, che compare nella Mail del gestionale come «Da leggere».
 import { dbServizio, Errore } from '../_comune/mod.ts';
@@ -21,6 +21,7 @@ const SITI = {
     azienda: 'corporation',
     tipi: {
       lotto: { cartella: 'Lotti', etichetta: 'Lotti', oggetto: 'Lotto da valutare dal sito' },
+      aziende: { cartella: 'Clienti', etichetta: 'Aziende', oggetto: 'Richiesta di un\'azienda dal negozio' },
       contatto: { cartella: 'In arrivo', etichetta: 'Sito', oggetto: 'Messaggio dal sito' },
     },
   },
@@ -68,11 +69,29 @@ Deno.serve(async (req) => {
       `Nome: ${nome}`, azienda && `Azienda: ${azienda}`, `Email: ${email}`, telefono && `Telefono: ${telefono}`,
       ...campi.map(([k, v]) => `${k}: ${v}`), note && `\n${note}`,
     ].filter(Boolean).join('\n');
-    await db.post('mail', {
+    // richiesta di un'azienda dal negozio: modello e quantità obbligatori, prima di scrivere qualcosa
+    const quantita = Math.floor(Number(dettagli.quantita ?? dettagli['Quantità']));
+    const modello = testo(dettagli.modello ?? dettagli['Modello'], 120);
+    if (c.tipo === 'aziende') {
+      if (!azienda) throw new Errore('Scrivi il nome dell\'azienda');
+      if (!modello) throw new Errore('Scrivi il modello che cercate');
+      if (!(quantita >= 1 && quantita <= 5000)) throw new Errore('Scrivi quanti pezzi vi servono');
+    }
+    const [m] = await db.post('mail', {
       azienda: sito.azienda, casella: 'sito', cartella: sito.cartella, etichetta: sito.etichetta, stato: 'Da leggere',
       da_nome: azienda ? `${nome} (${azienda})` : nome, da_indirizzo: email,
       oggetto: sito.oggetto, testo: righe, anteprima: (note || campi.map(([k, v]) => `${k}: ${v}`).join(', ')).slice(0, 160),
-    }, 'return=minimal');
+    });
+    // il preventivo dal sito arriva anche in Preventivi, già in bozza per il commerciale (con il potenziale cliente)
+    if (s0.azienda === 'trasporti' && c.tipo === 'preventivo') {
+      await db.rpc('preventivo_da_sito', { p_nome: azienda || nome, p_email: email, p_telefono: telefono || null, p_richiesta: righe, p_mail: m?.id ?? null });
+    }
+    // la richiesta di un'azienda arriva in Richieste della Corporation, assegnata a chi delle Vendite ne ha meno
+    if (c.tipo === 'aziende') {
+      const grado = testo(dettagli.grado ?? dettagli['Grado'], 20);
+      await db.rpc('richiesta_da_negozio', { p_azienda: azienda, p_referente: nome, p_email: email, p_telefono: telefono || null,
+        p_modello: modello, p_grado: ['A', 'B', 'C', 'D'].includes(grado) ? grado : 'Indifferente', p_quantita: quantita, p_note: note || null });
+    }
     return risposta({ ok: true });
   } catch (e) {
     const err = e instanceof Errore ? e : new Errore('Non siamo riusciti a inviare la richiesta: riprova o scrivici una mail', 500);

@@ -80,7 +80,10 @@ select public.chiudi_fermata('51000000-0000-0000-0000-000000000002', false, 'Des
 reset role;
 select pg_temp.verifica((select stato from public.bolle where id = '40000000-0000-0000-0000-000000000004') = 'Consegnata', 'bolla consegnata');
 select pg_temp.verifica((select count(*) from public.giacenze where chiusa_il is null) = 1, 'giacenza aperta');
-select pg_temp.verifica(public.valore_bolla('40000000-0000-0000-0000-000000000004') = 85 + 18 + 18, 'valore = base + sponda in bolla + sponda aggiunta');
+-- la sponda è in bolla e l'autista la segna di nuovo: in fattura va una volta sola
+select pg_temp.come('00000000-0000-0000-0000-000000000002');
+select pg_temp.verifica(public.valore_bolla('40000000-0000-0000-0000-000000000004') = 85 + 18, 'valore = base + sponda, una volta');
+reset role;
 
 -- Missioni: il posto si chiude solo se torna, altrimenti resta bloccato --------------
 select pg_temp.come('00000000-0000-0000-0000-000000000004');
@@ -112,7 +115,11 @@ select public.sblocca_posto((select id from public.missioni_posti where stato = 
 select pg_temp.verifica((select count(*) from public.anomalie where sezione = 'Missioni') = 0, 'sbloccato: sparisce dalle Anomalie');
 select pg_temp.verifica((select count(*) from public.storico where operazione = 'Sblocco') = 1, 'lo sblocco è nello storico');
 select pg_temp.deve_fallire($$update public.fatture set stato = 'Pagata' where stato = 'Pronta'$$, 'pagata prima di inviarla');
-update public.fatture set stato = 'Inviata' where stato = 'Pronta';
+select pg_temp.deve_fallire($$update public.fatture set stato = 'Inviata' where stato = 'Pronta'$$, 'inviata a mano senza Fatture in Cloud');
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+update public.fatture set stato = 'Inviata' where stato = 'Pronta';   -- lo fa il sistema dopo la risposta di Fatture in Cloud
+select pg_temp.come('00000000-0000-0000-0000-000000000002');
 update public.fatture set stato = 'Pagata' where stato = 'Inviata';
 select pg_temp.verifica((select incassato_mese from public.incassi_trasporti) = 1720, 'incassato = fatture pagate');
 select pg_temp.deve_fallire($$delete from public.storico$$, 'cancellare lo storico');

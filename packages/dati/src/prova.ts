@@ -10,13 +10,14 @@ const id = (p: string, n: number) => `${p}-${String(n).padStart(4, '0')}`;
 export const UTENTI_PROVA: Record<string, string> = {
   'direzione@prova.messina': 'u-dir', 'amministrazione@prova.messina': 'u-amm', 'bolle@prova.messina': 'u-bol',
   'traffico@prova.messina': 'u-tra', 'magazzino@prova.messina': 'u-mag', 'autista@prova.messina': 'u-aut',
-  'vendite@prova.messina': 'u-ven', 'stage@prova.messina': 'u-sta', 'snam@prova.messina': 'u-snam', 'econocom@prova.messina': 'u-eco',
+  'commerciale@prova.messina': 'u-com', 'vendite@prova.messina': 'u-ven', 'stage@prova.messina': 'u-sta', 'snam@prova.messina': 'u-snam', 'econocom@prova.messina': 'u-eco',
 };
 export const ELENCO_PROVA: { email: string; nome: string; dove: string }[] = [
   { email: 'direzione@prova.messina', nome: 'Direzione', dove: 'Autotrasporti' },
   { email: 'amministrazione@prova.messina', nome: 'Angela', dove: 'Amministrazione' },
   { email: 'bolle@prova.messina', nome: 'Gabriele', dove: 'Ufficio bolle' },
   { email: 'traffico@prova.messina', nome: 'Mauro', dove: 'Traffico' },
+  { email: 'commerciale@prova.messina', nome: 'Gianluca', dove: 'Commerciale' },
   { email: 'magazzino@prova.messina', nome: 'Magazziniere 1', dove: 'Magazzino' },
   { email: 'autista@prova.messina', nome: 'Autista 1', dove: 'Autisti' },
   { email: 'vendite@prova.messina', nome: 'Vendite', dove: 'Corporation' },
@@ -32,6 +33,7 @@ function dati(): Tabelle {
     { id: 'u-amm', azienda: 'trasporti', ruolo: 'amministrazione', nome: 'Angela', cliente_id: null },
     { id: 'u-bol', azienda: 'trasporti', ruolo: 'bolle', nome: 'Gabriele', cliente_id: null },
     { id: 'u-tra', azienda: 'trasporti', ruolo: 'traffico', nome: 'Mauro', cliente_id: null },
+    { id: 'u-com', azienda: 'trasporti', ruolo: 'commerciale', nome: 'Gianluca', cliente_id: null },
     { id: 'u-mag', azienda: 'trasporti', ruolo: 'magazzino', nome: 'Magazziniere 1', cliente_id: null },
     { id: 'u-aut', azienda: 'trasporti', ruolo: 'autista', nome: 'Autista 1', cliente_id: null },
     { id: 'u-ven', azienda: 'corporation', ruolo: 'vendite', nome: 'Vendite', cliente_id: null },
@@ -49,7 +51,7 @@ function dati(): Tabelle {
     { id: 'c-vel', nome: 'Velier', portale_live: false, tramite: null, azienda_collegata: null, cosa_spedisce: 'Bevande', referente_interno: 'Christian', contratto_al: g(90), fatturazione: 'A spedizione', esigenze: 'Consegna in cantina.', eccezioni: null },
     { id: 'c-acc', nome: 'Accenture', portale_live: false, tramite: null, azienda_collegata: null, cosa_spedisce: 'Telefoni da lavorare', referente_interno: 'Manuel', contratto_al: null, fatturazione: 'Mensile', esigenze: 'Ticket sul loro portale.', eccezioni: null },
   ];
-  const tar = (c: string, voce: string, unita: string, prezzo: number, quando: string | null = null) => ({ id: crypto.randomUUID(), cliente_id: c, voce, unita, prezzo, zona: 'Nord Italia', quando, valida_dal: g(-200) });
+  const tar = (c: string, voce: string, unita: string, prezzo: number, quando: string | null = null) => ({ id: crypto.randomUUID(), cliente_id: c, voce, unita, prezzo, zona: null, quando, valida_dal: g(-200), valida_al: null, stato: 'Attiva', minimo: null, scaglione_su: null, scaglione_da: null, scaglione_a: null });
   t.tariffe = [
     tar('c-snam', 'Base', 'spedizione', 85), tar('c-snam', 'Sponda', 'spedizione', 18, 'Dalla bolla o aggiunta dall’autista'),
     tar('c-snam', 'Giacenza', 'giorno', 5, 'La merce non consegnata resta in deposito'), tar('c-snam', 'Riconsegna', 'spedizione', 85, 'Nuova consegna dopo la giacenza'),
@@ -111,15 +113,18 @@ function dati(): Tabelle {
     { id: 'gi1', bolla_id: 'b-0012', motivo: 'Destinatario assente', dal: g(-3), riconsegna_il: null, chiusa_il: null },
     { id: 'gi2', bolla_id: 'b-0013', motivo: 'Chiuso o fuori orario', dal: g(-4), riconsegna_il: null, chiusa_il: null },
   ];
+  // le fatture del mese le prepara «Chiudi mese» dalle bolle consegnate: qui solo quelle del mese scorso, già inviate
   t.fatture = [
-    { id: 'fa1', azienda: 'trasporti', cliente_id: 'c-apple', periodo: g(0).slice(0, 7), imponibile: 1240, stato: 'Pronta', problema: null, numero: null, creata_il: oreFa(5), pagata_il: null },
-    { id: 'fa2', azienda: 'trasporti', cliente_id: 'c-snam', periodo: g(0).slice(0, 7), imponibile: 2310, stato: 'Da controllare', problema: 'Sponda ×12 senza tariffa concordata', numero: null, creata_il: oreFa(5), pagata_il: null },
-    { id: 'fa3', azienda: 'trasporti', cliente_id: 'c-lux', periodo: g(0).slice(0, 7), imponibile: 480, stato: 'Pronta', problema: null, numero: null, creata_il: oreFa(5), pagata_il: null },
+    { id: 'fa1', azienda: 'trasporti', tipo: 'Fattura', cliente_id: 'c-apple', periodo: g(-35).slice(0, 7), imponibile: 1240, iva: 272.8, totale: 1512.8, split_payment: false, stato: 'Pagata', problema: null,
+      numero: 'FT 2026/112', data: g(-10), creata_il: oreFa(260), inviata_il: oreFa(250), pagata_il: g(-2), sdi_esito: 'Consegnata', fic_id: 'FIC-311208', sdi_inviata_il: oreFa(250) },
+    { id: 'fa3', azienda: 'trasporti', tipo: 'Fattura', cliente_id: 'c-lux', periodo: g(-35).slice(0, 7), imponibile: 480, iva: 105.6, totale: 585.6, split_payment: false, stato: 'Inviata', problema: null,
+      numero: 'FT 2026/113', data: g(-10), creata_il: oreFa(260), inviata_il: oreFa(250), pagata_il: null, sdi_esito: 'Consegnata', fic_id: 'FIC-311209', sdi_inviata_il: oreFa(250) },
   ];
   t.righe_fattura = [
-    { id: 'r1', fattura_id: 'fa1', voce: 'Consegne', quantita: 120, prezzo: 9, totale: 1080 }, { id: 'r2', fattura_id: 'fa1', voce: 'Sabato', quantita: 3, prezzo: 40, totale: 120 }, { id: 'r2b', fattura_id: 'fa1', voce: 'Giacenza', quantita: 1, prezzo: 40, totale: 40 },
-    { id: 'r3', fattura_id: 'fa2', voce: 'Consegne', quantita: 24, prezzo: 85, totale: 2040 }, { id: 'r4', fattura_id: 'fa2', voce: 'Sponda', quantita: 12, prezzo: 18, totale: 216 }, { id: 'r4b', fattura_id: 'fa2', voce: 'Giacenza', quantita: 1, prezzo: 54, totale: 54 },
-    { id: 'r5', fattura_id: 'fa3', voce: 'Bancali', quantita: 12, prezzo: 35, totale: 420 }, { id: 'r6', fattura_id: 'fa3', voce: 'Attesa', quantita: 2, prezzo: 30, totale: 60 },
+    { id: 'r1', fattura_id: 'fa1', voce: 'Base · consegne', quantita: 120, prezzo: 9, totale: 1080, iva_aliquota: 22, iva_natura: null, margine: false },
+    { id: 'r2', fattura_id: 'fa1', voce: 'Sabato · consegne', quantita: 4, prezzo: 40, totale: 160, iva_aliquota: 22, iva_natura: null, margine: false },
+    { id: 'r5', fattura_id: 'fa3', voce: 'Base · consegne', quantita: 12, prezzo: 35, totale: 420, iva_aliquota: 22, iva_natura: null, margine: false },
+    { id: 'r6', fattura_id: 'fa3', voce: 'Attesa · consegne', quantita: 2, prezzo: 30, totale: 60, iva_aliquota: 22, iva_natura: null, margine: false },
   ];
   t.telepass = [
     { id: 'tp1', mezzo_id: 'm2', quando: ora(7, 12), entrata: 'Milano Sud', uscita: 'Bergamo', importo: 14.2 },
@@ -387,7 +392,7 @@ const FUNZIONI: FunzioniProva = {
     const SITI: Record<string, { azienda: string; tipi: Record<string, [string, string, string]> }> = {
       trasporti: { azienda: 'trasporti', tipi: { preventivo: ['Clienti', 'Preventivo', 'Richiesta di preventivo dal sito'], ritiro: ['Ordini', 'Ordine', 'Richiesta di ritiro dal sito'],
         candidatura: ['In arrivo', 'Personale', 'Candidatura dal sito'], contatto: ['In arrivo', 'Sito', 'Messaggio dal sito'] } },
-      corporation: { azienda: 'corporation', tipi: { lotto: ['Lotti', 'Lotti', 'Lotto da valutare dal sito'], contatto: ['In arrivo', 'Sito', 'Messaggio dal sito'] } },
+      corporation: { azienda: 'corporation', tipi: { lotto: ['Lotti', 'Lotti', 'Lotto da valutare dal sito'], contatto: ['In arrivo', 'Sito', 'Messaggio dal sito'], aziende: ['Clienti', 'Aziende', 'Richiesta di un\'azienda dal negozio'] } },
     };
     const s0 = SITI[c?.sito]; if (!s0) throw new Error('Sito sconosciuto');
     const [cartella, etichetta, oggetto] = s0.tipi[c.tipo] ?? Object.values(s0.tipi)[0];

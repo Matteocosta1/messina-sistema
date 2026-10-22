@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Btn, Msg, Pill } from '@messina/ui';
-import { useApp, useAzione, useDati, eur, meseISO, Mese, Errore } from '../core';
+import { Btn, Chip, Msg, Pill, Warn } from '@messina/ui';
+import { useApp, useAzione, useDati, eur, meseISO, oggiISO, Errore } from '../core';
 
 const fmtData = (d: string | null | undefined) => d ? new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '[data]';
-const UNITA = ['spedizione', 'collo', 'bancale', 'kg', 'giorno', 'ora', 'percentuale', 'pezzo'];
-const comeSiConta = (u: string) => u === 'percentuale' ? 'in percentuale' : u === 'ora' ? 'ogni ora' : u === 'giorno' ? 'al giorno' : 'a ' + u;
+const UNITA = ['spedizione', 'collo', 'bancale', 'kg', 'km', 'giorno', 'mese', 'ora', 'percentuale', 'pezzo'];
+const comeSiConta = (u: string) => u === 'percentuale' ? 'in percentuale' : u === 'ora' ? 'ogni ora' : u === 'giorno' ? 'al giorno' : u === 'mese' ? 'al mese' : 'a ' + u;
 
 // ------------------------------------------------------------------ Clienti
 export function Clienti({ scelto, titolo }: { scelto?: string; titolo: (t: string | null) => void }) {
-  const { vai } = useApp();
+  const { vai, io } = useApp();
   const [nuovo, setNuovo] = useState(false);
+  const [listino, setListino] = useState(false);
   const { dati } = useDati(async (d) => {
     const [clienti, bolle] = await Promise.all([
       d.from<any>('clienti').select('*').eq('azienda', 'trasporti').eq('attivo', true).order('nome'),
@@ -22,10 +23,12 @@ export function Clienti({ scelto, titolo }: { scelto?: string; titolo: (t: strin
   if (!dati) return null;
   if (c) return <Scheda c={c} />;
   return (<>
-    <div className="row between"><Btn onClick={() => setNuovo(!nuovo)}>{nuovo ? 'Chiudi' : 'Nuovo cliente'}</Btn></div>
+    <div className="row between"><Btn onClick={() => setNuovo(!nuovo)}>{nuovo ? 'Chiudi' : 'Nuovo cliente'}</Btn>
+      {io.ruolo !== 'bolle' && <Btn ghost onClick={() => setListino(!listino)}>{listino ? 'Chiudi' : 'Listino'}</Btn>}</div>
+    {listino && <Listino />}
     {nuovo && <NuovoCliente onFatto={(id) => { setNuovo(false); vai('clienti/' + id); }} />}
     <div className="glass tbox"><table className="t"><thead><tr><th>Cliente</th><th>Cosa spedisce</th><th>Referente interno</th><th>Contratto fino al</th><th>Spedizioni mese</th></tr></thead><tbody>
-      {dati.clienti.map((x) => <tr key={x.id} className="click" onClick={() => vai('clienti/' + x.id)}><td><b>{x.nome}</b></td><td>{x.cosa_spedisce ?? '—'}</td><td>{x.referente_interno ?? '—'}</td><td>{fmtData(x.contratto_al)}</td><td>{dati.n(x.id)}</td></tr>)}
+      {dati.clienti.map((x) => <tr key={x.id} className="click" onClick={() => vai('clienti/' + x.id)}><td><b>{x.nome}</b>{x.stato === 'Potenziale' && <> <Pill tone="red">Potenziale</Pill></>}</td><td>{x.cosa_spedisce ?? '—'}</td><td>{x.referente_interno ?? '—'}</td><td>{fmtData(x.contratto_al)}</td><td>{dati.n(x.id)}</td></tr>)}
     </tbody></table></div>
   </>);
 }
@@ -45,147 +48,288 @@ function NuovoCliente({ onFatto }: { onFatto: (id: string) => void }) {
   </div>;
 }
 
+// ------------------------------------------------------------------ Scheda cliente
+const ANAG: [string, string, string?][] = [['piva', 'Partita IVA'], ['codice_fiscale', 'Codice fiscale'], ['indirizzo', 'Indirizzo'], ['cap', 'CAP'],
+  ['citta', 'Città'], ['provincia', 'Provincia'], ['codice_destinatario', 'Codice destinatario'], ['pec', 'PEC'], ['email', 'Email', 'email']];
+const SCAGLIONE: Record<string, string> = { peso: 'kg', colli: 'colli', km: 'km' };
+const scaglione = (t: any) => !t.scaglione_su ? '—' : `${Number(t.scaglione_da).toLocaleString('it-IT')}${t.scaglione_a != null ? '–' + Number(t.scaglione_a).toLocaleString('it-IT') : '+'} ${SCAGLIONE[t.scaglione_su]}`;
+const nuovaRiga = () => ({ voce: '', unita: 'spedizione', prezzo: '', minimo: '', zona: '', quando: '', scaglione_su: '', scaglione_da: '', scaglione_a: '' });
+
 function Scheda({ c }: { c: any }) {
-  const { db, vai } = useApp();
+  const { db, vai, io } = useApp();
   const az = useAzione();
-  const [mod, setMod] = useState<null | { righe: Record<string, string>; nuove: any[]; eccezioni: string; esigenze: string }>(null);
-  const { dati: tariffe } = useDati((d) => d.from<any>('tariffe').select('*').eq('cliente_id', c.id).order('voce'), [c.id]);
-  if (!tariffe) return null;
-  const base = tariffe.filter((t) => !t.quando), extra = tariffe.filter((t) => t.quando);
-  const prezzo = (t: any) => mod ? <input className="input" type="number" step="0.01" min={0} style={{ width: 110, minHeight: 34, padding: '4px 8px' }} aria-label={'Prezzo ' + t.voce}
-    value={mod.righe[t.id] ?? t.prezzo} onChange={(e) => setMod({ ...mod, righe: { ...mod.righe, [t.id]: e.target.value } })} /> : eur(t.prezzo);
-  const salva = () => az.esegui(async () => {
-    for (const t of tariffe) { const v = mod!.righe[t.id]; if (v !== undefined && Number(v) !== Number(t.prezzo)) await db.from('tariffe').update({ prezzo: Number(v) }).eq('id', t.id); }
-    const nuove = mod!.nuove.filter((n) => n.voce.trim() && n.prezzo !== '');
-    if (nuove.length) await db.from('tariffe').insert(nuove.map((n) => ({ cliente_id: c.id, voce: n.voce.trim(), unita: n.unita, prezzo: Number(n.prezzo), zona: n.zona || null, quando: n.quando || null })));
-    if (mod!.eccezioni !== (c.eccezioni ?? '') || mod!.esigenze !== (c.esigenze ?? '')) await db.from('clienti').update({ eccezioni: mod!.eccezioni || null, esigenze: mod!.esigenze || null }).eq('id', c.id);
-  }).then((ok) => ok && setMod(null));
+  const puoTariffe = io.ruolo === 'commerciale' || io.ruolo === 'direzione';
+  const dir = io.ruolo === 'direzione';
+  const [mod, setMod] = useState<null | { righe: Record<string, { prezzo: string; minimo: string }>; nuove: any[]; dal: string }>(null);
+  const [anag, setAnag] = useState<null | Record<string, any>>(null);
+  const [msg, setMsg] = useState('');
+  const { dati } = useDati(async (d) => {
+    const [tariffe, manca] = await Promise.all([
+      d.from<any>('tariffe').select('*').eq('cliente_id', c.id).in('stato', ['Attiva', 'Da approvare']).order('voce'),
+      d.rpc<string[]>('anagrafica_mancante', { p_cliente: c.id }),
+    ]);
+    const oggi = oggiISO();
+    return { tariffe: tariffe.filter((t) => !t.valida_al || t.valida_al >= oggi), manca: manca ?? [] };
+  }, [c.id]);
+  if (!dati) return null;
+  const T = dati.tariffe;
+  const base = T.filter((t) => t.voce === 'Base'), extra = T.filter((t) => t.voce !== 'Base');
+  const salva = () => az.prendi(async () => {
+    const righe: any[] = [];
+    for (const t of T) { const v = mod!.righe[t.id]; if (v && (Number(v.prezzo) !== Number(t.prezzo) || (v.minimo === '' ? null : Number(v.minimo)) !== (t.minimo == null ? null : Number(t.minimo))))
+      righe.push({ id: t.id, prezzo: Number(v.prezzo), minimo: v.minimo === '' ? null : Number(v.minimo) }); }
+    for (const n of mod!.nuove) if (n.voce.trim() && n.prezzo !== '') righe.push({ voce: n.voce.trim(), unita: n.unita, prezzo: Number(n.prezzo), minimo: n.minimo === '' ? null : Number(n.minimo),
+      zona: n.zona || null, quando: n.quando || null, scaglione_su: n.scaglione_su || null, scaglione_da: n.scaglione_su ? Number(n.scaglione_da || 0) : null,
+      scaglione_a: n.scaglione_su && n.scaglione_a !== '' ? Number(n.scaglione_a) : null });
+    if (!righe.length) return 0;
+    return db.rpc<number>('salva_tariffe', { p_cliente: c.id, p_righe: righe, p_dal: mod!.dal });
+  }).then((n) => { if (n === undefined) return; setMod(null); setMsg(n ? 'Tariffe salvate. Quelle sotto il listino, di un cliente nuovo o con una data passata aspettano la Direzione: fino ad allora vale il prezzo di prima.' : 'Nessun prezzo cambiato.'); });
+  const approva = (t: any, ok: boolean) => az.esegui(() => db.rpc('approva_tariffa', { p_id: t.id, p_ok: ok })).then((x) => x && setMsg(ok ? `${t.voce} approvata: vale dal ${fmtData(t.valida_dal)}.` : `${t.voce} rifiutata: resta il prezzo di prima.`));
+  const salvaAnag = () => az.esegui(() => db.from('clienti').update({ ...anag, provincia: anag!.provincia ? String(anag!.provincia).toUpperCase() : null }).eq('id', c.id))
+    .then((x) => x && setAnag(null));
   const contratto = async () => {
     const percorso = `contratti/${c.id}.pdf`;
     try { const u = await db.storage.link('documenti', percorso); if (u) { window.open(u, '_blank', 'noopener'); return; } } catch { /* non c'è ancora: si carica */ }
     const i = document.createElement('input'); i.type = 'file'; i.accept = 'application/pdf';
     i.onchange = () => { const f = i.files?.[0]; if (f) az.esegui(() => db.storage.carica('documenti', percorso, f)); }; i.click();
   };
-  const riga = (n: any, k: string, l: string, w = 140) => <input className="input" aria-label={l} placeholder={l} style={{ minWidth: w, minHeight: 34, padding: '4px 8px' }} value={n[k]}
-    onChange={(e) => setMod({ ...mod!, nuove: mod!.nuove.map((x) => x === n ? { ...x, [k]: e.target.value } : x) })} />;
+  const inp = (val: string, set: (v: string) => void, l: string, w = 110, type = 'text') => <input className="input" type={type} aria-label={l} placeholder={l} value={val}
+    style={{ minWidth: w, width: w, minHeight: 34, padding: '4px 8px' }} onChange={(e) => set(e.target.value)} />;
+  const cambiaNuova = (n: any, k: string, v: string) => setMod({ ...mod!, nuove: mod!.nuove.map((x) => x === n ? { ...x, [k]: v } : x) });
+  const prezzo = (t: any) => mod && t.stato === 'Attiva'
+    ? inp(mod.righe[t.id]?.prezzo ?? String(t.prezzo), (v) => setMod({ ...mod, righe: { ...mod.righe, [t.id]: { prezzo: v, minimo: mod.righe[t.id]?.minimo ?? (t.minimo == null ? '' : String(t.minimo)) } } }), 'Prezzo ' + t.voce, 90, 'number')
+    : eur(Number(t.prezzo));
+  const minimo = (t: any) => mod && t.stato === 'Attiva'
+    ? inp(mod.righe[t.id]?.minimo ?? (t.minimo == null ? '' : String(t.minimo)), (v) => setMod({ ...mod, righe: { ...mod.righe, [t.id]: { prezzo: mod.righe[t.id]?.prezzo ?? String(t.prezzo), minimo: v } } }), 'Minimo ' + t.voce, 80, 'number')
+    : t.minimo != null ? eur(Number(t.minimo)) : '—';
+  const stato = (t: any) => t.stato === 'Da approvare'
+    ? <span className="row" style={{ gap: 6 }}><Pill tone="red">Da approvare</Pill>{dir && !mod && <><Btn sm onClick={() => approva(t, true)} disabled={az.inCorso}>Approva</Btn><Btn ghost sm onClick={() => approva(t, false)} disabled={az.inCorso}>Rifiuta</Btn></>}
+      {t.motivo && <span className="lbl">{t.motivo}</span>}</span>
+    : <span className="lbl">dal {fmtData(t.valida_dal)}</span>;
+  const tabella = (righe: any[], vuoto: string) => <div className="tbox"><table className="t"><thead><tr><th>Voce</th><th>Come si conta</th><th>Zona</th><th>Scaglione</th><th>Minimo</th><th>Prezzo</th><th>Stato</th></tr></thead><tbody>
+    {righe.map((t) => <tr key={t.id}><td><b>{t.voce}</b>{t.quando && <div className="lbl">{t.quando}</div>}</td><td>{comeSiConta(t.unita)}</td><td>{t.zona ?? '—'}</td><td>{scaglione(t)}</td><td>{minimo(t)}</td><td>{prezzo(t)}</td><td>{stato(t)}</td></tr>)}
+    {!righe.length && <tr><td colSpan={7} className="lbl">{vuoto}</td></tr>}
+  </tbody></table></div>;
   return (<>
     <div className="row between"><Btn ghost onClick={() => vai('clienti')}>Tutti i clienti</Btn>
       <div className="row"><Btn ghost sm onClick={contratto}>Contratto PDF</Btn>
-        {mod ? <><Btn sm onClick={salva} disabled={az.inCorso}>Salva</Btn><Btn ghost sm onClick={() => setMod(null)}>Annulla</Btn></>
-          : <Btn sm onClick={() => setMod({ righe: {}, nuove: [], eccezioni: c.eccezioni ?? '', esigenze: c.esigenze ?? '' })}>Modifica tariffe</Btn>}</div></div>
+        {!anag && !mod && <Btn ghost sm onClick={() => setAnag(Object.fromEntries([...ANAG.map(([k]) => [k, c[k] ?? '']), ['iva_natura', c.iva_natura ?? ''], ['split_payment', !!c.split_payment], ['eccezioni', c.eccezioni ?? ''], ['esigenze', c.esigenze ?? '']]))}>Anagrafica</Btn>}
+        {puoTariffe && !anag && (mod ? <><Btn sm onClick={salva} disabled={az.inCorso}>Salva</Btn><Btn ghost sm onClick={() => setMod(null)}>Annulla</Btn></>
+          : <Btn sm onClick={() => { setMsg(''); setMod({ righe: {}, nuove: [], dal: oggiISO() }); }}>Tariffe</Btn>)}</div></div>
+    {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
     <div className="grid g4">
-      <div className="glass card"><div className="lbl">Cosa spedisce</div><b>{c.cosa_spedisce ?? '—'}</b></div>
+      <div className="glass card"><div className="lbl">Cosa spedisce</div><b>{c.cosa_spedisce ?? '—'}</b>{c.stato === 'Potenziale' && <div style={{ marginTop: 6 }}><Pill tone="red">Potenziale</Pill></div>}</div>
       <div className="glass card"><div className="lbl">Referente interno</div><b>{c.referente_interno ?? '—'}</b></div>
       <div className="glass card"><div className="lbl">Contratto</div><b>dal {fmtData(c.contratto_dal)} al {fmtData(c.contratto_al)}</b></div>
       <div className="glass card"><div className="lbl">Fatturazione</div><b>{c.fatturazione ?? '[mensile o a spedizione]'}</b></div>
     </div>
-    <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Tariffa base</div><div className="tbox"><table className="t"><thead><tr><th>Voce</th><th>Unità</th><th>Zona</th><th>Prezzo</th></tr></thead><tbody>
-      {base.map((r) => <tr key={r.id}><td><b>{r.voce}</b></td><td>{comeSiConta(r.unita)}</td><td>{r.zona ?? '—'}</td><td>{prezzo(r)}</td></tr>)}
-      {!base.length && <tr><td colSpan={4} className="lbl">Nessuna tariffa base: premi «Modifica tariffe».</td></tr>}
-    </tbody></table></div></div>
-    <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Accessori e voci extra</div><div className="tbox"><table className="t"><thead><tr><th>Voce</th><th>Come si conta</th><th>Prezzo</th><th>Quando scatta</th></tr></thead><tbody>
-      {extra.map((r) => <tr key={r.id}><td><b>{r.voce}</b></td><td>{comeSiConta(r.unita)}</td><td>{prezzo(r)}</td><td className="lbl">{r.quando}</td></tr>)}
-      {mod?.nuove.map((n, i) => <tr key={'n' + i}><td>{riga(n, 'voce', 'Voce')}</td>
-        <td><select className="input" aria-label="Unità" style={{ minHeight: 34, padding: '4px 8px' }} value={n.unita} onChange={(e) => setMod({ ...mod, nuove: mod.nuove.map((x) => x === n ? { ...x, unita: e.target.value } : x) })}>{UNITA.map((u) => <option key={u} value={u}>{comeSiConta(u)}</option>)}</select></td>
-        <td>{riga(n, 'prezzo', 'Prezzo', 90)}</td><td>{riga(n, 'quando', 'Quando scatta (vuoto = base)', 200)}</td></tr>)}
-    </tbody></table></div>
-      {mod && <div style={{ padding: 14 }}><Btn ghost sm onClick={() => setMod({ ...mod, nuove: [...mod.nuove, { voce: '', unita: 'spedizione', prezzo: '', zona: '', quando: '' }] })}>Aggiungi</Btn></div>}</div>
-    <div className="grid g2">
-      <div className="glass card"><b>Eccezioni e accordi</b>{mod ? <textarea aria-label="Eccezioni e accordi" value={mod.eccezioni} onChange={(e) => setMod({ ...mod, eccezioni: e.target.value })} style={{ marginTop: 8 }} />
-        : <p style={{ margin: '8px 0 0' }}>{c.eccezioni ?? '[sconti, minimi, accordi particolari: li inserisce la Direzione]'}</p>}</div>
-      <div className="glass card"><b>Cosa chiede il cliente</b>{mod ? <textarea aria-label="Cosa chiede il cliente" value={mod.esigenze} onChange={(e) => setMod({ ...mod, esigenze: e.target.value })} style={{ marginTop: 8 }} />
-        : <p style={{ margin: '8px 0 0' }}>{c.esigenze ?? '[da chiarire]'}</p>}</div>
+    <div className="glass card stack">
+      <div className="row between"><b>Anagrafica per la fattura</b>{dati.manca.length > 0 && !anag && <span className="miss">Manca: {dati.manca.join(', ')}</span>}</div>
+      {anag ? <>
+        <div className="grid g2">{ANAG.map(([k, l, type]) => <label key={k} className="field"><span className="lbl">{l}</span><input className="input" type={type ?? 'text'} value={anag[k]} maxLength={k === 'provincia' ? 2 : k === 'cap' ? 5 : undefined}
+          onChange={(e) => setAnag({ ...anag, [k]: e.target.value })} /></label>)}
+          <label className="field"><span className="lbl">IVA</span><select className="input" value={anag.iva_natura} onChange={(e) => setAnag({ ...anag, iva_natura: e.target.value })}>
+            <option value="">22%</option><option value="N3.1">Non imponibile, esportazione (N3.1)</option><option value="N3.2">Non imponibile, cessione UE (N3.2)</option><option value="N2.1">Fuori campo (N2.1)</option></select></label>
+          <label className="field"><span className="lbl">Split payment</span><select className="input" value={anag.split_payment ? 'si' : 'no'} onChange={(e) => setAnag({ ...anag, split_payment: e.target.value === 'si' })}>
+            <option value="no">No</option><option value="si">Sì: ente pubblico, l’IVA la versa lui</option></select></label></div>
+        <div className="grid g2"><label className="field"><span className="lbl">Eccezioni e accordi</span><textarea value={anag.eccezioni} onChange={(e) => setAnag({ ...anag, eccezioni: e.target.value })} /></label>
+          <label className="field"><span className="lbl">Cosa chiede il cliente</span><textarea value={anag.esigenze} onChange={(e) => setAnag({ ...anag, esigenze: e.target.value })} /></label></div>
+        <div className="row"><Btn onClick={salvaAnag} disabled={az.inCorso}>Salva</Btn><Btn ghost onClick={() => setAnag(null)}>Annulla</Btn></div>
+      </> : <div className="kv">{ANAG.map(([k, l]) => <div key={k}><div className="lbl">{l}</div><b>{c[k] || '—'}</b></div>)}
+        <div><div className="lbl">IVA</div><b>{c.iva_natura ? 'Natura ' + c.iva_natura : Number(c.iva_aliquota ?? 22) + '%'}{c.split_payment ? ' · split payment' : ''}</b></div></div>}
+    </div>
+    <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Tariffa base</div>{tabella(base, puoTariffe ? 'Nessuna tariffa base: premi «Tariffe».' : 'Nessuna tariffa base: la inserisce il commerciale.')}</div>
+    <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Accessori e voci extra</div>{tabella(extra, 'Nessuna voce extra.')}
+      {mod && <div className="stack" style={{ padding: 14, gap: 8 }}>
+        {mod.nuove.map((n, i) => <div key={i} className="row" style={{ gap: 6 }}>
+          {inp(n.voce, (v) => cambiaNuova(n, 'voce', v), 'Voce', 130)}
+          <select className="input" aria-label="Come si conta" style={{ width: 140, minHeight: 34, padding: '4px 8px' }} value={n.unita} onChange={(e) => cambiaNuova(n, 'unita', e.target.value)}>{UNITA.map((u) => <option key={u} value={u}>{comeSiConta(u)}</option>)}</select>
+          {inp(n.prezzo, (v) => cambiaNuova(n, 'prezzo', v), n.unita === 'percentuale' ? '%' : 'Prezzo', 80, 'number')}
+          {inp(n.minimo, (v) => cambiaNuova(n, 'minimo', v), 'Minimo', 80, 'number')}
+          {inp(n.zona, (v) => cambiaNuova(n, 'zona', v), 'Zona', 100)}
+          <select className="input" aria-label="Scaglione" style={{ width: 120, minHeight: 34, padding: '4px 8px' }} value={n.scaglione_su} onChange={(e) => cambiaNuova(n, 'scaglione_su', e.target.value)}>
+            <option value="">Senza scaglione</option><option value="peso">Scaglione kg</option><option value="colli">Scaglione colli</option><option value="km">Scaglione km</option></select>
+          {n.scaglione_su && <>{inp(n.scaglione_da, (v) => cambiaNuova(n, 'scaglione_da', v), 'Da', 70, 'number')}{inp(n.scaglione_a, (v) => cambiaNuova(n, 'scaglione_a', v), 'A (vuoto = oltre)', 120, 'number')}</>}
+          {inp(n.quando, (v) => cambiaNuova(n, 'quando', v), 'Quando scatta', 160)}
+        </div>)}
+        <div className="row"><Btn ghost sm onClick={() => setMod({ ...mod, nuove: [...mod.nuove, nuovaRiga()] })}>Aggiungi</Btn>
+          <label className="row" style={{ gap: 6 }}><span className="lbl">Valgono dal</span><input className="input" type="date" value={mod.dal} style={{ width: 160, minHeight: 34, padding: '4px 8px' }} onChange={(e) => setMod({ ...mod, dal: e.target.value })} /></label></div>
+        <span className="lbl">Un prezzo cambiato non cancella il vecchio: il vecchio vale fino al giorno prima, così le bolle già fatte restano col loro prezzo. Serve la Direzione sotto il listino base, per un cliente nuovo o per una data passata (possibile solo se le bolle di quei giorni non sono già in una fattura inviata).</span>
+      </div>}
     </div>
   </>);
+}
+
+// ------------------------------------------------------------------ Listino base (lo cambia la Direzione)
+export function Listino() {
+  const { db, io } = useApp();
+  const az = useAzione();
+  const dir = io.ruolo === 'direzione';
+  const [nuova, setNuova] = useState<any | null>(null);
+  const { dati } = useDati((d) => d.from<any>('listino').select('*').order('voce'), []);
+  if (!dati) return null;
+  const salva = () => az.esegui(() => db.from('listino').insert({ voce: nuova.voce.trim(), unita: nuova.unita, prezzo: Number(nuova.prezzo), zona: nuova.zona || null,
+    minimo: nuova.minimo === '' ? null : Number(nuova.minimo), scaglione_su: nuova.scaglione_su || null, scaglione_da: nuova.scaglione_su ? Number(nuova.scaglione_da || 0) : null,
+    scaglione_a: nuova.scaglione_su && nuova.scaglione_a !== '' ? Number(nuova.scaglione_a) : null })).then((x) => x && setNuova(null));
+  const togli = (id: string) => az.esegui(() => db.from('listino').delete().eq('id', id));
+  const f = (k: string, l: string, w = 110, type = 'text') => <input className="input" type={type} aria-label={l} placeholder={l} value={nuova[k]} style={{ width: w, minHeight: 34, padding: '4px 8px' }} onChange={(e) => setNuova({ ...nuova, [k]: e.target.value })} />;
+  return <div className="glass stack" style={{ gap: 0 }}>
+    <div className="row between" style={{ padding: 14 }}><b>Listino base</b><span className="lbl">Un prezzo cliente più basso di questo aspetta la Direzione.</span></div>
+    <div className="tbox"><table className="t"><thead><tr><th>Voce</th><th>Come si conta</th><th>Zona</th><th>Scaglione</th><th>Minimo</th><th>Prezzo</th>{dir && <th />}</tr></thead><tbody>
+      {dati.map((t) => <tr key={t.id}><td><b>{t.voce}</b></td><td>{comeSiConta(t.unita)}</td><td>{t.zona ?? '—'}</td><td>{scaglione(t)}</td><td>{t.minimo != null ? eur(Number(t.minimo)) : '—'}</td><td>{eur(Number(t.prezzo))}</td>
+        {dir && <td><Btn ghost sm onClick={() => togli(t.id)} disabled={az.inCorso}>Togli</Btn></td>}</tr>)}
+      {!dati.length && <tr><td colSpan={7} className="lbl">Listino vuoto: lo compila la Direzione.</td></tr>}
+    </tbody></table></div>
+    <Errore testo={az.errore} />
+    {dir && <div className="row" style={{ padding: 14, gap: 6 }}>{nuova ? <>
+      {f('voce', 'Voce', 120)}<select className="input" aria-label="Come si conta" style={{ width: 140, minHeight: 34, padding: '4px 8px' }} value={nuova.unita} onChange={(e) => setNuova({ ...nuova, unita: e.target.value })}>{UNITA.map((u) => <option key={u} value={u}>{comeSiConta(u)}</option>)}</select>
+      {f('prezzo', 'Prezzo', 80, 'number')}{f('minimo', 'Minimo', 80, 'number')}{f('zona', 'Zona', 100)}
+      <select className="input" aria-label="Scaglione" style={{ width: 120, minHeight: 34, padding: '4px 8px' }} value={nuova.scaglione_su} onChange={(e) => setNuova({ ...nuova, scaglione_su: e.target.value })}>
+        <option value="">Senza scaglione</option><option value="peso">Scaglione kg</option><option value="colli">Scaglione colli</option><option value="km">Scaglione km</option></select>
+      {nuova.scaglione_su && <>{f('scaglione_da', 'Da', 70, 'number')}{f('scaglione_a', 'A', 70, 'number')}</>}
+      <Btn sm onClick={salva} disabled={!nuova.voce.trim() || nuova.prezzo === '' || az.inCorso}>Salva</Btn><Btn ghost sm onClick={() => setNuova(null)}>Annulla</Btn></>
+      : <Btn ghost sm onClick={() => setNuova(nuovaRiga())}>Aggiungi</Btn>}</div>}
+  </div>;
 }
 
 // ------------------------------------------------------------------ Fatturazione
+const mesePrima = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const nomeMese = (m: string) => { const s = new Date(m + '-15T12:00:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); return s[0].toUpperCase() + s.slice(1); };
+const APERTE = ['Bozza', 'Da controllare', 'Pronta'];
+const pillStato = (f: any) => f.stato === 'Pronta' ? <Pill tone="dark">Pronta</Pill> : f.stato === 'Pagata' ? <Pill tone="ok">Pagata</Pill> : f.stato === 'Inviata' ? <Pill tone="ok">Inviata</Pill>
+  : f.stato === 'Da controllare' ? <Pill tone="red">Da controllare</Pill> : <Pill>{f.stato}</Pill>;
+
 export function Fatturazione() {
   const { db } = useApp();
   const az = useAzione();
+  const [mese, setMese] = useState(meseISO());
   const [msg, setMsg] = useState('');
-  const [editor, setEditor] = useState<null | { fattura?: any }>(null);
-  const { dati } = useDati((d) => d.from<any>('fatture').select('*,clienti(nome),righe_fattura(*)').eq('azienda', 'trasporti').order('creata_il', { ascending: false }).limit(200), []);
+  const [aperta, setAperta] = useState<string | null>(null);
+  const [nuova, setNuova] = useState(false);
+  const { dati } = useDati((d) => d.from<any>('fatture').select('*,clienti(nome),fatture_bolle(bolla_id,valida)').eq('azienda', 'trasporti').order('creata_il', { ascending: false }).limit(300), []);
   if (!dati) return null;
-  const mese = meseISO();
-  const F = dati.filter((f) => f.periodo === mese || !['Pagata'].includes(f.stato));
+  const F = dati.filter((f) => f.periodo === mese || APERTE.includes(f.stato) || (f.stato === 'Inviata' && f.periodo < mese));
   const pronte = F.filter((f) => f.stato === 'Pronta');
-  const daControllare = F.filter((f) => f.stato === 'Da controllare');
-  const consegne = (f: any) => { const b = new Set(f.righe_fattura.map((r: any) => r.bolla_id).filter(Boolean)); return b.size || (f.righe_fattura[0]?.quantita ?? 0); };
-  const extra = (f: any) => f.righe_fattura.slice(1).map((r: any) => `${r.voce} ×${Number(r.quantita).toLocaleString('it-IT')}`).join(' · ') || '—';
-  const invia = (lista: any[]) => az.esegui(async () => {
-    for (const f of lista) await db.fn('fatture-in-cloud', { fattura_id: f.id });  // la funzione la segna Inviata e la manda allo SdI
-  }).then((ok) => ok && setMsg(`Fatture approvate e inviate a Fatture in Cloud.${daControllare.length ? ` ${daControllare.map((f) => 'Quella di ' + f.clienti?.nome).join(', ')} aspetta un controllo.` : ''}`));
-  const pagata = (f: any) => az.esegui(() => db.from('fatture').update({ stato: 'Pagata' }).eq('id', f.id));
+  const nBolle = (f: any) => (f.fatture_bolle ?? []).filter((x: any) => x.valida).length;
+  const chiudi = () => az.prendi(() => db.rpc<number>('chiudi_mese', { p_mese: mese })).then((n) => n !== undefined && setMsg(n
+    ? `${nomeMese(mese)}: ${n} ${n === 1 ? 'fattura preparata' : 'fatture preparate'} con tutte le bolle consegnate e non ancora fatturate. Quelle «Da controllare» dicono cosa manca.`
+    : `${nomeMese(mese)}: nessuna bolla nuova da fatturare.`));
+  const invia = (lista: any[]) => az.esegui(async () => { for (const f of lista) await db.fn('fatture-in-cloud', { fattura_id: f.id }); })
+    .then((ok) => ok && setMsg(`${lista.length === 1 ? 'Fattura inviata' : lista.length + ' fatture inviate'} a Fatture in Cloud, che le manda allo SdI. L’esito arriva da solo in questa pagina.`));
+  const esiti = () => az.prendi(() => db.fn<any>('fatture-in-cloud', { azione: 'esiti' })).then((r) => r && setMsg(`Esiti aggiornati: ${r.scartate ? r.scartate + ' scartate dallo SdI, da correggere' : 'nessuno scarto'}.`));
+  const cur = dati.find((f) => f.id === aperta);
+  if (cur) return <Dettaglio f={cur} onChiudi={(t) => { setAperta(null); if (t) setMsg(t); }} />;
   return (<>
-    <div className="glass tbox"><table className="t"><thead><tr><th>Cliente</th><th>Consegne</th><th>Accessori ed extra</th><th>Totale</th><th>Stato</th><th>Incasso</th></tr></thead><tbody>
-      {F.map((f) => <tr key={f.id}><td><b>{f.clienti?.nome}</b></td><td>{consegne(f)}</td><td>{extra(f)}</td><td>{eur(f.imponibile)}</td>
-        <td>{f.stato === 'Pronta' ? <Pill tone="dark">Pronta</Pill> : f.stato === 'Inviata' || f.stato === 'Pagata' ? <Pill tone="ok">Inviata</Pill> : f.stato === 'Bozza' ? <Pill>Bozza</Pill> : <Pill tone="red">{f.stato}</Pill>}</td>
-        <td>{f.stato === 'Pagata' ? <Pill tone="ok">Pagata</Pill> : f.stato === 'Inviata' ? <Btn ghost sm onClick={() => pagata(f)} disabled={az.inCorso}>Pagata</Btn>
-          : f.stato === 'Da controllare' || f.stato === 'Bozza' ? <Btn ghost sm onClick={() => setEditor({ fattura: f })}>Controlla</Btn> : <span className="lbl">—</span>}</td></tr>)}
-      {!F.length && <tr><td colSpan={6} className="lbl">Nessuna fattura per {Mese().toLowerCase()}.</td></tr>}
-    </tbody></table></div>
-    {daControllare.map((f) => <div key={f.id} className="lbl">{f.clienti?.nome}: {f.problema}</div>)}
+    <div className="row between">
+      <div className="row">{[mesePrima(), meseISO()].map((m) => <Chip key={m} on={mese === m} onClick={() => { setMese(m); setMsg(''); }}>{nomeMese(m)}</Chip>)}</div>
+      <div className="row"><Btn onClick={chiudi} disabled={az.inCorso}>Chiudi mese</Btn>
+        {pronte.length > 0 && <Btn onClick={() => invia(pronte)} disabled={az.inCorso}>Invia</Btn>}
+        <Btn ghost onClick={esiti} disabled={az.inCorso}>Esiti</Btn>
+        <Btn ghost onClick={() => setNuova(!nuova)}>{nuova ? 'Chiudi' : 'Nuova'}</Btn></div>
+    </div>
     {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
-    <div className="row">{pronte.length > 0 && <Btn onClick={() => invia(pronte)} disabled={az.inCorso}>Invia</Btn>}
-      <Btn ghost onClick={() => setEditor(editor ? null : {})}>{editor ? 'Chiudi' : 'Nuova'}</Btn>
-      <span className="lbl">Ogni voce della fattura rimanda alla sua consegna. Quando il cliente paga, premi «Pagata»: sale l’Incassato in Home.</span></div>
-    {editor && <Editor key={editor.fattura?.id ?? 'nuova'} fattura={editor.fattura} onFatto={(t) => { setEditor(null); setMsg(t); }} />}
+    {nuova && <NuovaFattura onFatto={(id) => { setNuova(false); setAperta(id); }} />}
+    <div className="glass tbox"><table className="t"><thead><tr><th>Cliente</th><th>Mese</th><th>Bolle</th><th>Imponibile</th><th>IVA</th><th>Totale</th><th>Stato</th><th>SdI</th><th /></tr></thead><tbody>
+      {F.map((f) => <tr key={f.id} className="click" onClick={() => setAperta(f.id)}>
+        <td><b>{f.clienti?.nome}</b>{f.tipo === 'Nota di credito' && <div className="lbl">Nota di credito</div>}{f.problema && <div className="miss" style={{ fontSize: 13 }}>{f.problema}</div>}</td>
+        <td>{f.periodo ? nomeMese(f.periodo) : '—'}</td><td>{nBolle(f) || '—'}</td><td>{eur(Number(f.imponibile))}</td><td>{f.split_payment ? <span className="lbl">split</span> : eur(Number(f.iva))}</td>
+        <td><b>{eur(Number(f.totale))}</b></td><td>{pillStato(f)}</td><td className="lbl">{f.sdi_esito ?? '—'}</td><td><span className="go">Apri</span></td></tr>)}
+      {!F.length && <tr><td colSpan={9} className="lbl">Nessuna fattura per {nomeMese(mese).toLowerCase()}: premi «Chiudi mese».</td></tr>}
+    </tbody></table></div>
+    <span className="lbl">«Chiudi mese» mette in fattura ogni bolla consegnata e non ancora fatturata, con le tariffe del giorno della consegna. Una bolla sta in una sola fattura. Le spedizioni in giacenza aspettano la chiusura della giacenza.</span>
   </>);
 }
 
-/** Nuova fattura (o controllo di una da controllare): righe già compilate da bolle e tariffe */
-function Editor({ fattura, onFatto }: { fattura?: any; onFatto: (msg: string) => void }) {
+function NuovaFattura({ onFatto }: { onFatto: (id: string) => void }) {
   const { db } = useApp();
   const az = useAzione();
-  const [cliente, setCliente] = useState<string>(fattura?.cliente_id ?? '');
-  const [righe, setRighe] = useState<any[] | null>(fattura ? fattura.righe_fattura.map((r: any) => ({ ...r })) : null);
-  const { dati: clienti } = useDati((d) => d.from<any>('clienti').select('id,nome,piva,fatturazione').eq('azienda', 'trasporti').eq('attivo', true).order('nome'), []);
-  // righe proposte: bolle chiuse del mese non ancora fatturate × tariffe del cliente
-  useDati(async (d) => {
-    if (fattura || !cliente) return null;
-    const [bolle, tariffe] = await Promise.all([
-      d.from<any>('bolle').select('id,colli_previsti,accessori').eq('cliente_id', cliente).in('stato', ['Consegnata', 'Giacenza', 'Non consegnata']).gte('data_consegna', meseISO() + '-01'),
-      d.from<any>('tariffe').select('*').eq('cliente_id', cliente),
+  const [cliente, setCliente] = useState('');
+  const { dati: clienti } = useDati((d) => d.from<any>('clienti').select('id,nome').eq('azienda', 'trasporti').eq('attivo', true).eq('stato', 'Attivo').order('nome'), []);
+  const crea = () => az.prendi(async () => { const r = await db.from<any>('fatture').insert({ azienda: 'trasporti', cliente_id: cliente, periodo: meseISO(), stato: 'Bozza' }).select('id'); return r[0].id as string; })
+    .then((id) => id && onFatto(id));
+  return <div className="glass card row" style={{ alignItems: 'flex-end' }}>
+    <label className="field" style={{ flex: '1 1 240px' }}><span className="lbl">Fattura a mano (voci fuori dalle bolle)</span><select className="input" value={cliente} onChange={(e) => setCliente(e.target.value)}><option value="">Scegli il cliente</option>{clienti?.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
+    <Btn onClick={crea} disabled={!cliente || az.inCorso}>Crea</Btn><Errore testo={az.errore} /></div>;
+}
+
+/** una fattura: righe (modificabili prima dell'invio), bolle collegate, passaggi di stato */
+function Dettaglio({ f, onChiudi }: { f: any; onChiudi: (msg?: string) => void }) {
+  const { db, vai } = useApp();
+  const az = useAzione();
+  const aperta = APERTE.includes(f.stato);
+  const [righe, setRighe] = useState<any[] | null>(null);
+  const [motivo, setMotivo] = useState<{ cosa: 'annulla' | 'nota'; testo: string } | null>(null);
+  const [msg, setMsg] = useState('');
+  const { dati } = useDati(async (d) => {
+    const ids = (f.fatture_bolle ?? []).filter((x: any) => x.valida).map((x: any) => x.bolla_id);
+    const [R, bolle, manca] = await Promise.all([
+      d.from<any>('righe_fattura').select('*').eq('fattura_id', f.id),
+      ids.length ? d.from<any>('bolle').select('id,numero,data_consegna,citta,colli_previsti').in('id', ids).order('data_consegna') : Promise.resolve([] as any[]),
+      d.rpc<string[]>('anagrafica_mancante', { p_cliente: f.cliente_id }),
     ]);
-    const R: any[] = []; const base = tariffe.filter((t) => t.voce === 'Base');
-    for (const t of base) R.push({ voce: 'Consegne', quantita: t.unita === 'spedizione' ? bolle.length : bolle.reduce((s, b) => s + (b.colli_previsti ?? 0), 0), prezzo: t.prezzo, bolle: bolle.map((b) => b.id) });
-    const acc: Record<string, number> = {}; bolle.forEach((b) => (b.accessori ?? []).forEach((a: string) => { acc[a] = (acc[a] ?? 0) + 1; }));
-    for (const [v, n] of Object.entries(acc)) { const t = tariffe.find((x) => x.voce === v); R.push({ voce: v, quantita: n, prezzo: t?.prezzo ?? 0 }); }
-    setRighe(R);
-    return null;
-  }, [cliente]);
-  const c = clienti?.find((x) => x.id === cliente);
-  const tot = (righe ?? []).reduce((s, r) => s + Number(r.quantita || 0) * Number(r.prezzo || 0), 0);
-  const cambia = (r: any, k: string, v: string) => setRighe(righe!.map((x) => x === r ? { ...x, [k]: v } : x));
-  const salva = (stato: 'Bozza' | 'Inviata') => az.esegui(async () => {
-    let id = fattura?.id;
-    const imponibile = Math.round(tot * 100) / 100;
-    if (!id) { const f = await db.from<any>('fatture').insert({ azienda: 'trasporti', cliente_id: cliente, periodo: meseISO(), imponibile, stato: 'Bozza' }).select('id'); id = f[0].id; }
-    else { await db.from('righe_fattura').delete().eq('fattura_id', id); await db.from('fatture').update({ imponibile, problema: null }).eq('id', id); }
-    await db.from('righe_fattura').insert(righe!.filter((r) => r.voce && Number(r.quantita)).map((r) => ({ fattura_id: id, voce: r.voce, quantita: Number(r.quantita), prezzo: Number(r.prezzo), bolla_id: r.bolla_id ?? null })));
-    if (stato === 'Inviata') {
-      if (fattura?.stato !== 'Pronta') await db.from('fatture').update({ stato: 'Pronta' }).eq('id', id);
-      await db.fn('fatture-in-cloud', { fattura_id: id });
+    return { R, bolle, manca: manca ?? [] };
+  }, [f.id]);
+  if (!dati) return null;
+  const R = righe ?? dati.R;
+  const modificata = !!righe;
+  const cambia = (r: any, k: string, v: string) => setRighe(R.map((x) => x === r ? { ...x, [k]: v } : x));
+  const salva = () => az.esegui(async () => {
+    const ora = R.filter((r) => String(r.voce).trim() && Number(r.quantita));
+    const togli = dati.R.filter((r) => !ora.some((x) => x.id === r.id));
+    for (const r of togli) await db.from('righe_fattura').delete().eq('id', r.id);
+    for (const r of ora) {
+      if (!r.id) await db.from('righe_fattura').insert({ fattura_id: f.id, voce: String(r.voce).trim(), quantita: Number(r.quantita), prezzo: Number(r.prezzo) });
+      else { const p = dati.R.find((x) => x.id === r.id); if (p && (p.voce !== r.voce || Number(p.quantita) !== Number(r.quantita) || Number(p.prezzo) !== Number(r.prezzo)))
+        await db.from('righe_fattura').update({ voce: String(r.voce).trim(), quantita: Number(r.quantita), prezzo: Number(r.prezzo) }).eq('id', r.id); }
     }
-  }).then((ok) => ok && onFatto(stato === 'Inviata' ? 'Fattura inviata a Fatture in Cloud, che la manda allo SdI. Resta registrata qui con cliente, bolle e incasso.' : 'Fattura salvata come bozza.'));
-  const cella = (r: any, k: string, w: number, l: string, type = 'number') => <input className="input" type={type} aria-label={l} style={{ width: w, minHeight: 34, padding: '4px 8px' }} value={r[k]} onChange={(e) => cambia(r, k, e.target.value)} />;
-  return <div className="glass card stack">
-    <div className="row between"><h3 style={{ fontSize: 20 }}>{fattura ? 'Fattura da controllare' : 'Nuova fattura'}</h3><span className="lbl">Numero e data li assegna Fatture in Cloud</span></div>
-    {fattura?.problema && <div className="warn">{fattura.problema}</div>}
-    <div className="kv">
-      <div><div className="lbl">Cliente</div>{fattura ? <b>{c?.nome}</b> : <select className="input" aria-label="Cliente" value={cliente} onChange={(e) => { setCliente(e.target.value); setRighe(null); }}><option value="">Scegli</option>{clienti?.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select>}</div>
-      <div><div className="lbl">Partita IVA</div><b>{c?.piva ?? '[dal cliente]'}</b></div>
-      <div><div className="lbl">Pagamento</div><b>{c?.fatturazione ?? '[dal contratto]'}</b></div>
+  }).then((x) => { if (x) { setRighe(null); setMsg('Righe salvate: totali e IVA ricalcolati. La fattura torna in bozza: riguardala e premi «Pronta».'); } });
+  const passa = (stato: string) => az.esegui(() => db.from('fatture').update({ stato }).eq('id', f.id));
+  const ricontrolla = () => az.prendi(() => db.rpc<string | null>('ricontrolla_fattura', { p_fattura: f.id })).then((p) => p !== undefined && setMsg(p ? 'Ancora da controllare: ' + p : 'Tutto in regola: la fattura è pronta.'));
+  const invia = () => az.esegui(() => db.fn('fatture-in-cloud', { fattura_id: f.id })).then((x) => x && onChiudi('Fattura inviata a Fatture in Cloud, che la manda allo SdI. L’esito arriva da solo.'));
+  const conferma = () => az.esegui(() => motivo!.cosa === 'annulla' ? db.rpc('annulla_fattura', { p_fattura: f.id, p_motivo: motivo!.testo }) : db.rpc('nota_di_credito', { p_fattura: f.id, p_motivo: motivo!.testo }))
+    .then((x) => x && onChiudi(motivo!.cosa === 'annulla' ? 'Fattura annullata: le sue bolle tornano da fatturare.' : 'Nota di credito creata in bozza con le stesse righe: correggila se serve, poi «Pronta» e «Invia». Quando lo SdI la prende, la fattura risulta stornata e le bolle tornano da fatturare.'));
+  const cella = (r: any, k: string, w: number, l: string, type = 'number') => aperta
+    ? <input className="input" type={type} aria-label={l} style={{ width: w, minHeight: 34, padding: '4px 8px' }} value={r[k]} onChange={(e) => cambia(r, k, e.target.value)} />
+    : type === 'number' && k === 'prezzo' ? eur(Number(r[k])) : String(r[k]);
+  return (<>
+    <div className="row between"><Btn ghost onClick={() => onChiudi()}>Tutte le fatture</Btn>{pillStato(f)}</div>
+    <div className="glass card stack">
+      <div className="row between"><h3 style={{ fontSize: 22, letterSpacing: '-.02em' }}>{f.tipo === 'Nota di credito' ? 'Nota di credito · ' : ''}{f.clienti?.nome}</h3>
+        <span className="lbl">{f.numero ? 'N. ' + f.numero : 'Numero e data li assegna Fatture in Cloud'}{f.periodo ? ' · ' + nomeMese(f.periodo) : ''}</span></div>
+      {f.problema && <Warn>{f.problema}</Warn>}
+      {dati.manca.length > 0 && aperta && <Msg azione="Apri la scheda" onAzione={() => vai('clienti/' + f.cliente_id)}>Nella scheda del cliente manca: {dati.manca.join(', ')}. Senza, la fattura elettronica viene scartata.</Msg>}
+      {f.motivo && <div className="lbl">Motivo: {f.motivo}</div>}
+      <div className="tbox"><table className="t"><thead><tr><th>Voce</th><th>Quantità</th><th>Prezzo</th><th>Totale</th>{aperta && <th />}</tr></thead><tbody>
+        {R.map((r, i) => <tr key={r.id ?? 'n' + i}><td>{cella(r, 'voce', 260, 'Voce', 'text')}</td><td>{cella(r, 'quantita', 90, 'Quantità')}</td><td>{cella(r, 'prezzo', 100, 'Prezzo')}</td>
+          <td>{eur(Number(r.quantita || 0) * Number(r.prezzo || 0))}</td>{aperta && <td><Btn ghost sm onClick={() => setRighe(R.filter((x) => x !== r))}>Togli</Btn></td>}</tr>)}
+        {!R.length && <tr><td colSpan={5} className="lbl">Nessuna riga.</td></tr>}
+      </tbody></table></div>
+      {aperta && <div className="row"><Btn ghost sm onClick={() => setRighe([...R, { voce: '', quantita: 1, prezzo: 0 }])}>Aggiungi</Btn>{modificata && <><Btn sm onClick={salva} disabled={az.inCorso}>Salva</Btn><Btn ghost sm onClick={() => setRighe(null)}>Annulla</Btn></>}</div>}
+      <div className="kv">
+        <div><div className="lbl">Imponibile</div><b>{eur(Number(f.imponibile))}</b></div>
+        <div><div className="lbl">IVA</div><b>{eur(Number(f.iva))}{f.split_payment ? ' (split payment: la versa il cliente)' : ''}</b></div>
+        <div><div className="lbl">Totale da incassare</div><b>{eur(Number(f.totale))}</b></div>
+        {f.sdi_esito && <div><div className="lbl">SdI</div><b>{f.sdi_esito}</b></div>}
+      </div>
+      {modificata && <span className="lbl">I totali si aggiornano quando salvi: li calcola il programma dalle righe.</span>}
+      {msg && <Msg>{msg}</Msg>}
+      <Errore testo={az.errore} />
+      {motivo ? <div className="stack" style={{ gap: 8 }}>
+        <label className="field"><span className="lbl">{motivo.cosa === 'annulla' ? 'Perché la annulli' : 'Motivo della nota di credito'}</span><input className="input" value={motivo.testo} onChange={(e) => setMotivo({ ...motivo, testo: e.target.value })} /></label>
+        <div className="row"><Btn onClick={conferma} disabled={!motivo.testo.trim() || az.inCorso}>Conferma</Btn><Btn ghost onClick={() => setMotivo(null)}>Annulla</Btn></div></div>
+      : <div className="row">
+        {aperta && dati.bolle.length > 0 && <Btn ghost onClick={ricontrolla} disabled={az.inCorso || modificata}>Ricontrolla</Btn>}
+        {(f.stato === 'Bozza' || f.stato === 'Da controllare') && <Btn onClick={() => passa('Pronta')} disabled={az.inCorso || modificata || !!f.problema}>Pronta</Btn>}
+        {f.stato === 'Pronta' && <Btn onClick={invia} disabled={az.inCorso || modificata}>Invia</Btn>}
+        {f.stato === 'Inviata' && <Btn onClick={() => passa('Pagata')} disabled={az.inCorso}>Pagata</Btn>}
+        {f.stato === 'Inviata' && f.tipo === 'Fattura' && <Btn ghost onClick={() => setMotivo({ cosa: 'nota', testo: '' })}>Nota di credito</Btn>}
+        {aperta && <Btn ghost onClick={() => setMotivo({ cosa: 'annulla', testo: '' })}>Annulla fattura</Btn>}
+      </div>}
     </div>
-    {righe && <div className="tbox"><table className="t"><thead><tr><th>Voce</th><th>Quantità</th><th>Prezzo</th><th>Totale</th></tr></thead><tbody>
-      {righe.map((r, i) => <tr key={i}><td>{cella(r, 'voce', 180, 'Voce', 'text')}{r.voce === 'Consegne' && <span className="lbl"> dalle bolle di {Mese().toLowerCase()}</span>}</td><td>{cella(r, 'quantita', 90, 'Quantità')}</td><td>{cella(r, 'prezzo', 100, 'Prezzo')}</td><td>{eur(Number(r.quantita || 0) * Number(r.prezzo || 0))}</td></tr>)}
-    </tbody></table></div>}
-    {righe && <div><Btn ghost sm onClick={() => setRighe([...righe, { voce: '', quantita: 1, prezzo: 0 }])}>Aggiungi</Btn></div>}
-    <div className="row between"><span className="lbl">Righe già compilate dalle bolle e dalle tariffe del cliente: si possono cambiare o aggiungere.</span><b>Totale {eur(tot)} + IVA</b></div>
-    <Errore testo={az.errore} />
-    <div className="row"><Btn onClick={() => salva('Inviata')} disabled={!cliente || !righe?.length || az.inCorso}>Invia</Btn><Btn ghost onClick={() => salva('Bozza')} disabled={!cliente || !righe?.length || az.inCorso}>Bozza</Btn></div>
-  </div>;
+    {dati.bolle.length > 0 && <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Bolle in questa fattura · {dati.bolle.length}</div><div className="tbox"><table className="t"><thead><tr><th>Bolla</th><th>Consegnata</th><th>Città</th><th>Colli</th></tr></thead><tbody>
+      {dati.bolle.map((b) => <tr key={b.id} className="click" onClick={() => vai('bolle/' + b.id)}><td><b>{b.numero}</b></td><td>{fmtData(b.data_consegna)}</td><td>{b.citta ?? '—'}</td><td>{b.colli_previsti ?? '—'}</td></tr>)}
+    </tbody></table></div></div>}
+  </>);
 }

@@ -13,7 +13,7 @@ export function MailT() {
 }
 
 /** mail al cliente scritta dal programma, da controllare e inviare */
-export function ScriviCliente(p: { a: string | null | undefined; oggetto: string; testo: string; avviso: string; onChiudi: () => void }) {
+export function ScriviCliente(p: { a: string | null | undefined; oggetto: string; testo: string; avviso: string; onChiudi: () => void; onInviato?: () => PromiseLike<unknown>; azienda?: 'trasporti' | 'corporation' }) {
   const { db } = useApp();
   const az = useAzione();
   const [testo, setTesto] = useState(p.testo);
@@ -25,14 +25,14 @@ export function ScriviCliente(p: { a: string | null | undefined; oggetto: string
       <label className="lbl" htmlFor="mail-cliente">A {p.a || '[email del cliente mancante: aggiungila in Clienti]'} · {p.oggetto}</label>
       <textarea id="mail-cliente" value={testo} onChange={(e) => setTesto(e.target.value)} />
       <Errore testo={az.errore} />
-      <div className="row"><Btn disabled={!p.a || az.inCorso} onClick={() => az.esegui(() => db.fn('mail-outlook', { azione: 'scrivi', azienda: 'trasporti', a: p.a, oggetto: p.oggetto, testo })).then((ok) => ok && setFatto(true))}>Invia</Btn>
+      <div className="row"><Btn disabled={!p.a || az.inCorso} onClick={() => az.esegui(async () => { await db.fn('mail-outlook', { azione: 'scrivi', azienda: p.azienda ?? 'trasporti', a: p.a, oggetto: p.oggetto, testo }); if (p.onInviato) await p.onInviato(); }).then((ok) => ok && setFatto(true))}>Invia</Btn>
         <Btn ghost onClick={p.onChiudi}>Annulla</Btn></div>
     </div>
   </>);
 }
 
 // ------------------------------------------------------------------ Bolle
-const CAMPO: Record<string, string> = { 'Indirizzo': 'indirizzo', 'Fascia oraria': 'fascia', 'Fascia': 'fascia', 'Data': 'data_consegna', 'Data di consegna': 'data_consegna', 'Colli': 'colli_previsti', 'Destinatario': 'destinatario', 'Città': 'citta' };
+const CAMPO: Record<string, string> = { 'Peso': 'peso_kg', 'Indirizzo': 'indirizzo', 'Fascia oraria': 'fascia', 'Fascia': 'fascia', 'Data': 'data_consegna', 'Data di consegna': 'data_consegna', 'Colli': 'colli_previsti', 'Destinatario': 'destinatario', 'Città': 'citta' };
 const SEL_BOLLA = '*,clienti(nome,email),operatore:profili!bolle_operatore_id_fkey(nome)';
 
 export function Bolle({ scelta }: { scelta?: string }) {
@@ -47,7 +47,7 @@ export function Bolle({ scelta }: { scelta?: string }) {
     return { nuove, tutte: [...nuove, ...oggi] };
   }, []);
   const cur = dati ? (dati.tutte.find((b) => b.id === s.sel) ?? dati.tutte[0]) : null;
-  const { dati: valore } = useDati((d) => cur ? d.rpc<number>('valore_bolla', { p_bolla: cur.id }) : Promise.resolve(null), [cur?.id, cur?.stato]);
+  const { dati: prezzo } = useDati((d) => cur ? d.rpc<any[]>('righe_bolla', { p_bolla: cur.id }) : Promise.resolve(null), [cur?.id, cur?.stato]);
   if (!dati) return null;
   const cosa = (b: any) => `${b.tipo} ${b.colli_previsti ?? '?'} ${b.colli_previsti === 1 ? 'collo' : 'colli'}${b.citta ? ' · ' + b.citta : ''}`;
   const ok = cur?.stato === 'Confermata';
@@ -74,13 +74,20 @@ export function Bolle({ scelta }: { scelta?: string }) {
           <div><div className="lbl">Cliente</div><b>{cur.clienti?.nome}</b></div>
           <div><div className="lbl">Data</div><b>{giornoLungo(cur.data_consegna)}</b></div>
           <div><div className="lbl">Fascia</div><b>{cur.fascia ?? 'Da definire'}</b></div>
-          <div><div className="lbl">Colli</div><b>{cur.colli_previsti ?? '—'}</b></div>
+          <div><div className="lbl">Colli</div><b>{cur.colli_previsti ?? '—'}{cur.bancali ? ` · ${cur.bancali} bancali` : ''}</b></div>
+          <div><div className="lbl">Peso</div><b>{cur.peso_kg != null ? `${Number(cur.peso_kg).toLocaleString('it-IT')} kg` : '—'}</b></div>
+          {cur.contrassegno != null && <div><div className="lbl">Contrassegno</div><b>{eur(Number(cur.contrassegno))}</b></div>}
+          {cur.valore_merce != null && <div><div className="lbl">Valore della merce</div><b>{eur(Number(cur.valore_merce))}</b></div>}
           <div><div className="lbl">Accessori</div><b>{cur.accessori?.length ? cur.accessori.join(', ') : '—'}</b></div>
           {manca.length > 0 && !ok && <div className="bad"><div className="lbl">Manca</div><b className="miss">{manca.join(' e ')}</b></div>}
         </div>
         {manca.length > 0 && !ok && <Completa bolla={cur} />}
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}><div className="lbl">Tariffa applicata dal contratto</div>
-          <div>Base del cliente + accessori · totale <b>{valore === null ? '€ —' : eur(valore)}</b></div></div>
+        <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}><div className="lbl">Prezzo dalle tariffe del cliente</div>
+          {prezzo && prezzo.length > 0 ? <div className="stack" style={{ gap: 4, marginTop: 6 }}>
+            {prezzo.map((r: any) => <div key={r.voce} className="row between"><span>{r.voce}{Number(r.quantita) !== 1 ? ` × ${Number(r.quantita).toLocaleString('it-IT')}` : ''}</span>
+              {r.problema ? <span className="miss">{r.problema}</span> : <b>{eur(Number(r.totale))}</b>}</div>)}
+            <div className="row between" style={{ borderTop: '1px solid var(--line)', paddingTop: 4 }}><span>Totale</span><b>{eur(prezzo.reduce((a: number, r: any) => a + Number(r.totale), 0))}</b></div>
+          </div> : <div>€ —</div>}</div>
         {(s.msg === 'ok' || ok) && <Msg azione="Vai al Traffico" onAzione={() => vai('traffico')}>Bolla confermata: è nei giri di domani e gli accessori sono già sull’app dell’autista. Al cliente parte la mail di conferma.</Msg>}
         {s.msg === 'chiesto' && <ScriviCliente a={cur.clienti?.email} oggetto={`Spedizione del ${giornoLungo(cur.data_consegna)}`} avviso="Mail al cliente pronta, con la domanda sul dato mancante."
           testo={`Buongiorno,\nper organizzare la spedizione ci manca: ${manca.join(', ').toLowerCase()}. Ce lo potete indicare?\nGrazie`} onChiudi={() => set({ msg: '' })} />}
@@ -101,7 +108,7 @@ function NonConsegnate() {
   const { dati } = useDati((d) => d.from<any>('bolle').select('id,numero,citta,colli_previsti,data_consegna,clienti(nome)').eq('stato', 'Non consegnata').order('data_consegna'), []);
   if (!dati || (!dati.length && !fatto)) return null;
   const rimetti = (b: any) => az.esegui(() => db.rpc('rimetti_in_giro', { p_bolla: b.id, p_data: data[b.id] }))
-    .then((x) => x !== undefined && setFatto(`${b.clienti?.nome ?? 'Spedizione'}: rimessa nei giri di ${giornoLungo(data[b.id]).toLowerCase()}.`));
+    .then((x) => x && setFatto(`${b.clienti?.nome ?? 'Spedizione'}: rimessa nei giri di ${giornoLungo(data[b.id]).toLowerCase()}.`));
   return <div className="glass card stack">
     <div className="row between"><b>Non consegnate</b>{dati.length > 0 && <span className="lbl">{dati.length} {dati.length === 1 ? 'spedizione' : 'spedizioni'}</span>}</div>
     {fatto && <Msg>{fatto}</Msg>}
@@ -122,7 +129,7 @@ function Completa({ bolla }: { bolla: any }) {
   const [v, setV] = useState<Record<string, string>>({});
   const salva = () => {
     const agg: Record<string, any> = {}; const note: string[] = [];
-    for (const [k, x] of Object.entries(v)) { if (!x.trim()) continue; const c = CAMPO[k]; if (c) agg[c] = c === 'colli_previsti' ? Number(x) : x.trim(); else note.push(`${k}: ${x.trim()}`); }
+    for (const [k, x] of Object.entries(v)) { if (!x.trim()) continue; const c = CAMPO[k]; if (c) agg[c] = c === 'colli_previsti' || c === 'peso_kg' ? Number(x.replace(',', '.')) : x.trim(); else note.push(`${k}: ${x.trim()}`); }
     agg.dati_mancanti = bolla.dati_mancanti.filter((k: string) => !v[k]?.trim());
     if (note.length) agg.note = [bolla.note, ...note].filter(Boolean).join('\n');
     return az.esegui(() => db.from('bolle').update(agg).eq('id', bolla.id)).then((ok) => ok && setV({}));
@@ -131,7 +138,7 @@ function Completa({ bolla }: { bolla: any }) {
     <div className="stack" style={{ gap: 8 }}>
       {bolla.dati_mancanti.map((k: string) => (
         <label key={k} className="field"><span className="lbl">{k}</span>
-          <input className="input" type={CAMPO[k] === 'data_consegna' ? 'date' : CAMPO[k] === 'colli_previsti' ? 'number' : 'text'} value={v[k] ?? ''} onChange={(e) => setV({ ...v, [k]: e.target.value })} /></label>
+          <input className="input" type={CAMPO[k] === 'data_consegna' ? 'date' : CAMPO[k] === 'colli_previsti' || CAMPO[k] === 'peso_kg' ? 'number' : 'text'} value={v[k] ?? ''} onChange={(e) => setV({ ...v, [k]: e.target.value })} /></label>
       ))}
       <Errore testo={az.errore} />
       <div className="row"><Btn ghost sm disabled={!Object.values(v).some((x) => x.trim()) || az.inCorso} onClick={salva}>Salva</Btn></div>
@@ -289,7 +296,7 @@ function GiroPagina({ giro: g, giri, libere }: { giro: any; giri: any[]; libere:
                   {uff.dopo === 'Nuova data' && <input className="input" type="date" aria-label="Giorno della nuova consegna" min={domaniISO()} value={uff.data} onChange={(e) => cambia({ data: e.target.value })} />}</div>}
                 <input className="input" aria-label="Motivo" placeholder="Motivo (finisce nello Storico)" value={uff.motivo} onChange={(e) => cambia({ motivo: e.target.value })} />
                 <div className="row"><Btn sm disabled={uff.ok === null || !uff.motivo.trim() || (uff.ok === false && uff.dopo === 'Nuova data' && !uff.data) || az.inCorso}
-                  onClick={() => fai('chiudi_ufficio', { p_fermata: f.id, p_consegnata: uff.ok, p_motivo: uff.motivo.trim(), p_dopo: uff.ok ? null : uff.dopo, p_nuova_data: uff.ok || uff.dopo !== 'Nuova data' ? null : uff.data }).then((x) => x !== undefined && setUff(null))}>Conferma</Btn>
+                  onClick={() => fai('chiudi_ufficio', { p_fermata: f.id, p_consegnata: uff.ok, p_motivo: uff.motivo.trim(), p_dopo: uff.ok ? null : uff.dopo, p_nuova_data: uff.ok || uff.dopo !== 'Nuova data' ? null : uff.data }).then((x) => x && setUff(null))}>Conferma</Btn>
                   <Btn ghost sm onClick={() => setUff(null)}>Annulla</Btn></div>
               </div>}
               {libera && <div className="row" style={{ gap: 6, marginTop: 10 }}>
@@ -337,15 +344,15 @@ export function Giacenze() {
   const costoGiacenza = (g: any) => { const t = tar(g.cliente_id, 'Giacenza'); return !t ? 0 : t.unita === 'giorno' ? t.prezzo * Math.max(1, g.giorni) : t.prezzo; };
   const daPren = G.filter((g) => !g.riconsegna_il && (g.motivo !== 'Merce rifiutata' || g.richiesta)).length;
   const fmtT = (t: any) => t ? `${eur(t.prezzo)} ${t.unita === 'giorno' ? 'al giorno' : t.unita === 'spedizione' ? '' : 'a ' + t.unita}`.trim() : '[tariffa da inserire in Clienti]';
-  const prenota = () => az.esegui(() => db.rpc('prenota_riconsegna', { p_giacenza: cur.id, p_data: s.data, p_ora: s.ora })).then((ok) => ok !== undefined && set({ msg: 'prenotata', prenota: false }));
-  const reso = () => az.esegui(() => db.rpc('reso_al_mittente', { p_giacenza: cur.id })).then((ok) => ok !== undefined && set({ msg: 'reso', reso: false }));
+  const prenota = () => az.esegui(() => db.rpc('prenota_riconsegna', { p_giacenza: cur.id, p_data: s.data, p_ora: s.ora })).then((ok) => ok && set({ msg: 'prenotata', prenota: false }));
+  const reso = () => az.esegui(() => db.rpc('reso_al_mittente', { p_giacenza: cur.id })).then((ok) => ok && set({ msg: 'reso', reso: false }));
   // un clic: la mail parte e la giacenza resta segnata «chiesta», il tasto non si ripete
   const chiedi = () => az.esegui(async () => {
     if (!cur.clienti?.email) throw new Error('Manca l’email del cliente: aggiungila in Clienti');
     await db.fn('mail-outlook', { azione: 'scrivi', azienda: 'trasporti', a: cur.clienti.email, oggetto: `Spedizione ${cur.numero ?? ''} in giacenza`,
       testo: `Buongiorno,\nla spedizione ${cur.numero ?? ''} per ${cur.destinatario ?? ''} non è stata consegnata (${cur.motivo.toLowerCase()}) ed è in giacenza nel nostro magazzino dal ${giornoCorto(cur.dal)}.\nLa giacenza costa ${fmtT(tar(cur.cliente_id, 'Giacenza'))}. Ci indicate in che giorno e a che ora riconsegnare?\nGrazie` });
     return db.rpc('chiesta_al_cliente', { p_giacenza: cur.id });
-  }).then((ok) => ok !== undefined && set({ msg: 'chiesto' }));
+  }).then((ok) => ok && set({ msg: 'chiesto' }));
   return (<>
     <div className="grid g4">
       <div className="glass card"><div className="lbl">Spedizioni in giacenza</div><div className="big">{G.length}</div><div className="lbl">merce tornata a Lacchiarella</div></div>

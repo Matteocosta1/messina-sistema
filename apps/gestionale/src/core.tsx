@@ -35,7 +35,14 @@ export function useAzione() {
     catch (e) { setErrore(String((e as Error).message ?? e)); return false; }
     finally { setInCorso(false); }
   }, [aggiorna]);
-  return { esegui, errore, inCorso, pulisci: () => setErrore(null) };
+  /** come esegui, ma restituisce il risultato (undefined se l'azione è fallita) */
+  const prendi = useCallback(async <T,>(fn: () => PromiseLike<T>): Promise<T | undefined> => {
+    setInCorso(true); setErrore(null);
+    try { const r = await fn(); aggiorna(); return (r === undefined ? null : r) as T; }
+    catch (e) { setErrore(String((e as Error).message ?? e)); return undefined; }
+    finally { setInCorso(false); }
+  }, [aggiorna]);
+  return { esegui, prendi, errore, inCorso, pulisci: () => setErrore(null) };
 }
 
 /** stato della pagina che sopravvive al ricaricamento dei dati (come S.t del mockup) */
@@ -57,6 +64,7 @@ export const T_NAV: Voce[] = [
   { id: 'magazzino', nome: 'Magazzino', ruoli: ['magazzino', 'traffico', 'bolle'] },
   { id: 'giacenze', nome: 'Giacenze', ruoli: ['bolle', 'traffico'] },
   { id: 'clienti', nome: 'Clienti', ruoli: ['commerciale', 'amministrazione', 'bolle'] },
+  { id: 'preventivi', nome: 'Preventivi', ruoli: ['commerciale'] },
   { id: 'fatture', nome: 'Fatturazione', ruoli: ['amministrazione'] },
   { id: 'mezzi', nome: 'Mezzi', ruoli: ['traffico', 'amministrazione'] },
   { id: 'autisti', nome: 'Autisti', ruoli: ['traffico', 'amministrazione'] },
@@ -72,6 +80,7 @@ export const C_NAV: Voce[] = [
   { id: 'lotti', nome: 'Lotti', ruoli: ['vendite', 'amministrazione'] },
   { id: 'inv', nome: 'Inventario' },
   { id: 'ordini', nome: 'Ordini', ruoli: ['vendite', 'magazzino'] },
+  { id: 'richieste', nome: 'Richieste', ruoli: ['vendite'] },
   { id: 'stage', nome: 'Stage Computer', ruoli: ['vendite', 'stage'] },
   { id: 'stageTel', nome: 'Stage Cellulari', ruoli: ['vendite', 'stage'] },
   { id: 'ricambi', nome: 'Ricambi', ruoli: ['vendite', 'stage', 'magazzino', 'amministrazione'] },

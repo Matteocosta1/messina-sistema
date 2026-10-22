@@ -5,6 +5,7 @@ import { Home, Anomalie } from './home';
 import { MailT, Bolle, Traffico, Giacenze } from './bolle';
 import { Magazzino } from './magazzino';
 import { Clienti, Fatturazione } from './clienti';
+import { Preventivi } from './preventivi';
 import { Mezzi, Autisti, Telepass } from './mezzi';
 import { Presenze } from './presenze';
 import { Ricerca } from './ricerca';
@@ -23,7 +24,7 @@ export function Trasporti() {
   const pagine: Record<string, React.ReactNode> = {
     home: <Home />, anomalie: <Anomalie sezione={sotto} titolo={setTitolo} />, mail: <MailT />, bolle: <Bolle scelta={sotto} />,
     traffico: <Traffico scelto={sotto} />, magazzino: <Magazzino tab={sotto} />, giacenze: <Giacenze />, clienti: <Clienti scelto={sotto} titolo={setTitolo} />,
-    fatture: <Fatturazione />, mezzi: <Mezzi />, autisti: <Autisti />, telepass: <Telepass />, satellitare: <Satellitare />, presenze: <Presenze tab={sotto} />, telecamere: <Telecamere />,
+    fatture: <Fatturazione />, preventivi: <Preventivi scelto={sotto} />, mezzi: <Mezzi />, autisti: <Autisti />, telepass: <Telepass />, satellitare: <Satellitare />, presenze: <Presenze tab={sotto} />, telecamere: <Telecamere />,
   };
   return (
     <Shell voci={voci} titolo={cerca ? 'Cerca' : (id === 'anomalie' || id === 'clienti') && sotto && titolo ? titolo : nome} cerca={cerca} onCerca={setCerca}>

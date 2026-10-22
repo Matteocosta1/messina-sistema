@@ -9,8 +9,13 @@ const sezioniPer = (ruolo: string) => SEZ.filter((x) => x !== 'Satellitare' || r
 const PILL: Record<string, 'red' | undefined> = { Magazzino: 'red', Missioni: 'red', Bolle: 'red', Presenze: 'red', Fatturazione: 'red', Telepass: 'red', Satellitare: 'red' };
 
 export function Home() {
-  const { vai } = useApp();
+  const { vai, io } = useApp();
   const oggi = oggiISO();
+  const capo = io.ruolo === 'direzione';
+  const { dati: dir } = useDati(async (db) => capo ? {
+    tariffe: await db.from<any>('tariffe').select('id,cliente_id').eq('stato', 'Da approvare'),
+    preventivi: await db.from<any>('preventivi').select('id').eq('stato', 'Da approvare'),
+  } : null, [capo]);
   const { dati } = useDati(async (db) => {
     const [bolleOggi, nuove, inc, pagate, fermate, an, giac, mezzi, res, ferme] = await Promise.all([
       db.from<any>('bolle').select('id,stato,tipo').eq('data_consegna', oggi).neq('tipo', 'Magazzino'),
@@ -45,6 +50,8 @@ export function Home() {
     if (l.length === 1) voci.push([l[0].cosa, l[0].dove, s, PILL[s]]);
     else if (l.length > 1) voci.push([`${l.length} anomalie in ${s}`, 'anomalie/' + s, s, PILL[s]]);
   }
+  if (dir?.tariffe.length) voci.push([dir.tariffe.length === 1 ? '1 tariffa da approvare' : `${dir.tariffe.length} tariffe da approvare`, dir.tariffe.length === 1 ? 'clienti/' + dir.tariffe[0].cliente_id : 'clienti', 'Clienti', 'red']);
+  if (dir?.preventivi.length) voci.push([dir.preventivi.length === 1 ? '1 preventivo da approvare' : `${dir.preventivi.length} preventivi da approvare`, 'preventivi', 'Preventivi', 'red']);
   if (daRimettere) voci.push([daRimettere === 1 ? '1 spedizione non consegnata da rimettere in giro' : `${daRimettere} spedizioni non consegnate da rimettere in giro`, 'bolle', 'Bolle', undefined]);
   if (daPren) voci.push([`${daPren === 1 ? '1 giacenza' : daPren + ' giacenze'} con riconsegna da prenotare`, 'giacenze', 'Giacenze', 'red']);
   scad.forEach((x) => voci.push([x, 'mezzi', 'Mezzi', undefined]));

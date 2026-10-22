@@ -96,7 +96,7 @@ function App() {
       <div className="row" style={{ gap: 4 }}>
         <button type="button" className="tab" onClick={() => { setBrand('Tutti'); vai(''); }}>Portatili</button>
         <button type="button" className="tab" onClick={() => { setBrand('Apple'); vai(''); }}>Apple</button>
-        <button type="button" className="tab" onClick={() => vai('aziende')}>Per aziende</button>
+        <button type="button" className="tab" onClick={() => vai('aziende')}>Aziende</button>
         <button type="button" className="tab" onClick={() => vai('ricambi')}>Ricambi</button>
       </div>
       <Btn sm onClick={() => vai('carrello')}>{'Carrello · ' + carrello.length}</Btn>
@@ -109,7 +109,7 @@ function App() {
   else if (sez === 'carrello') inner = <Carrello carrello={carrello} onCarrello={cambiaCarrello} vai={vai} />;
   else if (sez === 'grazie') inner = <Grazie onSvuota={() => cambiaCarrello([])} vai={vai} />;
   else if (sez === 'annullato') inner = <Pagina titolo="Pagamento annullato"><p className="muted">Nessun addebito. Il carrello è ancora qui.</p><Btn sm onClick={() => vai('carrello')}>Carrello</Btn></Pagina>;
-  else if (sez === 'aziende') inner = <Pagina titolo="Per aziende"><p className="muted">Lotti di portatili usati e testati, fattura e consegna in tutta Italia. Scrivici e ti prepariamo un’offerta.</p><a className="btn" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }} href="mailto:vendite@[dominio]">Scrivi</a></Pagina>;
+  else if (sez === 'aziende') inner = <Aziende modelli={[...new Set((prodotti ?? []).map((x) => `${x.marca} ${x.modello}`))]} />;
   else if (sez === 'privacy' || sez === 'termini' || sez === 'resi') inner = <Pagina titolo={{ privacy: 'Privacy', termini: 'Termini', resi: 'Resi' }[sez]}><p className="muted">[Testo da inserire: lo prepara il consulente legale prima dell’apertura del negozio.]</p></Pagina>;
   else inner = <Vetrina prodotti={prodotti} errore={errore} brand={brand} onBrand={setBrand} vai={vai} />;
 
@@ -226,6 +226,41 @@ function SchedaTecnica({ r, g }: { r: Riga; g: Condizione }) {
 }
 
 /** ricambi originali smontati dai computer che non si vendono interi */
+// richiesta di un'azienda: arriva in Richieste della Corporation, assegnata a chi delle Vendite ne ha meno
+function Aziende({ modelli }: { modelli: string[] }) {
+  const [v, setV] = useState({ azienda: '', nome: '', email: '', telefono: '', modello: '', altro: '', grado: 'Indifferente', quantita: '5', note: '', privacy: false, sito_web: '' });
+  const [stato, setStato] = useState<'' | 'invio' | 'ok'>('');
+  const [errore, setErrore] = useState<string | null>(null);
+  const modello = v.modello === 'Altro' ? v.altro.trim() : v.modello;
+  const manda = async () => {
+    setStato('invio'); setErrore(null);
+    try {
+      await db.fn('richiesta-sito', { sito: 'corporation', tipo: 'aziende', nome: v.nome, azienda: v.azienda, email: v.email, telefono: v.telefono, privacy: v.privacy, sito_web: v.sito_web,
+        note: v.note, dettagli: { modello, grado: v.grado === 'Indifferente' ? '' : v.grado, quantita: Number(v.quantita) } });
+      setStato('ok');
+    } catch (e) { setErrore((e as Error).message); setStato(''); }
+  };
+  const campo = (k: 'azienda' | 'nome' | 'email' | 'telefono', l: string, type = 'text', auto = '') => <label className="field"><span className="lbl">{l}</span>
+    <input className="input" type={type} autoComplete={auto || undefined} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} /></label>;
+  if (stato === 'ok') return <Pagina titolo="Aziende"><Msg>Richiesta ricevuta: entro poche ore vi mandiamo l’offerta per email.</Msg></Pagina>;
+  const pronta = v.azienda.trim() && v.nome.trim() && /@/.test(v.email) && modello && Number(v.quantita) >= 1 && v.privacy;
+  return <Pagina titolo="Aziende">
+    <p className="muted" style={{ margin: 0 }}>Più portatili usati e testati per la vostra azienda, con fattura e consegna in tutta Italia. Diteci modello e quantità: vi mandiamo l’offerta.</p>
+    <div className="grid g2">{campo('azienda', 'Azienda', 'text', 'organization')}{campo('nome', 'Nome e cognome', 'text', 'name')}{campo('email', 'Email', 'email', 'email')}{campo('telefono', 'Telefono', 'tel', 'tel')}
+      <label className="field"><span className="lbl">Modello</span><select className="input" value={v.modello} onChange={(e) => setV({ ...v, modello: e.target.value })}>
+        <option value="">Scegli</option>{modelli.map((m) => <option key={m}>{m}</option>)}<option>Altro</option></select></label>
+      {v.modello === 'Altro' && <label className="field"><span className="lbl">Quale</span><input className="input" value={v.altro} onChange={(e) => setV({ ...v, altro: e.target.value })} /></label>}
+      <label className="field"><span className="lbl">Grado</span><select className="input" value={v.grado} onChange={(e) => setV({ ...v, grado: e.target.value })}>{['Indifferente', 'A', 'B', 'C', 'D'].map((g) => <option key={g}>{g}</option>)}</select></label>
+      <label className="field"><span className="lbl">Quantità</span><input className="input" type="number" min={1} max={5000} value={v.quantita} onChange={(e) => setV({ ...v, quantita: e.target.value })} /></label></div>
+    <label className="field"><span className="lbl">Note</span><textarea value={v.note} onChange={(e) => setV({ ...v, note: e.target.value })} /></label>
+    <input aria-hidden="true" tabIndex={-1} autoComplete="off" value={v.sito_web} onChange={(e) => setV({ ...v, sito_web: e.target.value })} style={{ position: 'absolute', left: -9999, width: 1, height: 1 }} />
+    <label className="row" style={{ gap: 8, alignItems: 'flex-start' }}><input type="checkbox" checked={v.privacy} onChange={(e) => setV({ ...v, privacy: e.target.checked })} style={{ marginTop: 3 }} />
+      <span className="lbl">Ho letto l’<a href="#/privacy">informativa privacy</a>.</span></label>
+    {errore && <div className="warn">{errore}</div>}
+    <div><Btn onClick={manda} disabled={!pronta || stato === 'invio'}>{stato === 'invio' ? 'Un momento…' : 'Invia'}</Btn></div>
+  </Pagina>;
+}
+
 function Ricambi() {
   const [R, setR] = useState<Ricambio[] | null>(null);
   const [errore, setErrore] = useState<string | null>(null);

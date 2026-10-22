@@ -9,3 +9,4 @@ import './prova-consegne';
 import './prova-portale';
 import './prova-negozio';
 import './prova-corporation';
+import './prova-fatture';
