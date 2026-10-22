@@ -1,13 +1,14 @@
-// App Messina: una sola web app installabile sugli iPhone aziendali.
-// Cosa si vede lo decide chi entra: autista → Consegne, magazzino → Magazzino,
-// Corporation → Entrate (App Corporation), ogni dipendente → Badge. Più il Lettore all'ingresso (…/#lettore).
+// App Messina: lo stesso codice fa le quattro app del mockup approvato, ognuna con il suo ingresso:
+// App autisti, App magazzino, App presenze (badge) e App Corporation (Entrate). Più il Lettore all'ingresso (…/#lettore).
+// Quale app è lo dice la configurazione (window.MESSINA.parte) oppure l'indirizzo (?parte=autisti, …/autisti/).
+// Senza parte resta l'app unica di prima, con la scelta in basso (vedi STATO: «Da decidere»).
 import '@messina/dati/prova-tutto';   // stessi dati di prova in tutti i programmi
 import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
 import './app.css';
-import { collega, onCambioProva, type Config, type Fattore } from '@messina/dati';
+import { collega, entraInProva, onCambioProva, type Config, type Fattore } from '@messina/dati';
 import { motoreDiProva } from '@messina/dati/prova';
 import { Pill } from '@messina/ui';
 import { AppCtx, type Profilo, type Dipendente, ErroreApp } from './core';
@@ -31,6 +32,16 @@ function modiPer(io: Profilo, dip: Dipendente | null): Modo[] {
   return m;
 }
 const leggiModo = (): Modo | null => { try { return localStorage.getItem('messina.modo') as Modo | null; } catch { return null; } };
+/** le quattro app del mockup e la parte dell'app che aprono */
+const PARTI: Record<string, Modo> = { autisti: 'consegne', magazzino: 'magazzino', presenze: 'badge', corporation: 'entrate' };
+const NOMI_APP: Record<Modo, string> = { consegne: 'App autisti', magazzino: 'App magazzino', badge: 'App presenze', entrate: 'App Corporation' };
+function parteFissa(): Modo | null {
+  const da = (x: string | null | undefined) => (x && PARTI[x.toLowerCase()]) || null;
+  let q: string | null = null; try { q = new URLSearchParams(location.search).get('parte'); } catch { /* */ }
+  const cartella = location.pathname.split('/').filter(Boolean).find((x) => PARTI[x.toLowerCase()]);
+  return da(window.MESSINA?.parte) ?? da(q) ?? da(cartella);
+}
+const FISSA = parteFissa();
 
 function App() {
   const [io, setIo] = useState<Profilo | null | undefined>(undefined);
@@ -41,6 +52,7 @@ function App() {
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => { const f = () => setOnline(navigator.onLine); window.addEventListener('online', f); window.addEventListener('offline', f); return () => { window.removeEventListener('online', f); window.removeEventListener('offline', f); }; }, []);
   const carica = useCallback(async () => {
+    await entraInProva(db, window.MESSINA);   // solo in Prova, se la pagina indica l'utente di esempio
     const s = db.auth.sessione();
     if (!s) return setIo(null);
     try {
@@ -63,7 +75,19 @@ function App() {
   if (io === undefined) return null;
   if (!io) return <div className="appvera">{offline}<Login onEntra={carica} onLettore={() => { const l = { nome: 'Ingresso', chiave: 'prova' }; salvaLettore(l); setLettore(l); }} /></div>;
   const modi = modiPer(io, dip);
-  const cur = modo && modi.includes(modo) ? modo : modi[0];
+  if (FISSA && !modi.includes(FISSA)) return <div className="appvera"><div className="pscr"><div className="ptitle">{NOMI_APP[FISSA]}</div>
+    <div className="lbl">Questa app non è per il tuo profilo.</div>
+    <button type="button" className="bigbtn ghost" onClick={esci}>Esci</button></div></div>;
+  const cur = FISSA ?? (modo && modi.includes(modo) ? modo : modi[0]);
+  if (FISSA) return (
+    <AppCtx.Provider value={{ db, io, dip, aggiorna, giro }}>
+      <ScanProvider prova={db.modo === 'prova'}>
+        <div className="appvera">{offline}
+          {cur === 'consegne' ? <Autisti /> : cur === 'magazzino' ? <Magazzino /> : cur === 'entrate' ? <Carico /> : <Presenze />}
+        </div>
+      </ScanProvider>
+    </AppCtx.Provider>
+  );
   if (!cur) return <div className="appvera"><div className="pscr"><div className="ptitle">Messina</div>
     <div className="lbl">Questa app è per autisti, magazzino e Corporation. Il tuo accesso è sul gestionale.</div>
     <button type="button" className="bigbtn ghost" onClick={esci}>Esci</button></div></div>;

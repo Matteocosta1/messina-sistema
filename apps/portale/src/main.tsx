@@ -6,7 +6,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
-import { collega, onCambioProva, type Config, type Db } from '@messina/dati';
+import { collega, entraInProva, onCambioProva, type Config, type Db } from '@messina/dati';
 import { motoreDiProva, ELENCO_PROVA } from '@messina/dati/prova';
 import { Badge, Btn, Chip, Msg, Pill, Search, Stat, Card } from '@messina/ui';
 
@@ -89,6 +89,7 @@ function Portale() {
   const [giro, setGiro] = useState(0);
   const [cerca, setCerca] = useState('');
   const carica = useCallback(async () => {
+    await entraInProva(db, window.MESSINA);   // solo in Prova, se la pagina indica l'utente di esempio
     const s = db.auth.sessione();
     if (!s) return setIo(null);
     try {

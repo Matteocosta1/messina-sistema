@@ -10,7 +10,7 @@ const id = (p: string, n: number) => `${p}-${String(n).padStart(4, '0')}`;
 export const UTENTI_PROVA: Record<string, string> = {
   'direzione@prova.messina': 'u-dir', 'amministrazione@prova.messina': 'u-amm', 'bolle@prova.messina': 'u-bol',
   'traffico@prova.messina': 'u-tra', 'magazzino@prova.messina': 'u-mag', 'autista@prova.messina': 'u-aut',
-  'commerciale@prova.messina': 'u-com', 'studio@prova.messina': 'u-cms', 'vendite@prova.messina': 'u-ven', 'stage@prova.messina': 'u-sta', 'snam@prova.messina': 'u-snam', 'econocom@prova.messina': 'u-eco',
+  'commerciale@prova.messina': 'u-com', 'studio@prova.messina': 'u-cms', 'vendite@prova.messina': 'u-ven', 'stage@prova.messina': 'u-sta', 'direzione.corporation@prova.messina': 'u-dirc', 'christian@prova.messina': 'u-chr', 'snam@prova.messina': 'u-snam', 'econocom@prova.messina': 'u-eco',
 };
 export const ELENCO_PROVA: { email: string; nome: string; dove: string }[] = [
   { email: 'direzione@prova.messina', nome: 'Direzione', dove: 'Autotrasporti' },
@@ -21,6 +21,7 @@ export const ELENCO_PROVA: { email: string; nome: string; dove: string }[] = [
   { email: 'studio@prova.messina', nome: 'Commercialista', dove: 'Studio' },
   { email: 'magazzino@prova.messina', nome: 'Magazziniere 1', dove: 'Magazzino' },
   { email: 'autista@prova.messina', nome: 'Autista 1', dove: 'Autisti' },
+  { email: 'direzione.corporation@prova.messina', nome: 'Direzione', dove: 'Corporation' },
   { email: 'vendite@prova.messina', nome: 'Vendite', dove: 'Corporation' },
   { email: 'stage@prova.messina', nome: 'Manuel', dove: 'Stage' },
   { email: 'snam@prova.messina', nome: 'Snam', dove: 'Cliente' },
@@ -33,11 +34,13 @@ function dati(): Tabelle {
     { id: 'u-dir', azienda: 'trasporti', ruolo: 'direzione', nome: 'Direzione', cliente_id: null },
     { id: 'u-amm', azienda: 'trasporti', ruolo: 'amministrazione', nome: 'Angela', cliente_id: null },
     { id: 'u-bol', azienda: 'trasporti', ruolo: 'bolle', nome: 'Gabriele', cliente_id: null },
+    { id: 'u-chr', azienda: 'trasporti', ruolo: 'bolle', nome: 'Christian', cliente_id: null },   // App presenze della prova: il badge di Christian
     { id: 'u-tra', azienda: 'trasporti', ruolo: 'traffico', nome: 'Mauro', cliente_id: null },
     { id: 'u-com', azienda: 'trasporti', ruolo: 'commerciale', nome: 'Gianluca', cliente_id: null },
     { id: 'u-cms', azienda: 'trasporti', ruolo: 'commercialista', nome: 'Commercialista', cliente_id: null },
     { id: 'u-mag', azienda: 'trasporti', ruolo: 'magazzino', nome: 'Magazziniere 1', cliente_id: null },
     { id: 'u-aut', azienda: 'trasporti', ruolo: 'autista', nome: 'Autista 1', cliente_id: null },
+    { id: 'u-dirc', azienda: 'corporation', ruolo: 'direzione', nome: 'Direzione', cliente_id: null },   // solo in prova: la Direzione già nella Corporation
     { id: 'u-ven', azienda: 'corporation', ruolo: 'vendite', nome: 'Vendite', cliente_id: null },
     { id: 'u-sta', azienda: 'corporation', ruolo: 'stage', nome: 'Manuel', cliente_id: null },
     { id: 'u-snam', azienda: 'trasporti', ruolo: 'cliente', nome: 'Referente Snam', cliente_id: 'c-snam' },
@@ -66,7 +69,7 @@ function dati(): Tabelle {
     { id: 'd-a2', azienda: 'trasporti', nome: 'Autista 2', mansione: 'Autista', reparto: 'Strada', ore_settimana: 39, inizio: '06:00', fine: '15:00', patente_scadenza: g(700), cqc_scadenza: g(25), profilo_id: null, contratto: 'CCNL Logistica' },
     { id: 'd-a3', azienda: 'trasporti', nome: 'Autista 3', mansione: 'Autista', reparto: 'Strada', ore_settimana: 39, inizio: '05:45', fine: '14:45', patente_scadenza: g(500), cqc_scadenza: g(600), profilo_id: null, contratto: 'CCNL Logistica' },
     { id: 'd-a4', azienda: 'trasporti', nome: 'Autista 4', mansione: 'Autista', reparto: 'Strada', ore_settimana: 39, inizio: '06:00', fine: '15:00', patente_scadenza: g(300), cqc_scadenza: g(300), profilo_id: null, contratto: 'CCNL Logistica' },
-    { id: 'd-ch', azienda: 'trasporti', nome: 'Christian', mansione: 'Ufficio bolle', reparto: 'Ufficio bolle', ore_settimana: 40, inizio: '08:00', fine: '17:00', profilo_id: null, contratto: 'CCNL Commercio' },
+    { id: 'd-ch', azienda: 'trasporti', nome: 'Christian', mansione: 'Ufficio bolle', reparto: 'Ufficio bolle', ore_settimana: 40, inizio: '08:00', fine: '17:00', profilo_id: 'u-chr', contratto: 'CCNL Commercio' },
     { id: 'd-ga', azienda: 'trasporti', nome: 'Gabriele', mansione: 'Ufficio bolle', reparto: 'Ufficio bolle', ore_settimana: 40, inizio: '08:00', fine: '17:00', profilo_id: 'u-bol', contratto: 'CCNL Commercio' },
     { id: 'd-al', azienda: 'trasporti', nome: 'Alberto', mansione: 'Ufficio bolle', reparto: 'Ufficio bolle', ore_settimana: 40, inizio: '08:00', fine: '17:00', profilo_id: null, contratto: 'CCNL Commercio' },
     { id: 'd-ma', azienda: 'trasporti', nome: 'Mauro', mansione: 'Traffico', reparto: 'Traffico', ore_settimana: 40, inizio: '06:00', fine: '15:00', profilo_id: 'u-tra', contratto: 'CCNL Commercio' },

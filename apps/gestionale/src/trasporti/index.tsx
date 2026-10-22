@@ -1,6 +1,6 @@
 // Gestionale Messina Autotrasporti: trasp() del mockup, sezione per sezione, con i dati veri.
 import React, { useState } from 'react';
-import { Shell, vociPer, useApp, useDati, T_NAV } from '../core';
+import { Shell, vociPer, nascostePer, useApp, useDati, T_NAV, T_NASCOSTE } from '../core';
 import { Home, Anomalie } from './home';
 import { MailT, Bolle, Traffico, Giacenze } from './bolle';
 import { Magazzino } from './magazzino';
@@ -11,6 +11,8 @@ import { Presenze } from './presenze';
 import { Ricerca } from './ricerca';
 import { Satellitare } from './satellitare';
 import { Telecamere } from '../telecamere';
+import { Portale } from './portale';
+import { J7 } from './j7';
 
 export function Trasporti() {
   const { io, percorso } = useApp();
@@ -19,13 +21,14 @@ export function Trasporti() {
   const { dati: an } = useDati((db) => db.from<any>('anomalie').select('sezione'), []);
   const { dati: presenze } = useDati((db) => db.rpc<boolean>('vede_presenze', { p_azienda: 'trasporti' }), []);
   const voci = vociPer(io).filter((v) => v.id !== 'presenze' || presenze).map((v) => v.id === 'anomalie' ? { ...v, badge: an?.length ?? 0 } : v);
-  const id = voci.some((v) => v.id === sez) ? sez : 'home';
+  const id = [...voci, ...nascostePer(io)].some((v) => v.id === sez) ? sez : 'home';
   const [titolo, setTitolo] = useState<string | null>(null);
-  const nome = T_NAV.find((v) => v.id === id)!.nome;
+  const nome = [...T_NAV, ...T_NASCOSTE].find((v) => v.id === id)!.nome;
   const pagine: Record<string, React.ReactNode> = {
     home: <Home />, anomalie: <Anomalie sezione={sotto} titolo={setTitolo} />, mail: <MailT />, bolle: <Bolle scelta={sotto} />,
     traffico: <Traffico scelto={sotto} />, magazzino: <Magazzino tab={sotto} />, giacenze: <Giacenze />, clienti: <Clienti scelto={sotto} titolo={setTitolo} />,
     fatture: <Fatturazione />, preventivi: <Preventivi scelto={sotto} />, mezzi: <Mezzi />, autisti: <Autisti />, telepass: <Telepass />, satellitare: <Satellitare />, presenze: <Presenze tab={sotto} />, telecamere: <Telecamere />,
+    portale: <Portale />, j7: <J7 />,
   };
   return (
     <Shell voci={voci} titolo={cerca ? 'Cerca' : (id === 'anomalie' || id === 'clienti') && sotto && titolo ? titolo : nome} cerca={cerca} onCerca={setCerca}>

@@ -3,7 +3,7 @@
 import { estendiProva } from './prova';
 
 estendiProva(({ t, rpc, filtri }) => {
-  t.accessi = t.profili.filter((p) => p.ruolo !== 'cliente').map((p) => ({ profilo_id: p.id, azienda: p.azienda, ruolo: p.ruolo, riepiloghi_presenze: p.ruolo === 'amministrazione' }));
+  t.accessi = t.profili.filter((p) => p.ruolo !== 'cliente').map((p) => ({ profilo_id: p.id, azienda: p.azienda, ruolo: p.ruolo, riepiloghi_presenze: p.ruolo === 'amministrazione' || p.ruolo === 'direzione' }));   // la Direzione vede Allarmi, Riepiloghi e Ferie (mockup, App presenze)
   t.accessi.push(
     { profilo_id: 'u-dir', azienda: 'corporation', ruolo: 'direzione', riepiloghi_presenze: false },        // i genitori: tutte e due le società
     { profilo_id: 'u-amm', azienda: 'corporation', ruolo: 'amministrazione', riepiloghi_presenze: true },   // Angela: anche i dipendenti della Corporation

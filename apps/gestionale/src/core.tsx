@@ -54,7 +54,7 @@ export function useStato<T>(iniziale: T): [T, (p: Partial<T> | ((s: T) => Partia
 // ------------------------------------------------------------------ menu
 export interface Voce { id: string; nome: string; ruoli?: Ruolo[]; badge?: number }
 
-/** T_NAV del mockup, con chi può vedere ogni sezione */
+/** T_NAV del mockup, stesso ordine e stessi nomi, con chi può vedere ogni sezione */
 export const T_NAV: Voce[] = [
   { id: 'home', nome: 'Home' },
   { id: 'anomalie', nome: 'Anomalie', ruoli: ['amministrazione'] },
@@ -64,7 +64,7 @@ export const T_NAV: Voce[] = [
   { id: 'magazzino', nome: 'Magazzino', ruoli: ['magazzino', 'traffico', 'bolle'] },
   { id: 'giacenze', nome: 'Giacenze', ruoli: ['bolle', 'traffico'] },
   { id: 'clienti', nome: 'Clienti', ruoli: ['commerciale', 'amministrazione', 'bolle'] },
-  { id: 'preventivi', nome: 'Preventivi', ruoli: ['commerciale'] },
+  { id: 'portale', nome: 'Portale', ruoli: ['commerciale', 'bolle'] },
   { id: 'fatture', nome: 'Fatturazione', ruoli: ['amministrazione', 'commercialista'] },
   { id: 'mezzi', nome: 'Mezzi', ruoli: ['traffico', 'amministrazione'] },
   { id: 'autisti', nome: 'Autisti', ruoli: ['traffico', 'amministrazione'] },
@@ -72,7 +72,10 @@ export const T_NAV: Voce[] = [
   { id: 'satellitare', nome: 'Satellitare', ruoli: [] },   // solo direzione
   { id: 'presenze', nome: 'Presenze', ruoli: ['amministrazione'] },
   { id: 'telecamere', nome: 'Telecamere', ruoli: [] },     // solo direzione
+  { id: 'j7', nome: 'J7', ruoli: [] },                     // solo direzione
 ];
+/** sezioni che esistono nel codice ma non nel menu del mockup: si aprono solo da un link (vedi STATO «Da decidere») */
+export const T_NASCOSTE: Voce[] = [{ id: 'preventivi', nome: 'Preventivi', ruoli: ['commerciale'] }];
 /** C_NAV del mockup */
 export const C_NAV: Voce[] = [
   { id: 'home', nome: 'Home' },
@@ -80,27 +83,31 @@ export const C_NAV: Voce[] = [
   { id: 'lotti', nome: 'Lotti', ruoli: ['vendite', 'amministrazione', 'commercialista'] },
   { id: 'inv', nome: 'Inventario' },
   { id: 'ordini', nome: 'Ordini', ruoli: ['vendite', 'magazzino'] },
-  { id: 'richieste', nome: 'Richieste', ruoli: ['vendite'] },
   { id: 'stage', nome: 'Stage Computer', ruoli: ['vendite', 'stage'] },
   { id: 'stageTel', nome: 'Stage Cellulari', ruoli: ['vendite', 'stage'] },
   { id: 'ricambi', nome: 'Ricambi', ruoli: ['vendite', 'stage', 'magazzino', 'amministrazione'] },
-  { id: 'presenze', nome: 'Presenze', ruoli: ['amministrazione'] },   // e solo con il permesso dei riepiloghi
   { id: 'telecamere', nome: 'Telecamere', ruoli: [] },     // solo direzione: lo stesso capannone
 ];
+export const C_NASCOSTE: Voce[] = [
+  { id: 'richieste', nome: 'Richieste', ruoli: ['vendite'] },
+  { id: 'presenze', nome: 'Presenze', ruoli: ['amministrazione'] },   // e solo con il permesso dei riepiloghi
+];
+const puo = (io: Profilo) => (v: Voce) => !v.ruoli || io.ruolo === 'direzione' || v.ruoli.includes(io.ruolo);
 export function vociPer(io: Profilo): Voce[] {
-  const menu = io.azienda === 'trasporti' ? T_NAV : C_NAV;
-  return menu.filter((v) => !v.ruoli || io.ruolo === 'direzione' || v.ruoli.includes(io.ruolo));
+  return (io.azienda === 'trasporti' ? T_NAV : C_NAV).filter(puo(io));
+}
+/** sezioni fuori dal menu che il profilo può comunque aprire da un link */
+export function nascostePer(io: Profilo): Voce[] {
+  return (io.azienda === 'trasporti' ? T_NASCOSTE : C_NASCOSTE).filter(puo(io));
 }
 
 const dataLunga = () => { const s = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return s[0].toUpperCase() + s.slice(1); };
 
 /** shell(company, navList, cur, act, title, body) del mockup */
 export function Shell(p: { voci: Voce[]; titolo: string; cerca: string; onCerca: (v: string) => void; children: React.ReactNode }) {
-  const { io, vai, percorso, db } = useApp();
-  // chi lavora in tutte e due le società passa dall'una all'altra: una alla volta, così non si mescolano
-  const { dati: aziende } = useDati((d) => d.rpc<{ azienda: string; ruolo: string }[]>('mie_aziende').then((r) => r ?? [], () => []), []);
-  const [errAz, setErrAz] = useState<string | null>(null);
-  const passa = (a: string) => db.rpc('cambia_azienda', { p_azienda: a }).then(() => { location.hash = '#/home'; location.reload(); }, (e) => setErrAz((e as Error).message));
+  const { io, vai, percorso } = useApp();
+  // Il passaggio tra le due società (rpc mie_aziende / cambia_azienda) e «Esci» non sono nel mockup:
+  // le funzioni restano nel database; dove metterli nello schermo è in STATO «Da decidere».
   const company = io.azienda === 'trasporti' ? 'Autotrasporti' : 'Corporation';
   const cur = percorso.split('/')[0] || 'home';
   const nav = useRef<HTMLElement>(null);
@@ -113,17 +120,15 @@ export function Shell(p: { voci: Voce[]; titolo: string; cerca: string; onCerca:
       <div className="gest">
         <nav className="side glass" aria-label={'Sezioni ' + company} ref={nav}>
           <div className="co"><b>MESSINA</b><span className="lbl">{company}</span></div>
-          {aziende && aziende.length > 1 && <div className="row" style={{ gap: 4, padding: '0 6px 8px' }}>{aziende.filter((a) => a.azienda !== io.azienda).map((a) =>
-            <button key={a.azienda} type="button" className="chipbtn" onClick={() => passa(a.azienda)}>{a.azienda === 'trasporti' ? 'Autotrasporti' : 'Corporation'}</button>)}{errAz && <span className="miss">{errAz}</span>}</div>}
+          {/* Da decidere (STATO): il passaggio tra le due società (passa) e «Esci» non sono nel mockup, quindi non si vedono */}
           {p.voci.map((n) => (
             <button key={n.id} type="button" className={'nav' + (cur === n.id ? ' on' : '')} aria-current={cur === n.id ? 'page' : undefined}
               onClick={() => vai(n.id)}>{n.nome}<Badge n={n.badge ?? 0} /></button>
           ))}
-          <button type="button" className="nav esci" onClick={() => db.auth.logout().then(() => location.reload())}>Esci</button>
         </nav>
         <div className="content">
           <div className="chead">
-            <div><div className="lbl">{dataLunga()} · {company}{db.modo === 'prova' ? ' · Prova' : ''}</div><h2>{p.titolo}</h2></div>
+            <div><div className="lbl">{dataLunga()} · {company}</div><h2>{p.titolo}</h2></div>
             <div className="row"><Search id={'s-' + io.azienda} value={p.cerca} onChange={p.onCerca} /></div>
           </div>
           {p.children}

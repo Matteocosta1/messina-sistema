@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
-import { collega, onCambioProva, type Config, type Fattore } from '@messina/dati';
+import { collega, entraInProva, onCambioProva, type Config, type Fattore } from '@messina/dati';
 import '@messina/dati/prova-tutto';   // stessi dati di prova in tutti i programmi
 import { motoreDiProva, ELENCO_PROVA } from '@messina/dati/prova';
 import { Btn } from '@messina/ui';
@@ -21,6 +21,7 @@ function App() {
   const [percorso, setPercorso] = useState(leggiPercorso());
   const [giro, setGiro] = useState(0);
   const carica = useCallback(async () => {
+    await entraInProva(db, window.MESSINA);   // solo in Prova, se la pagina indica l'utente di esempio
     const s = db.auth.sessione();
     if (!s) return setIo(null);
     try {

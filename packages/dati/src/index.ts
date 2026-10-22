@@ -4,7 +4,13 @@
 //  · supabase: le API vere (REST + Auth + Storage + Edge Functions), con i permessi del database;
 //  · prova: dati finti in memoria, per vedere le schermate prima di collegare Supabase.
 
-export interface Config { supabaseUrl?: string; supabaseKey?: string }
+export interface Config {
+  supabaseUrl?: string; supabaseKey?: string;
+  /** App Messina: quale delle quattro app del mockup (autisti, magazzino, presenze, corporation). Di solito la dice la pagina d'ingresso. */
+  parte?: string;
+  /** solo modalità Prova (senza chiavi): l'utente di esempio con cui entrare da soli, come nella pagina «Prova programma Messina» */
+  provaUtente?: string;
+}
 export interface Sessione { access_token: string; refresh_token: string; expires_at: number; user: { id: string; email?: string } }
 /** doppio fattore: «ok» = si entra; «codice» = chiedere il codice dell'app di autenticazione; «nuovo» = primo collegamento con il QR */
 export type Fattore = { stato: 'ok' } | { stato: 'codice'; id: string } | { stato: 'nuovo'; id: string; qr: string; segreto: string };
@@ -189,18 +195,20 @@ const ascoltatori = new Set<() => void>();
 export function onCambioProva(f: () => void) { ascoltatori.add(f); return () => { ascoltatori.delete(f); }; }
 
 function condividi(t: Tabelle) {
-  let dentro = false;
-  try { dentro = window.parent !== window; } catch { dentro = false; }
+  // la pagina della prova è sempre la più esterna (window.top): anche il portale, che in Prova sta dentro Autotrasporti, parla con lei
+  let pagina: Window | null = null;
+  try { pagina = window.top && window.top !== window ? window.top : null; } catch { pagina = null; }
+  const dentro = !!pagina;
   const impronta = () => { try { return JSON.stringify(t); } catch { return String(Math.random()); } };
   if (!dentro) return { impronta: () => '', invia: () => {}, esterno: (_f: (nome: string, corpo: unknown) => void) => {} };
   const io = Math.random().toString(36).slice(2);
   // versione: quante modifiche conosce questo programma. La pagina accetta una modifica solo se parte
   // dall'ultima versione, così una copia vecchia non cancella quella nuova.
   let versione = 0;
-  const manda = (azione: string) => { try { window.parent.postMessage({ tipo: 'messina-prova', azione, da: io, base: versione, t }, '*'); } catch { /* */ } };
+  const manda = (azione: string) => { try { pagina!.postMessage({ tipo: 'messina-prova', azione, da: io, base: versione, t }, '*'); } catch { /* */ } };
   window.addEventListener('message', (e) => {
     const d = e.data;
-    if (e.source !== window.parent || !d || typeof d !== 'object') return;
+    if (e.source !== pagina || !d || typeof d !== 'object') return;
     if (d.tipo === 'messina-prova-versione' && typeof d.v === 'number') { versione = d.v; return; }
     if (d.tipo !== 'messina-prova-stato' || d.da === io || !d.t || typeof d.t !== 'object') return;
     if (typeof d.v === 'number') versione = d.v;
@@ -212,7 +220,7 @@ function condividi(t: Tabelle) {
     // la pagina chiede di eseguire un servizio qui (per esempio il modulo di un sito che arriva nella Mail)
     window.addEventListener('message', (e) => {
       const d = e.data;
-      if (e.source === window.parent && d && d.tipo === 'messina-prova-fn' && typeof d.nome === 'string') f(d.nome, d.corpo);
+      if (e.source === pagina && d && d.tipo === 'messina-prova-fn' && typeof d.nome === 'string') f(d.nome, d.corpo);
     });
   } };
 }
@@ -329,6 +337,12 @@ export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: R
     async fattore() { return { stato: 'ok' }; },   // in Prova il codice non serve
     async verifica() { /* */ },
   };
+}
+
+/** Prova: se la configurazione indica un utente di esempio, entra da solo (online, con le chiavi, non fa niente) */
+export async function entraInProva(db: { modo: string; auth: { sessione: () => unknown; login: (e: string, p: string) => Promise<unknown> } }, cfg: Config | undefined) {
+  if (db.modo !== 'prova' || !cfg?.provaUtente || db.auth.sessione()) return;
+  try { await db.auth.login(cfg.provaUtente, 'prova'); } catch { /* resta la scelta dell'utente */ }
 }
 
 /** sceglie il motore: con config.js compilato → Supabase, altrimenti Prova */
