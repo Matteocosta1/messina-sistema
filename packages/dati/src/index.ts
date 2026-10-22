@@ -171,10 +171,52 @@ function dividi(s: string) {
 export type FunzioniProva = Record<string, (corpo: any, t: Tabelle, utente: string | null) => unknown>;
 /** regole del database rifatte in prova: ricevono la riga prima e dopo la modifica (prima = null se è nuova) e possono rifiutarla */
 export type RegoleProva = Record<string, (prima: Record<string, any> | null, dopo: Record<string, any>, t: Tabelle, utente: string | null) => void>;
+/** chiave della sessione di prova: ogni programma della pagina «Prova programma Messina» ha la sua (nome della cornice) */
+export function chiaveProva() {
+  let nome = '';
+  try { nome = window.name; } catch { /* */ }
+  return nome ? 'messina.prova.' + nome : 'messina.prova';
+}
+
+// ------------------------------------------------------------------ prova condivisa
+// Dentro la pagina «Prova programma Messina» ogni programma (gestionale, app, portale, negozio) gira in una sua cornice.
+// Perché sembri tutto collegato allo stesso database, dopo ogni modifica la copia dei dati va alla pagina,
+// che la gira agli altri programmi. Fuori da quella pagina, o con Supabase collegato, non succede niente.
+const ascoltatori = new Set<() => void>();
+/** chiama f quando i dati di prova cambiano in un altro programma della pagina; restituisce la funzione per smettere */
+export function onCambioProva(f: () => void) { ascoltatori.add(f); return () => { ascoltatori.delete(f); }; }
+
+function condividi(t: Tabelle) {
+  let dentro = false;
+  try { dentro = window.parent !== window; } catch { dentro = false; }
+  if (!dentro) return { invia: () => {}, esterno: (_f: (nome: string, corpo: unknown) => void) => {} };
+  const io = Math.random().toString(36).slice(2);
+  const manda = (azione: string) => { try { window.parent.postMessage({ tipo: 'messina-prova', azione, da: io, t }, '*'); } catch { /* */ } };
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (e.source !== window.parent || !d || d.tipo !== 'messina-prova-stato' || d.da === io || !d.t || typeof d.t !== 'object') return;
+    for (const k of Object.keys(d.t)) if (Array.isArray(d.t[k])) t[k] = d.t[k];
+    ascoltatori.forEach((f) => f());
+  });
+  manda('ciao');
+  return { invia: () => manda('stato'), esterno: (f: (nome: string, corpo: unknown) => void) => {
+    // la pagina chiede di eseguire un servizio qui (per esempio il modulo di un sito che arriva nella Mail)
+    window.addEventListener('message', (e) => {
+      const d = e.data;
+      if (e.source === window.parent && d && d.tipo === 'messina-prova-fn' && typeof d.nome === 'string') f(d.nome, d.corpo);
+    });
+  } };
+}
+
 export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: Record<string, string>, viste: (t: Tabelle) => void = () => {}, funzioni: FunzioniProva = {}, regole: RegoleProva = {}): Motore {
   let io: string | null = null;
-  try { io = sessionStorage.getItem('messina.prova'); } catch { io = null; }
+  try { io = sessionStorage.getItem(chiaveProva()); } catch { io = null; }
   const pausa = () => new Promise((r) => setTimeout(r, 80));
+  const pagina = condividi(t);
+  pagina.esterno((nome, corpo) => {
+    const f = funzioni[nome]; if (!f) return;
+    try { f(corpo, t, null); viste(t); pagina.invia(); ascoltatori.forEach((x) => x()); } catch (e) { console.warn('Prova:', (e as Error).message); }
+  });
 
   function proietta(tab: string, riga: Record<string, any>, colonne: string): Record<string, any> {
     const out: Record<string, any> = {};
@@ -223,20 +265,21 @@ export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: R
       }
       for (const [c, a] of [...q.ordine].reverse()) righe = [...righe].sort((x, y) => (x[c] ?? '') < (y[c] ?? '') ? (a ? -1 : 1) : (x[c] ?? '') > (y[c] ?? '') ? (a ? 1 : -1) : 0);
       if (q.limite) righe = righe.slice(0, q.limite);
+      if (q.metodo !== 'GET') pagina.invia();
       return righe.map((r) => proietta(q.tabella, r, q.colonne));
     },
-    async rpc(fn, args) { await pausa(); const f = rpc[fn]; if (!f) throw new Error(`In prova «${fn}» non è disponibile`); const r = f(args, t, io); viste(t); return r; },
-    async fn(nome, corpo) { await pausa(); const f = funzioni[nome]; if (!f) throw new Error(`«${nome}» funziona solo collegato a Supabase`); const r = f(corpo, t, io); viste(t); return r; },
+    async rpc(fn, args) { await pausa(); const f = rpc[fn]; if (!f) throw new Error(`In prova «${fn}» non è disponibile`); const r = f(args, t, io); viste(t); pagina.invia(); return r; },
+    async fn(nome, corpo) { await pausa(); const f = funzioni[nome]; if (!f) throw new Error(`«${nome}» funziona solo collegato a Supabase`); const r = f(corpo, t, io); viste(t); pagina.invia(); return r; },
     async carica() { await pausa(); },
     async link() { return ''; },
     async login(email) {
       await pausa();
       const id = utenti[email.trim().toLowerCase()];
       if (!id) throw new Error('Utente di prova sconosciuto');
-      io = id; try { sessionStorage.setItem('messina.prova', id); } catch { /* */ }
+      io = id; try { sessionStorage.setItem(chiaveProva(), id); } catch { /* */ }
       return { access_token: 'prova', refresh_token: 'prova', expires_at: 0, user: { id, email } };
     },
-    async logout() { io = null; try { sessionStorage.removeItem('messina.prova'); } catch { /* */ } },
+    async logout() { io = null; try { sessionStorage.removeItem(chiaveProva()); } catch { /* */ } },
     sessione: () => io ? { access_token: 'prova', refresh_token: 'prova', expires_at: 0, user: { id: io } } : null,
     async fattore() { return { stato: 'ok' }; },   // in Prova il codice non serve
     async verifica() { /* */ },

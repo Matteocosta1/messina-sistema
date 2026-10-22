@@ -36,8 +36,25 @@ estendiProva(({ t, rpc, funzioni }) => {
     }
     return Object.values(m).sort((a: any, b: any) => (a.marca + a.modello + a.grado).localeCompare(b.marca + b.modello + b.grado));
   };
-  funzioni['stripe-checkout'] = (c: { righe: unknown[] }) => {
+  // pagamento: in prova si fa subito quello che online fanno Stripe e la funzione stripe-webhook a pagamento riuscito
+  // (ordine «Da preparare» in Corporation › Ordini, vendita registrata, computer «Venduto» e fuori dal catalogo)
+  funzioni['stripe-checkout'] = (c: { righe: any[] }) => {
     if (!Array.isArray(c?.righe) || !c.righe.length) throw new Error('Il carrello è vuoto');
-    return { url: location.pathname + '#/grazie' };
+    const presi: any[] = []; const mancano: string[] = [];
+    for (const r of c.righe) {
+      const d = t.device.filter((x) => x.stato === 'Disponibile' && x.siti.includes('Sito') && x.prezzo != null && x.prezzo_confermato_da && x.modello === r.modello && x.grado === r.grado
+        && (!r.ram || x.ram === r.ram) && !presi.includes(x)).sort((a, b) => a.prezzo - b.prezzo)[0];
+      if (d) presi.push(d); else mancano.push(`${r.modello} grado ${r.grado}`);
+    }
+    if (!presi.length) throw new Error('Questi computer non sono più disponibili');
+    const ora = new Date().toISOString(); const id = crypto.randomUUID();
+    t.ordini.unshift({ id, canale: 'Sito', riferimento: 'cs_' + id.slice(0, 8), stripe_session: 'cs_prova_' + id, email: 'cliente@esempio.it', cliente: 'Cliente del sito',
+      indirizzo: 'Via [indirizzo], Milano', totale: presi.reduce((s, d) => s + Number(d.prezzo), 0), device_id: presi[0].id, stato: 'Da preparare', creato_il: ora,
+      entro: new Date(Date.now() + 86400000).toISOString(), problema: mancano.length ? `Pagato ma non disponibile: ${mancano.join(', ')}. Da rimborsare o sostituire.` : null });
+    for (const d of presi) {
+      t.vendite.push({ id: crypto.randomUUID(), device_id: d.id, canale: 'Sito', prezzo: Number(d.prezzo), commissione: 0, incassato: Number(d.prezzo), venduto_il: ora, ordine_id: id });
+      d.stato = 'Venduto'; d.siti = ['Sito'];
+    }
+    return { url: '#/grazie' };   // solo la parte dopo #: funziona anche dentro la cornice della prova
   };
 });

@@ -368,12 +368,35 @@ const FUNZIONI: FunzioniProva = {
   'fatture-in-cloud': (c, t) => { const f = t.fatture.find((x) => x.id === c.fattura_id);
     if (!f || !['Pronta', 'Inviata'].includes(f.stato)) throw new Error(`Fattura «${f?.stato}»: si invia solo quando è Pronta`);
     if (f.stato === 'Pronta') { f.stato = 'Inviata'; f.inviata_il = new Date().toISOString(); }
-    if (!f.numero) f.numero = 'FPR ' + (100 + t.fatture.filter((x) => x.numero).length) + '/' + new Date().getFullYear().toString().slice(2); return { numero: f?.numero }; },
+    if (!f.numero) f.numero = 'FPR ' + (100 + t.fatture.filter((x) => x.numero).length) + '/' + new Date().getFullYear().toString().slice(2);
+    f.fic_id ??= 'FIC-' + Math.floor(Math.random() * 900000 + 100000); f.sdi_inviata_il ??= new Date().toISOString();   // come la funzione vera: documento creato e mandato allo SdI
+    return { numero: f?.numero }; },
   'mail-outlook': (c, t) => {
     const m = c.mail_id ? t.mail.find((x) => x.id === c.mail_id) : null;
     t.mail_uscita.unshift({ id: crypto.randomUUID(), azienda: c.azienda ?? m?.azienda ?? 'trasporti', risposta_a: m?.id ?? null, a: c.a ?? m?.da_indirizzo, oggetto: c.oggetto ?? ('Re: ' + (m?.oggetto ?? '')),
       testo: c.testo, creata_il: new Date().toISOString(), inviata_il: new Date().toISOString(), errore: null });
     if (m) m.stato = 'Risposta';
+    return { ok: true };
+  },
+  // moduli dei siti: stessa cartella, etichetta e testo della funzione vera (supabase/functions/richiesta-sito)
+  'richiesta-sito': (c, t) => {
+    const SITI: Record<string, { azienda: string; tipi: Record<string, [string, string, string]> }> = {
+      trasporti: { azienda: 'trasporti', tipi: { preventivo: ['Clienti', 'Preventivo', 'Richiesta di preventivo dal sito'], ritiro: ['Ordini', 'Ordine', 'Richiesta di ritiro dal sito'],
+        candidatura: ['In arrivo', 'Personale', 'Candidatura dal sito'], contatto: ['In arrivo', 'Sito', 'Messaggio dal sito'] } },
+      corporation: { azienda: 'corporation', tipi: { lotto: ['Lotti', 'Lotti', 'Lotto da valutare dal sito'], contatto: ['In arrivo', 'Sito', 'Messaggio dal sito'] } },
+    };
+    const s0 = SITI[c?.sito]; if (!s0) throw new Error('Sito sconosciuto');
+    const [cartella, etichetta, oggetto] = s0.tipi[c.tipo] ?? Object.values(s0.tipi)[0];
+    const testo = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+    if (testo(c.sito_web, 200)) return { ok: true };
+    const nome = testo(c.nome, 80), azienda = testo(c.azienda, 120), email = testo(c.email, 200).toLowerCase(), telefono = testo(c.telefono, 40);
+    if (!nome) throw new Error('Scrivi il tuo nome');
+    if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,24}$/i.test(email)) throw new Error("Controlla l'indirizzo email");
+    const campi = Object.entries(c.dettagli ?? {}).slice(0, 12).map(([k, v]) => [testo(k, 40), Array.isArray(v) ? v.join(', ') : testo(v, 300)]).filter(([, v]) => v);
+    const note = testo(c.note, 3000);
+    const righe = [`Nome: ${nome}`, azienda && `Azienda: ${azienda}`, `Email: ${email}`, telefono && `Telefono: ${telefono}`, ...campi.map(([k, v]) => `${k}: ${v}`), note && `\n${note}`].filter(Boolean).join('\n');
+    t.mail.unshift({ id: crypto.randomUUID(), azienda: s0.azienda, casella: 'sito', cartella, etichetta, stato: 'Da leggere', da_nome: azienda ? `${nome} (${azienda})` : nome, da_indirizzo: email,
+      oggetto, testo: righe, anteprima: (note || campi.map(([k, v]) => `${k}: ${v}`).join(', ')).slice(0, 160), ricevuta_il: new Date().toISOString(), allegati: [], bozza: null, bolla_id: null });
     return { ok: true };
   },
 };

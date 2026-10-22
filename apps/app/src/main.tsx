@@ -1,14 +1,13 @@
 // App Messina: una sola web app installabile sugli iPhone aziendali.
 // Cosa si vede lo decide chi entra: autista → Consegne, magazzino → Magazzino,
 // Corporation → Entrate (App Corporation), ogni dipendente → Badge. Più il Lettore all'ingresso (…/#lettore).
-import '@messina/dati/prova-app';
-import '@messina/dati/prova-traffico';
+import '@messina/dati/prova-tutto';   // stessi dati di prova in tutti i programmi
 import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
 import './app.css';
-import { collega, type Config, type Fattore } from '@messina/dati';
+import { collega, onCambioProva, type Config, type Fattore } from '@messina/dati';
 import { motoreDiProva } from '@messina/dati/prova';
 import { Pill } from '@messina/ui';
 import { AppCtx, type Profilo, type Dipendente, ErroreApp } from './core';
@@ -53,6 +52,7 @@ function App() {
   }, []);
   useEffect(() => { if (!lettore) carica(); }, [carica, lettore]);
   const aggiorna = useCallback(() => setGiro((g) => g + 1), []);
+  useEffect(() => onCambioProva(aggiorna), [aggiorna]);   // prova: i dati cambiati in un altro programma della pagina
   const esci = async () => { try { localStorage.removeItem('messina.modo'); } catch { /* */ } await db.auth.logout(); setModo(null); setDip(null); setIo(null); window.scrollTo(0, 0); };
   const scegli = (m: Modo) => { setModo(m); try { localStorage.setItem('messina.modo', m); } catch { /* */ } window.scrollTo(0, 0); };
 

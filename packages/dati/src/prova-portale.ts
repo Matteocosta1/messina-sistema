@@ -2,8 +2,9 @@
 // fatture inviate e pagate, richieste di riconsegna e le funzioni del portale.
 // In prova non ci sono i permessi del database: il portale filtra comunque per cliente.
 import { estendiProva } from './prova';
+import { chiaveProva } from './index';
 
-const utenteProva = () => { try { return sessionStorage.getItem('messina.prova'); } catch { return null; } };
+const utenteProva = () => { try { return sessionStorage.getItem(chiaveProva()); } catch { return null; } };
 
 estendiProva(({ t, rpc, rel, viste }) => {
   const g = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };

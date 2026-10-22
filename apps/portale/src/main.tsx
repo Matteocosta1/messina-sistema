@@ -1,12 +1,12 @@
 // Portale clienti di Messina Autotrasporti: lo stesso aspetto del gestionale approvato
 // (shell con menu laterale, schede in vetro, tabelle). Ogni cliente vede solo il suo:
 // lo decidono i permessi del database (RLS); il portale in più filtra per cliente.
-import '@messina/dati/prova-portale';
+import '@messina/dati/prova-tutto';   // stessi dati di prova in tutti i programmi
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
-import { collega, type Config, type Db } from '@messina/dati';
+import { collega, onCambioProva, type Config, type Db } from '@messina/dati';
 import { motoreDiProva, ELENCO_PROVA } from '@messina/dati/prova';
 import { Badge, Btn, Chip, Msg, Pill, Search, Stat, Card } from '@messina/ui';
 
@@ -104,6 +104,7 @@ function Portale() {
   }, []);
   const vai = useCallback((p: string) => { location.hash = '#/' + p; }, []);
   const aggiorna = useCallback(() => setGiro((g) => g + 1), []);
+  useEffect(() => onCambioProva(aggiorna), [aggiorna]);   // prova: i dati cambiati in un altro programma della pagina
 
   if (io === undefined) return null;
   if (!io) return <Login onEntra={carica} />;

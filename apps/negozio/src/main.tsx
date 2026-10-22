@@ -1,12 +1,12 @@
 // Negozio online di Messina Corporation: identico al negozio del mockup approvato
 // (prova-messina.html, negozio()). Legge solo il catalogo pubblico e apre il pagamento Stripe.
-import '@messina/dati/prova-negozio';
+import '@messina/dati/prova-tutto';   // stessi dati di prova in tutti i programmi
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
 import './negozio.css';
-import { collega, type Config } from '@messina/dati';
+import { collega, onCambioProva, type Config } from '@messina/dati';
 import { motoreDiProva } from '@messina/dati/prova';
 import { Btn, Chip, Msg, Pill } from '@messina/ui';
 
@@ -62,10 +62,12 @@ function App() {
   const [carrello, setCarrello] = useState<Voce[]>(leggiCarrello);
   const [brand, setBrand] = useState('Tutti');
 
-  useEffect(() => {
+  const caricaCatalogo = useCallback(() => {
     db.rpc<Riga[]>('catalogo').then((r) => setProdotti(raggruppa((r ?? []).map((x) => ({ ...x, prezzo: Number(x.prezzo), disponibili: Number(x.disponibili) })))),
       () => setErrore('Il catalogo non si è caricato. Riprova tra poco.'));
   }, []);
+  useEffect(() => { caricaCatalogo(); }, [caricaCatalogo]);
+  useEffect(() => onCambioProva(caricaCatalogo), [caricaCatalogo]);   // prova: prezzi e pezzi cambiati in Corporation
   useEffect(() => {
     const f = () => { setPercorso(leggiPercorso()); window.scrollTo(0, 0); };
     window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f);

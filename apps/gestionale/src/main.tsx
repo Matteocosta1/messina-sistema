@@ -4,9 +4,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
-import { collega, type Config, type Fattore } from '@messina/dati';
-import '@messina/dati/prova-recap';
-import '@messina/dati/prova-traffico';
+import { collega, onCambioProva, type Config, type Fattore } from '@messina/dati';
+import '@messina/dati/prova-tutto';   // stessi dati di prova in tutti i programmi
 import { motoreDiProva, ELENCO_PROVA } from '@messina/dati/prova';
 import { Btn } from '@messina/ui';
 import { AppCtx, type Profilo, Errore } from './core';
@@ -38,6 +37,7 @@ function App() {
   }, []);
   const vai = useCallback((p: string) => { location.hash = '#/' + p; }, []);
   const aggiorna = useCallback(() => setGiro((g) => g + 1), []);
+  useEffect(() => onCambioProva(aggiorna), [aggiorna]);   // prova: i dati cambiati in un altro programma della pagina
 
   if (io === undefined) return null;
   if (!io) return <Login onEntra={carica} />;
