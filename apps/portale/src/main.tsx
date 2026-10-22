@@ -16,7 +16,7 @@ const db = collega(cfg, motoreDiProva);
 
 // ------------------------------------------------------------------ contesto e dati (stesso schema del gestionale)
 interface Profilo { id: string; ruolo: string; nome: string; cliente_id: string | null }
-interface Cliente { id: string; nome: string; portale_live: boolean }
+interface Cliente { id: string; nome: string; portale_live: boolean; traccia_asset?: boolean }
 interface Ctx { db: Db; io: Profilo; clienti: Cliente[]; vai: (p: string) => void; percorso: string; aggiorna: () => void; giro: number; cerca: string }
 const AppCtx = createContext<Ctx | null>(null);
 const useApp = () => useContext(AppCtx)!;
@@ -71,7 +71,7 @@ function useApriFile() {
 }
 
 // ------------------------------------------------------------------ menu
-const NAV = [['home', 'Home'], ['magazzino', 'Magazzino'], ['spedizioni', 'Spedizioni'], ['giacenze', 'Giacenze'], ['fatture', 'Fatture']] as const;
+const NAV_TUTTI: [string, string][] = [['home', 'Home'], ['magazzino', 'Magazzino'], ['asset', 'Asset'], ['spedizioni', 'Spedizioni'], ['giacenze', 'Giacenze'], ['fatture', 'Fatture']];
 const leggiPercorso = () => decodeURIComponent(location.hash.replace(/^#\/?/, '')) || 'home';
 
 // link della mail «Password dimenticata»: Supabase torna qui con #access_token=…&type=recovery
@@ -93,7 +93,7 @@ function Portale() {
     if (!s) return setIo(null);
     try {
       const p = await db.from<Profilo>('profili').select('id,ruolo,nome,cliente_id').eq('id', s.user.id).single();
-      if (p.ruolo === 'cliente') setClienti(await db.from<Cliente>('clienti_portale').select('id,nome,portale_live'));
+      if (p.ruolo === 'cliente') setClienti(await db.from<Cliente>('clienti_portale').select('id,nome,portale_live,traccia_asset'));
       setIo(p);
     } catch { await db.auth.logout(); setIo(null); }
   }, []);
@@ -121,7 +121,9 @@ function Portale() {
 
 function Shell(p: { cerca: string; onCerca: (v: string) => void }) {
   const { io, clienti, vai, percorso } = useApp();
-  const cur = percorso.split('/')[0] || 'home';
+  const NAV = NAV_TUTTI.filter(([id]) => id !== 'asset' || clienti.some((c) => c.traccia_asset));
+  const cur0 = percorso.split('/')[0] || 'home';
+  const cur = NAV.some(([id]) => id === cur0) ? cur0 : 'home';
   const nome = clienti.find((c) => c.id === io.cliente_id)?.nome ?? io.nome;
   const titolo = NAV.find((n) => n[0] === cur)?.[1] ?? 'Home';
   const nav = useRef<HTMLElement>(null);
@@ -129,7 +131,7 @@ function Shell(p: { cerca: string; onCerca: (v: string) => void }) {
     const n = nav.current; if (!n || window.innerWidth > 760) return;
     const on = n.querySelector<HTMLElement>('.nav.on'); if (on) n.scrollLeft = on.offsetLeft - n.clientWidth / 2 + on.clientWidth / 2;
   }, [cur]);
-  const corpo = { home: <Home />, magazzino: <Magazzino />, spedizioni: <Spedizioni />, giacenze: <Giacenze />, fatture: <Fatture /> }[cur] ?? <Home />;
+  const corpo = { home: <Home />, magazzino: <Magazzino />, asset: <Asset />, spedizioni: <Spedizioni />, giacenze: <Giacenze />, fatture: <Fatture /> }[cur] ?? <Home />;
   return (
     <div className="wrap">
       <div className="gest">
@@ -241,6 +243,49 @@ function Magazzino() {
         </tr>); })}
     </Tabella>
     <p className="lbl" style={{ margin: 0 }}>Si aggiorna da solo ogni 30 secondi. Cercate un seriale o un IMEI per sapere in che bancale si trova.</p>
+  </>);
+}
+
+// ------------------------------------------------------------------ Asset
+// Telefoni per utente (es. UniCredit): IMEI, cespite, utente, dove si trova o con che bolla è uscito; file di oggi e dei giorni passati.
+interface Asset { id: string; cliente_id: string; imei: string; modello: string | null; cespite: string | null; utente: string | null; sede: string | null; stato: string;
+  entrato_il: string; spedito_il: string | null; bancali?: { codice: string } | null; bolle?: { numero: string | null } | null }
+const scarica = (nome: string, testo: string) => {
+  const u = URL.createObjectURL(new Blob(['﻿' + testo], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = u; a.download = nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000);
+};
+function Asset() {
+  const { clienti, cerca } = useApp();
+  const conAsset = clienti.filter((c) => c.traccia_asset);
+  const [f, setF] = useState('Tutti');
+  const [msg, setMsg] = useState<string | null>(null);
+  const { dati: A, errore } = useDati((d) => d.from<Asset>('asset').select('id,cliente_id,imei,modello,cespite,utente,sede,stato,entrato_il,spedito_il,bancali(codice),bolle(numero)')
+    .in('cliente_id', conAsset.map((c) => c.id)).order('entrato_il', { ascending: false }).limit(5000), [conAsset.map((c) => c.id).join(',')]);
+  const { dati: F } = useDati((d) => d.from<{ cliente_id: string; giorno: string; righe: number }>('asset_file').select('cliente_id,giorno,righe').in('cliente_id', conAsset.map((c) => c.id)).order('giorno', { ascending: false }).limit(30), [conAsset.length]);
+  const lista = (A ?? []).filter((a) => (f === 'Tutti' || a.stato === f) && trova(cerca, a.imei, a.cespite, a.utente, a.sede, a.modello, a.bolle?.numero));
+  const n = (x: string) => (A ?? []).filter((a) => a.stato === x).length;
+  const oggi = async (c: Cliente) => { setMsg(null); try { scarica(`asset-${c.nome}-${new Date().toISOString().slice(0, 10)}.csv`, await db.rpc<string>('asset_csv', { p_cliente: c.id })); } catch (e) { setMsg((e as Error).message); } };
+  const giorno = async (x: { cliente_id: string; giorno: string }) => { setMsg(null);
+    try { const r = await db.from<{ csv: string }>('asset_file').select('csv').eq('cliente_id', x.cliente_id).eq('giorno', x.giorno).single(); scarica(`asset-${clienti.find((c) => c.id === x.cliente_id)?.nome ?? ''}-${x.giorno}.csv`, r.csv); }
+    catch (e) { setMsg((e as Error).message); } };
+  return (<>
+    <div className="grid g4">
+      <Stat label="In magazzino" value={A ? num(n('In magazzino') + n('Abbinato') + n('Rientrato')) : '…'} sub={A ? `${num(n('Abbinato'))} con cespite e utente` : undefined} />
+      <Stat label="Spediti" value={A ? num(n('Spedito')) : '…'} />
+      <Stat label="Rientrati" value={A ? num(n('Rientrato')) : '…'} />
+    </div>
+    {errore && <div className="warn">{errore}</div>}
+    {msg && <div className="warn">{msg}</div>}
+    <div className="row">{['Tutti', 'In magazzino', 'Abbinato', 'Spedito', 'Rientrato'].map((x) => <Chip key={x} on={f === x} onClick={() => setF(x)}>{x}</Chip>)}</div>
+    <Tabella colonne={['IMEI', 'Modello', 'Cespite', 'Utente', 'Sede', 'Stato', 'Dove', 'Entrato']} minWidth={900} righe={lista.length} vuoto={A ? 'Nessun telefono.' : 'Carico…'}>
+      {lista.slice(0, 500).map((a) => <tr key={a.id}><td style={{ fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace', fontSize: 13 }}><b>{a.imei}</b></td><td>{a.modello ?? '—'}</td><td>{a.cespite ?? '—'}</td><td>{a.utente ?? '—'}</td>
+        <td className="lbl">{a.sede ?? '—'}</td><td>{a.stato === 'Spedito' ? <Pill tone="ok">Spedito</Pill> : a.stato === 'Rientrato' ? <Pill tone="red">Rientrato</Pill> : <Pill>{a.stato}</Pill>}</td>
+        <td>{a.stato === 'Spedito' ? (a.bolle?.numero ? 'Bolla ' + a.bolle.numero : '—') : a.bancali?.codice ?? '—'}</td><td>{quando(a.entrato_il)}</td></tr>)}
+    </Tabella>
+    <Card><div className="row between"><b>File</b>{conAsset.map((c) => <Btn key={c.id} sm onClick={() => oggi(c)}>{conAsset.length > 1 ? 'Oggi · ' + c.nome : 'Oggi'}</Btn>)}</div>
+      <div className="list" style={{ marginTop: 8 }}>{(F ?? []).length ? F!.map((x) => <button key={x.cliente_id + x.giorno} type="button" className="li" onClick={() => giorno(x)}>
+        <span className="row between" style={{ width: '100%' }}><span>{giornoCorto(x.giorno)}{conAsset.length > 1 ? ' · ' + (clienti.find((c) => c.id === x.cliente_id)?.nome ?? '') : ''}</span><span className="lbl">{num(x.righe)} righe</span></span></button>)
+        : <div className="lbl" style={{ padding: 10 }}>Il file si prepara ogni sera.</div>}</div></Card>
   </>);
 }
 

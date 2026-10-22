@@ -113,7 +113,7 @@ function Scheda({ c }: { c: any }) {
   return (<>
     <div className="row between"><Btn ghost onClick={() => vai('clienti')}>Tutti i clienti</Btn>
       <div className="row"><Btn ghost sm onClick={contratto}>Contratto PDF</Btn>
-        {!anag && !mod && <Btn ghost sm onClick={() => setAnag(Object.fromEntries([...ANAG.map(([k]) => [k, c[k] ?? '']), ['iva_natura', c.iva_natura ?? ''], ['split_payment', !!c.split_payment], ['eccezioni', c.eccezioni ?? ''], ['esigenze', c.esigenze ?? '']]))}>Anagrafica</Btn>}
+        {!anag && !mod && <Btn ghost sm onClick={() => setAnag(Object.fromEntries([...ANAG.map(([k]) => [k, c[k] ?? '']), ['iva_natura', c.iva_natura ?? ''], ['split_payment', !!c.split_payment], ['traccia_asset', !!c.traccia_asset], ['eccezioni', c.eccezioni ?? ''], ['esigenze', c.esigenze ?? '']]))}>Anagrafica</Btn>}
         {puoTariffe && !anag && (mod ? <><Btn sm onClick={salva} disabled={az.inCorso}>Salva</Btn><Btn ghost sm onClick={() => setMod(null)}>Annulla</Btn></>
           : <Btn sm onClick={() => { setMsg(''); setMod({ righe: {}, nuove: [], dal: oggiISO() }); }}>Tariffe</Btn>)}</div></div>
     {msg && <Msg>{msg}</Msg>}
@@ -132,12 +132,15 @@ function Scheda({ c }: { c: any }) {
           <label className="field"><span className="lbl">IVA</span><select className="input" value={anag.iva_natura} onChange={(e) => setAnag({ ...anag, iva_natura: e.target.value })}>
             <option value="">22%</option><option value="N3.1">Non imponibile, esportazione (N3.1)</option><option value="N3.2">Non imponibile, cessione UE (N3.2)</option><option value="N2.1">Fuori campo (N2.1)</option></select></label>
           <label className="field"><span className="lbl">Split payment</span><select className="input" value={anag.split_payment ? 'si' : 'no'} onChange={(e) => setAnag({ ...anag, split_payment: e.target.value === 'si' })}>
-            <option value="no">No</option><option value="si">Sì: ente pubblico, l’IVA la versa lui</option></select></label></div>
+            <option value="no">No</option><option value="si">Sì: ente pubblico, l’IVA la versa lui</option></select></label>
+          <label className="field"><span className="lbl">Asset</span><select className="input" value={anag.traccia_asset ? 'si' : 'no'} onChange={(e) => setAnag({ ...anag, traccia_asset: e.target.value === 'si' })}>
+            <option value="no">No</option><option value="si">Sì: ogni IMEI con cespite e utente, live nel portale</option></select></label></div>
         <div className="grid g2"><label className="field"><span className="lbl">Eccezioni e accordi</span><textarea value={anag.eccezioni} onChange={(e) => setAnag({ ...anag, eccezioni: e.target.value })} /></label>
           <label className="field"><span className="lbl">Cosa chiede il cliente</span><textarea value={anag.esigenze} onChange={(e) => setAnag({ ...anag, esigenze: e.target.value })} /></label></div>
         <div className="row"><Btn onClick={salvaAnag} disabled={az.inCorso}>Salva</Btn><Btn ghost onClick={() => setAnag(null)}>Annulla</Btn></div>
       </> : <div className="kv">{ANAG.map(([k, l]) => <div key={k}><div className="lbl">{l}</div><b>{c[k] || '—'}</b></div>)}
-        <div><div className="lbl">IVA</div><b>{c.iva_natura ? 'Natura ' + c.iva_natura : Number(c.iva_aliquota ?? 22) + '%'}{c.split_payment ? ' · split payment' : ''}</b></div></div>}
+        <div><div className="lbl">IVA</div><b>{c.iva_natura ? 'Natura ' + c.iva_natura : Number(c.iva_aliquota ?? 22) + '%'}{c.split_payment ? ' · split payment' : ''}</b></div>
+        <div><div className="lbl">Asset</div><b>{c.traccia_asset ? 'Sì' : 'No'}</b></div></div>}
     </div>
     <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Tariffa base</div>{tabella(base, puoTariffe ? 'Nessuna tariffa base: premi «Tariffe».' : 'Nessuna tariffa base: la inserisce il commerciale.')}</div>
     <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Accessori e voci extra</div>{tabella(extra, 'Nessuna voce extra.')}

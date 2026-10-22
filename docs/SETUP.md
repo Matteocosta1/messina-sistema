@@ -128,6 +128,16 @@ select cron.schedule('messina-giri', '0 * * * 1-5', $$select public.prepara_giri
 
 Per cambiare l'ora: `update public.impostazioni set valore = '16' where chiave = 'ora_giri';`. Le spedizioni confermate dopo la preparazione entrano da sole nei giri e il giro torna «da confermare».
 
+### File serale degli asset (UniCredit tramite Econocom)
+
+Ogni sera il database salva il file degli asset di ogni cliente con «Asset» attivo nella scheda (IMEI, cespite, utente, stato, bancale, bolla): il cliente lo scarica dal portale, voce Asset. Il lavoro si chiama `messina-file-asset` e lo crea la migrazione `20261022000700_stage_asset.sql` se `pg_cron` è già acceso. Se l'avete acceso dopo, nel **SQL Editor** una volta:
+
+```sql
+select cron.schedule('messina-file-asset', '55 21 * * *', $$select public.salva_file_asset()$$);
+```
+
+L'invio del file su un server del cliente (FTP o SFTP) si aggiunge quando il cliente dà indirizzo e accesso.
+
 ### Claude (lettura mail, bolle, seriali, resoconto)
 
 - `ANTHROPIC_API_KEY`: **a pagamento a consumo**, senza canone. Si caricano crediti in anticipo e Haiku 5.5 costa 0,10 $ per milione di token in entrata e 0,50 $ in uscita. Si crea su [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) con l'account `it@dominio`. In Limits conviene fissare un tetto di spesa mensile.

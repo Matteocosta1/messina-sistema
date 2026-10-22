@@ -189,7 +189,17 @@ estendiProva(({ t, rpc, rel, funzioni, viste, regole }) => {
       && t.fatture.some((f) => f.id === r.fattura_id && f.id !== escludi && f.cliente_id === cid && f.periodo === mese && f.tipo === 'Fattura' && !['Annullata', 'Stornata'].includes(f.stato)));
     const conDeposito = t.clienti.filter((c) => c.azienda !== 'corporation' && giorniDeposito(c.id) > 0
       && !t.fatture.some((f) => f.cliente_id === c.id && f.periodo === mese && ['Inviata', 'Pagata'].includes(f.stato) && t.righe_fattura.some((r) => r.fattura_id === f.id && String(r.voce).startsWith('Deposito · ')))).map((c) => c.id);
-    const clienti = new Set([...nuove.map((b) => b.cliente_id), ...conDeposito,
+    // stage: lo lavora la Corporation, lo fatturano i Trasporti (cliente con lo stesso nome o la stessa partita IVA)
+    const clienteStage = (cid: string | null) => { const c = t.clienti.find((x) => x.id === cid); if (!c) return null; if (c.azienda !== 'corporation') return c.id;
+      return c.fatturato_da ?? t.clienti.find((x) => x.azienda !== 'corporation' && x.stato !== 'Potenziale' && ((c.piva && x.piva === c.piva) || String(x.nome).toLowerCase() === String(c.nome).toLowerCase()))?.id ?? null; };
+    const giornoIt = (iso: string) => { const d = new Date(iso); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+    const pcDa = () => t.stage_pc.filter((s) => s.cliente_id && !s.fattura_id && ['Formattato', 'In vendita'].includes(s.esito) && s.finito_il && giornoIt(s.finito_il) <= fineIso);
+    const telDa = () => t.stage_telefoni.filter((s) => s.cliente_id && !s.fattura_id && s.chiuso_il && giornoIt(s.chiuso_il) <= fineIso);
+    const senza = [...new Set([...pcDa(), ...telDa()].filter((s) => !clienteStage(s.cliente_id)).map((s) => t.clienti.find((c) => c.id === s.cliente_id)?.nome ?? '—'))];
+    if (senza.length) throw new Error(`Stage da fatturare di ${senza.join(', ')}: manca il cliente in Clienti (stesso nome o stessa partita IVA)`);
+    const conStage = [...pcDa(), ...telDa()].map((s) => clienteStage(s.cliente_id)!);
+    const clienti = new Set([...nuove.map((b) => b.cliente_id), ...conDeposito, ...conStage,
+      ...t.fatture.filter((f) => f.azienda === 'trasporti' && f.periodo === mese && f.tipo === 'Fattura' && APERTE.includes(f.stato) && [...t.stage_pc, ...t.stage_telefoni].some((s) => s.fattura_id === f.id)).map((f) => f.cliente_id),
       ...t.fatture.filter((f) => f.azienda === 'trasporti' && f.periodo === mese && f.tipo === 'Fattura' && APERTE.includes(f.stato) && t.fatture_bolle.some((x) => x.fattura_id === f.id && x.valida)).map((f) => f.cliente_id)]);
     let n = 0;
     for (const cid of clienti) {
@@ -215,6 +225,15 @@ estendiProva(({ t, rpc, rel, funzioni, viste, regole }) => {
         if (td) t.righe_fattura.push({ id: crypto.randomUUID(), fattura_id: f.id, voce: `Deposito · bancali al giorno ${mese}`, quantita: gg, prezzo: Number(td.prezzo), iva_aliquota: c.iva_aliquota ?? 22, iva_natura: c.iva_natura ?? null, margine: false });
         else problemi.push(`deposito: ${gg} giorni di bancali senza tariffa Deposito`);
       }
+      t.righe_fattura = t.righe_fattura.filter((r) => !(r.fattura_id === f!.id && String(r.voce).startsWith('Stage · ')));
+      for (const s of [...t.stage_pc, ...t.stage_telefoni]) if (s.fattura_id === f.id) s.fattura_id = null;
+      for (const [lista, voce, cosa] of [[pcDa(), 'Formattazione PC', 'PC formattati'], [telDa(), 'Lavorazione telefono', 'telefoni lavorati']] as [R[], string, string][]) {
+        const miei = lista.filter((s) => clienteStage(s.cliente_id) === cid); if (!miei.length) continue;
+        miei.forEach((s) => { s.fattura_id = f!.id; });
+        const ts = valida(cid, voce, fineIso, [], null, miei.length, null);
+        if (ts) t.righe_fattura.push({ id: crypto.randomUUID(), fattura_id: f.id, voce: `Stage · ${voce} ${mese}`, quantita: miei.length, prezzo: Number(ts.prezzo), iva_aliquota: c.iva_aliquota ?? 22, iva_natura: c.iva_natura ?? null, margine: false });
+        else problemi.push(`stage: ${miei.length} ${cosa} senza tariffa «${voce}»`);
+      }
       ricalcola(f);
       const tutti = [...new Set(problemi), ...manca(cid).map((m) => 'scheda cliente: manca ' + m)];
       if (!t.righe_fattura.some((r) => r.fattura_id === f!.id) && !tutti.length) { f.stato = 'Annullata'; f.motivo = 'Niente da fatturare'; continue; }
@@ -235,7 +254,8 @@ estendiProva(({ t, rpc, rel, funzioni, viste, regole }) => {
     if (!t.fatture_bolle.some((x) => x.fattura_id === f.id && x.valida)) { const m = manca(f.cliente_id); f.problema = m.length ? m.map((x) => 'scheda cliente: manca ' + x).join('; ') : null; return f.problema; }
     chiudiMese(f.periodo, u); return f.problema;
   };
-  const liberaBolle = (f: R) => { for (const fb of t.fatture_bolle.filter((x) => x.fattura_id === f.id)) { fb.valida = false; const b = bolla(fb.bolla_id); if (b?.stato === 'Fatturata') b.stato = 'Consegnata'; } };
+  const liberaBolle = (f: R) => { for (const fb of t.fatture_bolle.filter((x) => x.fattura_id === f.id)) { fb.valida = false; const b = bolla(fb.bolla_id); if (b?.stato === 'Fatturata') b.stato = 'Consegnata'; }
+    for (const s of [...t.stage_pc, ...t.stage_telefoni]) if (s.fattura_id === f.id) s.fattura_id = null; };
   rpc.annulla_fattura = (a, _t, u) => {
     const f = t.fatture.find((x) => x.id === a.p_fattura); if (!f) throw new Error('Fattura non trovata');
     if (!APERTE.includes(f.stato)) throw new Error(`Passaggio non permesso: ${f.stato} → Annullata`);

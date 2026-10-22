@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Btn, Chip, Msg, Pill, Warn, Badge } from '@messina/ui';
 import { useApp, useAzione, useDati, useStato, hm, quando, num, oggiISO, Errore } from '../core';
 
-const TABS: [string, string][] = [['pianta', 'Pianta'], ['controllo', 'Controllo'], ['mov', 'Movimenti'], ['missioni', 'Missioni'], ['storico', 'Storico']];
+const TABS: [string, string][] = [['pianta', 'Pianta'], ['controllo', 'Controllo'], ['mov', 'Movimenti'], ['missioni', 'Missioni'], ['asset', 'Asset'], ['storico', 'Storico']];
 const pad = (n: number) => String(n).padStart(2, '0');
 
 export function Magazzino({ tab }: { tab?: string }) {
   const { vai } = useApp();
-  const t = TABS.some(([k]) => k === tab) ? tab! : 'pianta';
+  const [tab0, scelto] = (tab ?? '').split(':');
+  const t = TABS.some(([k]) => k === tab0) ? tab0 : 'pianta';
   const [cli, setCli] = useState('Tutti');
   const { dati } = useDati(async (d) => {
     const [cc, clienti] = await Promise.all([
@@ -25,6 +26,7 @@ export function Magazzino({ tab }: { tab?: string }) {
     {t === 'controllo' && <Controllo cc={dati.cc} cli={cli} />}
     {t === 'mov' && <Movimenti cli={cli} />}
     {t === 'missioni' && <Missioni />}
+    {t === 'asset' && <Asset cli={cli} imei={scelto} />}
     {t === 'storico' && <Storico cc={dati.cc} />}
   </>);
 }
@@ -236,5 +238,62 @@ function Storico({ cc }: { cc: any[] }) {
       {!all.length && <tr><td colSpan={6} className="lbl">Niente nello Storico.</td></tr>}
     </tbody></table></div>
     <p className="lbl" style={{ margin: 0 }}>Ogni scansione, modifica e cancellazione resta registrata e non si può cancellare. Il programma indica dove guardare; chi ha sbagliato lo decidete voi dopo aver parlato con la persona. Da scrivere nell’informativa e da far vedere al consulente.</p>
+  </>);
+}
+
+// ------------------------------------------------------------------ Asset (UniCredit tramite Econocom e gli altri clienti con i telefoni per utente)
+// Ogni IMEI sparato nel contenuto di un bancale diventa un asset; si abbina a cespite e utente incollando l'Excel del cliente,
+// si spedisce con la bolla. Il cliente vede tutto live nel portale e ha il file del giorno.
+const STATI_ASSET = ['Tutti', 'In magazzino', 'Abbinato', 'Spedito', 'Rientrato'];
+/** righe incollate dall'Excel: IMEI, cespite, utente, sede (separate da tab o punto e virgola) */
+const leggiExcel = (t: string) => t.split(/\r?\n/).map((r) => r.split(/\t|;/).map((x) => x.trim())).filter((c) => c[0] && !/^imei$/i.test(c[0]))
+  .map(([imei, cespite, utente, sede]) => ({ imei, cespite: cespite ?? '', utente: utente ?? '', sede: sede ?? '' }));
+function Asset({ cli, imei }: { cli: string; imei?: string }) {
+  const { db, io } = useApp();
+  const az = useAzione();
+  const [s, set] = useStato({ stato: 'Tutti', apri: '', excel: '', abbina: false, sel: [] as string[], bolla: '', msg: '' });
+  const { dati: A } = useDati((d) => d.from<any>('asset').select('*,clienti(nome),bancali(codice),bolle(numero)').order('entrato_il', { ascending: false }).limit(5000), []);
+  const { dati: E } = useDati((d) => s.apri ? d.from<any>('asset_eventi').select('*,profili(nome)').eq('asset_id', s.apri).order('quando', { ascending: true }) : Promise.resolve([] as any[]), [s.apri]);
+  const daCerca = imei ? A?.find((a) => a.imei === imei)?.id : undefined;   // arrivato da «Cerca» in alto
+  useEffect(() => { if (daCerca) set({ apri: daCerca }); }, [daCerca, set]);
+  if (!A) return null;
+  const opera = ['magazzino', 'traffico', 'bolle', 'amministrazione'].includes(io.ruolo);
+  const conta = (x: string) => A.filter((a) => (cli === 'Tutti' || a.clienti?.nome === cli) && a.stato === x).length;
+  const lista = A.filter((a) => (cli === 'Tutti' || a.clienti?.nome === cli) && (s.stato === 'Tutti' || a.stato === s.stato));
+  const righe = leggiExcel(s.excel);
+  const abbina = () => az.esegui(() => db.rpc('abbina_asset', { p_righe: righe }))
+    .then((ok) => ok && set({ excel: '', abbina: false, msg: `${righe.length === 1 ? '1 telefono abbinato' : righe.length + ' telefoni abbinati'} a cespite e utente.` }));
+  const spedisci = () => az.esegui(() => db.rpc('spedisci_asset', { p_imei: s.sel, p_bolla: s.bolla.trim() }))
+    .then((ok) => ok && set({ sel: [], bolla: '', msg: `${s.sel.length === 1 ? '1 telefono spedito' : s.sel.length + ' telefoni spediti'} con la bolla ${s.bolla.trim()}: tolti dal bancale.` }));
+  const scegli = (imei: string) => set({ sel: s.sel.includes(imei) ? s.sel.filter((x) => x !== imei) : [...s.sel, imei] });
+  const pill = (x: string) => x === 'Spedito' ? <Pill tone="ok">{x}</Pill> : x === 'Abbinato' ? <Pill tone="dark">{x}</Pill> : x === 'Rientrato' ? <Pill tone="red">{x}</Pill> : <Pill>{x}</Pill>;
+  const aperto = A.find((a) => a.id === s.apri);
+  return (<>
+    <div className="row">{STATI_ASSET.map((x) => <Chip key={x} on={s.stato === x} onClick={() => set({ stato: x })}>{x === 'Tutti' ? x : `${x} · ${num(conta(x))}`}</Chip>)}</div>
+    {s.msg && <Msg>{s.msg}</Msg>}
+    <Errore testo={az.errore} />
+    {opera && (s.abbina ? <div className="glass card stack">
+      <b>Abbina</b>
+      <span className="lbl">Incolla dall’Excel del cliente le colonne IMEI, Cespite, Utente, Sede. Se anche una riga non torna non si abbina niente.</span>
+      <textarea className="input" rows={6} value={s.excel} onChange={(e) => set({ excel: e.target.value })} aria-label="Righe dall’Excel" style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13 }} />
+      <div className="row"><Btn onClick={abbina} disabled={az.inCorso || !righe.length}>{righe.length ? `Abbina ${righe.length}` : 'Abbina'}</Btn><Btn ghost onClick={() => set({ abbina: false })}>Annulla</Btn></div>
+    </div> : <div className="row">
+      <Btn onClick={() => set({ abbina: true, msg: '' })}>Abbina</Btn>
+      {s.sel.length > 0 && <><input className="input" style={{ maxWidth: 180 }} placeholder="Numero bolla" value={s.bolla} onChange={(e) => set({ bolla: e.target.value })} />
+        <Btn onClick={spedisci} disabled={az.inCorso || !s.bolla.trim()}>{`Spedisci ${s.sel.length}`}</Btn></>}
+    </div>)}
+    {aperto && <div className="glass card stack">
+      <div className="row between"><b>{aperto.imei} · {aperto.modello ?? '—'}</b><Btn ghost sm onClick={() => set({ apri: '' })}>Chiudi</Btn></div>
+      <div className="lbl">{[aperto.clienti?.nome, aperto.cliente_finale !== aperto.clienti?.nome ? aperto.cliente_finale : null, aperto.cespite && 'cespite ' + aperto.cespite, aperto.utente, aperto.sede, aperto.accessori?.length ? aperto.accessori.join(', ') : null].filter(Boolean).join(' · ')}</div>
+      <div className="list">{(E ?? []).map((e) => <div key={e.id} className="li"><span className="row between" style={{ width: '100%' }}><span><b>{e.evento}</b> · {e.dettagli ?? ''}</span><span className="lbl">{quando(e.quando)}{e.profili?.nome ? ' · ' + e.profili.nome : ''}</span></span></div>)}</div>
+    </div>}
+    <div className="glass tbox"><table className="t nw" style={{ minWidth: 1100 }}><thead><tr>{opera && <th />}<th>IMEI</th><th>Modello</th><th>Cliente</th><th>Cespite</th><th>Utente</th><th>Sede</th><th>Stato</th><th>Dove</th><th>Entrato</th></tr></thead><tbody>
+      {lista.length ? lista.slice(0, 500).map((a) => <tr key={a.id} className="click" onClick={() => set({ apri: a.id })} style={s.apri === a.id ? { background: 'var(--soft)' } : undefined}>
+        {opera && <td onClick={(e) => e.stopPropagation()}>{(a.stato === 'Abbinato' || (a.stato === 'Rientrato' && a.cespite)) && <input type="checkbox" aria-label={'Scegli ' + a.imei} checked={s.sel.includes(a.imei)} onChange={() => scegli(a.imei)} />}</td>}
+        <td><b>{a.imei}</b></td><td>{a.modello ?? '—'}</td><td>{a.clienti?.nome}{a.cliente_finale && a.cliente_finale !== a.clienti?.nome ? <div className="lbl">{a.cliente_finale}</div> : null}</td><td>{a.cespite ?? '—'}</td><td>{a.utente ?? '—'}</td><td className="lbl">{a.sede ?? '—'}</td>
+        <td>{pill(a.stato)}</td><td>{a.stato === 'Spedito' ? (a.bolle?.numero ? 'Bolla ' + a.bolle.numero : '—') : a.bancali?.codice ?? <span className="miss">senza bancale</span>}</td><td>{quando(a.entrato_il)}</td></tr>)
+        : <tr><td colSpan={opera ? 10 : 9} className="lbl">Nessun asset. Si creano da soli sparando gli IMEI nel contenuto dei bancali dei clienti con gli asset attivi.</td></tr>}
+    </tbody></table></div>
+    {lista.length > 500 && <p className="lbl" style={{ margin: 0 }}>Ne mostro 500 di {num(lista.length)}: un IMEI, un cespite o un utente si trovano con «Cerca» in alto.</p>}
   </>);
 }

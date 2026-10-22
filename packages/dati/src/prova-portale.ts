@@ -44,7 +44,7 @@ estendiProva(({ t, rpc, rel, viste }) => {
   const miei = (utente: string | null) => { const c = mioCliente(utente); return c ? t.clienti.filter((x) => x.id === c || x.tramite === c) : []; };
 
   // come la vista clienti_portale: il cliente e chi passa da lui
-  viste.push((tt) => { tt.clienti_portale = miei(utenteProva()).map((c) => ({ id: c.id, nome: c.nome, portale_live: c.portale_live })); });
+  viste.push((tt) => { tt.clienti_portale = miei(utenteProva()).map((c) => ({ id: c.id, nome: c.nome, portale_live: c.portale_live, traccia_asset: !!c.traccia_asset })); });
 
   rpc.portale_bancali = (_a, tt, utente) => {
     const ids = miei(utente).filter((c) => c.portale_live).map((c) => c.id);

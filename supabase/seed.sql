@@ -26,7 +26,8 @@ insert into public.clienti (id, azienda, nome, portale_live, azienda_collegata) 
   ('10000000-0000-0000-0000-000000000003', 'trasporti', 'Luxiona', false, null),
   ('10000000-0000-0000-0000-000000000004', 'trasporti', 'Econocom', true, null),
   ('10000000-0000-0000-0000-000000000006', 'trasporti', 'Messina Corporation', false, 'corporation'),
-  ('10000000-0000-0000-0000-000000000007', 'trasporti', 'Velier', false, null);
+  ('10000000-0000-0000-0000-000000000007', 'trasporti', 'Velier', false, null),
+  ('10000000-0000-0000-0000-000000000009', 'trasporti', 'Accenture', false, null);   -- lo stage di Accenture lo fattura la Trasporti
 insert into public.clienti (id, azienda, nome, portale_live, tramite) values
   ('10000000-0000-0000-0000-000000000005', 'trasporti', 'UniCredit', true, '10000000-0000-0000-0000-000000000004');
 insert into public.clienti (id, azienda, nome) values

@@ -4,7 +4,7 @@ import './prova-ricambi';
 
 estendiProva(({ t, funzioni, viste }) => {
   // in Postgres lo stato del telefono è una colonna calcolata: qui la ricalcoliamo
-  viste.push((tt) => tt.stage_telefoni.forEach((x) => { x.stato = !x.reset_fatto ? 'Reset' : !x.sblocco_fatto ? 'Sblocco' : !x.ticket_chiuso ? 'Ticket' : 'Chiuso'; }));
+  viste.push((tt) => tt.stage_telefoni.forEach((x) => { x.stato = !x.reset_fatto ? 'Reset' : !x.sblocco_fatto ? 'Sblocco' : !x.ticket_chiuso ? 'Ticket' : 'Chiuso'; x.chiuso_il = x.stato === 'Chiuso' ? (x.chiuso_il ?? x.ricevuto_il ?? new Date().toISOString()) : null; }));
   // i computer di prova stanno su bancali della Corporation: se il bancale manca nei dati base, lo creiamo
   let nb = 300;
   for (const d of t.device) if (d.bancale_id && !t.bancali.some((k) => k.id === d.bancale_id)) {
