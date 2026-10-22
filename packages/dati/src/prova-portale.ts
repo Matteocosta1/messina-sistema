@@ -13,7 +13,7 @@ estendiProva(({ t, rpc, rel, viste }) => {
   t.bolle.push(
     { id: 'b-p01', numero: '26-000033', cliente_id: 'c-snam', tipo: 'Consegna', data_consegna: g(-1), fascia: 'Entro le 12', destinatario: 'Snam', indirizzo: 'Via [indirizzo]', citta: 'Milano', colli_previsti: 4, accessori: ['Sponda'], dati_mancanti: [], stato: 'Consegnata', operatore_id: 'u-bol', creata_il: oreFa(50) },
     { id: 'b-p02', numero: '26-000027', cliente_id: 'c-snam', tipo: 'Ritiro', data_consegna: g(-6), fascia: null, destinatario: 'Messina', indirizzo: 'Lacchiarella', citta: 'Lacchiarella', colli_previsti: 2, accessori: [], dati_mancanti: [], stato: 'Fatturata', operatore_id: 'u-bol', creata_il: oreFa(160) },
-    { id: 'b-p03', numero: '26-000044', cliente_id: 'c-uni', tipo: 'Consegna', data_consegna: g(1), fascia: '9–13', destinatario: 'UniCredit', indirizzo: 'Piazza [indirizzo]', citta: 'Milano', colli_previsti: 20, accessori: [], dati_mancanti: [], stato: 'Confermata', operatore_id: 'u-bol', creata_il: oreFa(6) },
+    { id: 'b-p03', numero: '26-000049', cliente_id: 'c-uni', tipo: 'Consegna', data_consegna: g(1), fascia: '9–13', destinatario: 'UniCredit', indirizzo: 'Piazza [indirizzo]', citta: 'Milano', colli_previsti: 20, accessori: [], dati_mancanti: [], stato: 'Confermata', operatore_id: 'u-bol', creata_il: oreFa(6) },
   );
   for (const b of t.bolle.filter((x) => x.id.startsWith('b-p'))) for (let k = 1; k <= b.colli_previsti; k++)
     t.colli.push({ id: crypto.randomUUID(), bolla_id: b.id, codice: `CP${b.id.slice(-2)}-${k}`, letto_entrata: null, letto_carico: b.stato !== 'Confermata' ? oreFa(30) : null, letto_consegna: b.stato !== 'Confermata' ? oreFa(26) : null });

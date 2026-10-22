@@ -11,10 +11,10 @@ estendiProva(({ t, rpc, funzioni }) => {
   t.impostazioni ??= [{ chiave: 'soglia_nitidezza', valore: 35 }];
   t.badge_usati ??= [];
   // una spedizione da caricare (Uscita) e una bolla da mettere a posto (Entrata)
-  t.giri.push({ id: 'giro2', data: oggi(), mezzo_id: 'm1', autista_id: 'd-a2', zona: 'Milano Nord', stato: 'Preparato' });
-  t.bolle.push({ id: 'b-0050', numero: '26-000043', cliente_id: 'c-snam', tipo: 'Consegna', data_consegna: oggi(), fascia: 'Entro le 12', destinatario: 'Snam', indirizzo: 'Via [indirizzo]', citta: 'Sesto',
+  t.giri.push({ id: 'giro2', data: oggi(), mezzo_id: 'm2', autista_id: 'd-a2', zona: 'Milano Nord', stato: 'Preparato' });
+  t.bolle.push({ id: 'b-0050', numero: '26-000047', cliente_id: 'c-snam', tipo: 'Consegna', data_consegna: oggi(), fascia: 'Entro le 12', destinatario: 'Snam', indirizzo: 'Via [indirizzo]', citta: 'Sesto',
     colli_previsti: 4, accessori: ['Sponda'], dati_mancanti: [], stato: 'Confermata', operatore_id: 'u-bol', creata_il: ora(), note: null, mail_id: null });
-  t.bolle.push({ id: 'b-0051', numero: '26-000044', cliente_id: 'c-snam', tipo: 'Magazzino', data_consegna: oggi(), fascia: null, destinatario: 'Messina', indirizzo: 'Lacchiarella', citta: 'Lacchiarella',
+  t.bolle.push({ id: 'b-0051', numero: '26-000048', cliente_id: 'c-snam', tipo: 'Magazzino', data_consegna: oggi(), fascia: null, destinatario: 'Messina', indirizzo: 'Lacchiarella', citta: 'Lacchiarella',
     colli_previsti: 4, accessori: [], dati_mancanti: [], stato: 'Confermata', operatore_id: 'u-bol', creata_il: ora(), note: null, mail_id: null });
   ['p3-2-1', 'p3-2-1', 'p3-2-2', 'p3-2-2'].forEach((p, i) => t.colli.push({ id: crypto.randomUUID(), bolla_id: 'b-0050', codice: `C50-00${i + 1}`, posto_id: p, letto_entrata: ora(), letto_carico: null, letto_consegna: null }));
   for (let i = 1; i <= 4; i++) t.colli.push({ id: crypto.randomUUID(), bolla_id: 'b-0051', codice: `C51-00${i}`, posto_id: null, letto_entrata: null, letto_carico: null, letto_consegna: null });

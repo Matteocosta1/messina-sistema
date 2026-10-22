@@ -189,23 +189,57 @@ export function onCambioProva(f: () => void) { ascoltatori.add(f); return () => 
 function condividi(t: Tabelle) {
   let dentro = false;
   try { dentro = window.parent !== window; } catch { dentro = false; }
-  if (!dentro) return { invia: () => {}, esterno: (_f: (nome: string, corpo: unknown) => void) => {} };
+  const impronta = () => { try { return JSON.stringify(t); } catch { return String(Math.random()); } };
+  if (!dentro) return { impronta: () => '', invia: () => {}, esterno: (_f: (nome: string, corpo: unknown) => void) => {} };
   const io = Math.random().toString(36).slice(2);
-  const manda = (azione: string) => { try { window.parent.postMessage({ tipo: 'messina-prova', azione, da: io, t }, '*'); } catch { /* */ } };
+  // versione: quante modifiche conosce questo programma. La pagina accetta una modifica solo se parte
+  // dall'ultima versione, così una copia vecchia non cancella quella nuova.
+  let versione = 0;
+  const manda = (azione: string) => { try { window.parent.postMessage({ tipo: 'messina-prova', azione, da: io, base: versione, t }, '*'); } catch { /* */ } };
   window.addEventListener('message', (e) => {
     const d = e.data;
-    if (e.source !== window.parent || !d || d.tipo !== 'messina-prova-stato' || d.da === io || !d.t || typeof d.t !== 'object') return;
+    if (e.source !== window.parent || !d || typeof d !== 'object') return;
+    if (d.tipo === 'messina-prova-versione' && typeof d.v === 'number') { versione = d.v; return; }
+    if (d.tipo !== 'messina-prova-stato' || d.da === io || !d.t || typeof d.t !== 'object') return;
+    if (typeof d.v === 'number') versione = d.v;
     for (const k of Object.keys(d.t)) if (Array.isArray(d.t[k])) t[k] = d.t[k];
     ascoltatori.forEach((f) => f());
   });
   manda('ciao');
-  return { invia: () => manda('stato'), esterno: (f: (nome: string, corpo: unknown) => void) => {
+  return { impronta, invia: () => manda('stato'), esterno: (f: (nome: string, corpo: unknown) => void) => {
     // la pagina chiede di eseguire un servizio qui (per esempio il modulo di un sito che arriva nella Mail)
     window.addEventListener('message', (e) => {
       const d = e.data;
       if (e.source === window.parent && d && d.tipo === 'messina-prova-fn' && typeof d.nome === 'string') f(d.nome, d.corpo);
     });
   } };
+}
+
+/** in prova: il file caricato, oppure un documento di esempio che dice cos'è */
+function linkProva(t: Tabelle, bucket: string, percorso: string) {
+  const f = [...(t.prova_file ?? [])].reverse().find((x) => x.bucket === bucket && x.percorso === percorso);
+  if (f?.dati) {
+    const [testa, b64] = String(f.dati).split(',');
+    const bin = atob(b64 ?? ''); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([a], { type: testa.match(/data:([^;]+)/)?.[1] ?? 'application/octet-stream' }));
+  }
+  const esc = (x: string) => x.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]!));
+  const nome = esc(percorso.split('/').pop() ?? percorso);
+  const cosa = bucket === 'bolle' ? 'Foto della bolla firmata' : bucket === 'telecamere' ? 'Immagine della telecamera' : bucket === 'device' ? 'Foto del seriale' : 'Documento';
+  if (bucket !== 'documenti') {   // immagini (bolle, telecamere, seriali): un'immagine di esempio, che si vede anche dentro <img>
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="560" viewBox="0 0 800 560"><rect width="800" height="560" fill="#eceef3"/>
+<rect x="40" y="40" width="720" height="480" rx="24" fill="#fff" stroke="#d6d8de" stroke-width="2"/>
+<text x="400" y="250" text-anchor="middle" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#111214">${cosa}</text>
+<text x="400" y="300" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" fill="#5b5e66">Dati di esempio · ${nome}</text></svg>`;
+    return URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  }
+  const html = `<!doctype html><html lang="it"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${cosa}</title>
+<body style="margin:0;font-family:system-ui,-apple-system,sans-serif;background:#f2f3f5;color:#111214;display:grid;place-items:center;min-height:100vh">
+<div style="background:#fff;border-radius:20px;padding:28px;max-width:520px;width:calc(100% - 32px);box-shadow:0 16px 36px -22px rgba(20,24,32,.28)">
+<div style="font-size:13px;color:#5b5e66">Messina · dati di esempio</div><h1 style="font-size:24px;margin:6px 0 14px">${cosa}</h1>
+<div style="border:2px dashed rgba(17,18,20,.15);border-radius:14px;height:220px;display:grid;place-items:center;color:#5b5e66;font-size:14px;text-align:center;padding:12px">${nome}</div>
+<p style="font-size:14px;color:#5b5e66;margin:14px 0 0">Online qui si apre il file vero, con un link che scade dopo 10 minuti.</p></div></body></html>`;
+  return URL.createObjectURL(new Blob([html], { type: 'text/html' }));
 }
 
 export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: Record<string, string>, viste: (t: Tabelle) => void = () => {}, funzioni: FunzioniProva = {}, regole: RegoleProva = {}): Motore {
@@ -215,7 +249,7 @@ export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: R
   const pagina = condividi(t);
   pagina.esterno((nome, corpo) => {
     const f = funzioni[nome]; if (!f) return;
-    try { f(corpo, t, null); viste(t); pagina.invia(); ascoltatori.forEach((x) => x()); } catch (e) { console.warn('Prova:', (e as Error).message); }
+    try { const prima = pagina.impronta(); f(corpo, t, null); const cambiato = pagina.impronta() !== prima; viste(t); if (cambiato) { pagina.invia(); ascoltatori.forEach((x) => x()); } } catch (e) { console.warn('Prova:', (e as Error).message); }
   });
 
   function proietta(tab: string, riga: Record<string, any>, colonne: string): Record<string, any> {
@@ -250,6 +284,7 @@ export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: R
     modo: 'prova',
     async esegui(q) {
       await pausa();
+      const prima = q.metodo === 'GET' ? '' : pagina.impronta();
       if (q.metodo === 'GET') viste(t);
       const tab = t[q.tabella] ?? (t[q.tabella] = []);
       let righe = tab.filter((r) => q.filtri.every((f) => passa(r, f)));
@@ -265,13 +300,20 @@ export function motoreProva(t: Tabelle, rel: Relazioni, rpc: RpcProva, utenti: R
       }
       for (const [c, a] of [...q.ordine].reverse()) righe = [...righe].sort((x, y) => (x[c] ?? '') < (y[c] ?? '') ? (a ? -1 : 1) : (x[c] ?? '') > (y[c] ?? '') ? (a ? 1 : -1) : 0);
       if (q.limite) righe = righe.slice(0, q.limite);
-      if (q.metodo !== 'GET') pagina.invia();
+      if (q.metodo !== 'GET' && pagina.impronta() !== prima) pagina.invia();   // solo se qualcosa è cambiato davvero
       return righe.map((r) => proietta(q.tabella, r, q.colonne));
     },
-    async rpc(fn, args) { await pausa(); const f = rpc[fn]; if (!f) throw new Error(`In prova «${fn}» non è disponibile`); const r = f(args, t, io); viste(t); pagina.invia(); return r; },
-    async fn(nome, corpo) { await pausa(); const f = funzioni[nome]; if (!f) throw new Error(`«${nome}» funziona solo collegato a Supabase`); const r = f(corpo, t, io); viste(t); pagina.invia(); return r; },
-    async carica() { await pausa(); },
-    async link() { return ''; },
+    async rpc(fn, args) { await pausa(); const f = rpc[fn]; if (!f) throw new Error(`In prova «${fn}» non è disponibile`); const prima = pagina.impronta(); const r = f(args, t, io); const cambiato = pagina.impronta() !== prima; viste(t); if (cambiato) pagina.invia(); return r; },
+    async fn(nome, corpo) { await pausa(); const f = funzioni[nome]; if (!f) throw new Error(`«${nome}» funziona solo collegato a Supabase`); const prima = pagina.impronta(); const r = f(corpo, t, io); const cambiato = pagina.impronta() !== prima; viste(t);
+      if (cambiato) { pagina.invia(); ascoltatori.forEach((x) => x()); } return r; },
+    // file: in prova la foto o il documento caricato resta nel database di esempio, così si riapre anche da un altro programma
+    async carica(bucket, percorso, file) {
+      await pausa();
+      const dati = file.size <= 1_500_000 ? await new Promise<string>((ok) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => ok(''); r.readAsDataURL(file); }) : '';
+      (t.prova_file ??= []).push({ id: crypto.randomUUID(), bucket, percorso, tipo: file.type, dati });
+      pagina.invia();
+    },
+    async link(bucket, percorso) { return linkProva(t, bucket, percorso); },
     async login(email) {
       await pausa();
       const id = utenti[email.trim().toLowerCase()];

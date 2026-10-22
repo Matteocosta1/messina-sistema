@@ -16,7 +16,8 @@ const inizioMese = () => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 
 const inizioOggi = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
 
 export function Presenze() {
-  const { db, dip } = useApp();
+  const { db, dip, aggiorna } = useApp();
+  const [esitoProva, setEsitoProva] = useState<string | null>(null);
   const [codice, setCodice] = useState<string | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
   const [left, setLeft] = useState(30 - Math.floor(Date.now() / 1000) % 30);
@@ -60,6 +61,16 @@ export function Presenze() {
         <div className="lbl">Cambia tra <b id="qrleft">{left}</b> secondi · uno screenshot non funziona</div>
       </div>
       {errore && <Esito ok={false} titolo="Badge non attivo">{errore}</Esito>}
+      {db.modo === 'prova' && sel && codice && <>
+        {/* solo in prova: al posto del lettore vero all'ingresso, che legge questo stesso QR */}
+        <button type="button" className="bigbtn ghost" onClick={async () => {
+          try { const r = await db.fn<{ ok: boolean; motivo?: string; verso?: string }>('timbra-lettore', { codice, lettore: 'Ingresso (prova)', chiave: 'prova' });
+            setEsitoProva(r?.ok ? `${r.verso} registrata` : r?.motivo ?? 'Timbratura rifiutata'); setScelto(null); aggiorna(); }
+          catch (e) { setEsitoProva(String((e as Error).message)); }
+        }}>Lettore</button>
+        <div className="lbl" style={{ textAlign: 'center' }}>Prova: «Lettore» fa quello che fa il lettore all'ingresso quando legge il QR.</div>
+      </>}
+      {esitoProva && <div className="lbl" style={{ textAlign: 'center' }}>{esitoProva}</div>}
       <div className="lbl" style={{ textAlign: 'center' }}>{sel ? `${sel}: avvicina il telefono al lettore all’ingresso` : 'Premi Entrata o Uscita e avvicina il telefono al lettore'} · telefono registrato: {nomeTelefono(dip.nome)}</div>
       <div className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
         {(['Entrata', 'Uscita'] as const).map((v) => <button key={v} type="button" className={'bigbtn' + (sel === v ? '' : ' ghost')} style={{ flex: 1, ...(v === prossimo ? {} : { opacity: .35, cursor: 'not-allowed' }) }}

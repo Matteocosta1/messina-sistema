@@ -102,7 +102,7 @@ function dati(): Tabelle {
   for (const bb of t.bolle) for (let k = 1; k <= bb.colli_previsti; k++)
     t.colli.push({ id: crypto.randomUUID(), bolla_id: bb.id, codice: `C${bb.id.slice(-2)}-${String(k).padStart(3, '0')}`,
       letto_entrata: bb.tipo === 'Magazzino' && k < 32 ? oreFa(2) : null, letto_carico: bb.stato === 'In giro' ? oreFa(3) : null, letto_consegna: null });
-  t.giri = [{ id: 'giro1', data: g(0), mezzo_id: 'm2', autista_id: 'd-a1', zona: 'Milano Sud', stato: 'Partito' }];
+  t.giri = [{ id: 'giro1', data: g(0), mezzo_id: 'm1', autista_id: 'd-a1', zona: 'Milano Sud', stato: 'Partito' }];
   t.fermate = ['b-0006', 'b-0007', 'b-0008', 'b-0009', 'b-0010'].map((bid, i) => ({ id: id('f', i + 1), giro_id: 'giro1', bolla_id: bid, ordine: i + 1, esito: 'Da fare', motivo: null, dopo: null, firmata: false, foto_bolla: null, nitidezza: null, chiusa_il: null }));
   t.accessori_extra = [];
   t.giacenze = [
@@ -358,7 +358,8 @@ const FUNZIONI: FunzioniProva = {
   'crea-bolla': (c, t, u) => {
     const m = t.mail.find((x) => x.id === c.mail_id); if (!m) throw new Error('Mail non trovata');
     if (m.bolla_id) return { bolla_id: m.bolla_id };
-    const cli = t.clienti.find((x) => x.nome === m.da_nome) ?? t.clienti[0];
+    const cli = t.clienti.find((x) => x.azienda === 'trasporti' && (x.nome === m.da_nome || (x.email && x.email.toLowerCase() === String(m.da_indirizzo).toLowerCase())));
+    if (!cli) throw new Error('Non riconosco il cliente: crea prima la sua scheda in Clienti');
     const id = crypto.randomUUID();
     t.bolle.unshift({ id, numero: null, cliente_id: cli.id, tipo: /ritir/i.test(m.oggetto) ? 'Ritiro' : 'Consegna', data_consegna: g(1), fascia: /entro le 12/i.test(m.testo ?? '') ? 'Entro le 12:00' : null,
       destinatario: cli.nome, indirizzo: 'Via [indirizzo]', citta: 'Milano', colli_previsti: Number((m.testo ?? '').match(/(\d+) (bancal|coll)/)?.[1] ?? 1), accessori: /sponda/i.test(m.testo ?? '') ? ['Sponda'] : [],
@@ -369,6 +370,7 @@ const FUNZIONI: FunzioniProva = {
     if (!f || !['Pronta', 'Inviata'].includes(f.stato)) throw new Error(`Fattura «${f?.stato}»: si invia solo quando è Pronta`);
     if (f.stato === 'Pronta') { f.stato = 'Inviata'; f.inviata_il = new Date().toISOString(); }
     if (!f.numero) f.numero = 'FPR ' + (100 + t.fatture.filter((x) => x.numero).length) + '/' + new Date().getFullYear().toString().slice(2);
+    f.data ??= new Date().toISOString().slice(0, 10); f.iva = Math.round(Number(f.imponibile ?? 0) * 22) / 100;   // IVA 22% calcolata da Fatture in Cloud
     f.fic_id ??= 'FIC-' + Math.floor(Math.random() * 900000 + 100000); f.sdi_inviata_il ??= new Date().toISOString();   // come la funzione vera: documento creato e mandato allo SdI
     return { numero: f?.numero }; },
   'mail-outlook': (c, t) => {
@@ -402,7 +404,6 @@ const FUNZIONI: FunzioniProva = {
 };
 
 /** le regole di chiusura del database (trigger) rifatte in prova, con gli stessi messaggi */
-let numBolla = 42;
 const REGOLE: RegoleProva = {
   contenuto: (a, b, t, u) => {
     b.il = new Date().toISOString(); b.da ??= u;
@@ -410,16 +411,23 @@ const REGOLE: RegoleProva = {
     t.storico.unshift({ id: Date.now(), quando: b.il, azienda: 'trasporti', chi_nome: t.profili.find((x) => x.id === u)?.nome ?? 'Tu', operazione: a ? 'Modifica' : 'Entrata',
       cosa: `${b.articolo} · ${b.quantita} pz${a ? ` (prima ${a.quantita})` : ''}`, dove: p?.codice ?? '—', come: b.inserito });
   },
-  bolle: (a, b) => {
+  bolle: (a, b, t) => {
     if (!a) { if (b.stato && b.stato !== 'Nuova') throw new Error('Una bolla nasce Nuova e senza numero'); b.stato = 'Nuova'; b.accessori ??= []; b.dati_mancanti ??= []; b.creata_il ??= new Date().toISOString(); return; }
     if (a.stato === 'Nuova' && b.stato === 'Confermata') {
       if (b.dati_mancanti?.length) throw new Error('Bolla bloccata: manca ' + b.dati_mancanti.join(', '));
       if (!b.data_consegna || !b.indirizzo || !b.colli_previsti) throw new Error('Bolla bloccata: servono data, indirizzo e colli');
-      b.numero = new Date().toISOString().slice(2, 4) + '-' + String(++numBolla).padStart(6, '0'); b.confermata_il = new Date().toISOString();
+      const anno = new Date().toISOString().slice(2, 4);   // come la sequenza del database: il numero dopo il più alto già dato
+      const ultimo = Math.max(0, ...t.bolle.map((x) => String(x.numero ?? '').startsWith(anno + '-') ? Number(String(x.numero).slice(3)) : 0));
+      b.numero = anno + '-' + String(ultimo + 1).padStart(6, '0'); b.confermata_il = new Date().toISOString();
     }
   },
+  device: (a, b) => {   // valori predefiniti del database per un computer appena caricato
+    if (a) return;
+    b.caricato_il ??= new Date().toISOString(); b.stato ??= 'Disponibile'; b.siti ??= []; b.difetti ??= []; b.foto ??= [];
+  },
   fatture: (a, b, t) => {
-    if (!a || a.stato === b.stato) return;
+    if (!a) { b.iva ??= 0; b.imponibile ??= 0; b.stato ??= 'Bozza'; b.creata_il ??= new Date().toISOString(); return; }   // valori predefiniti del database
+    if (a.stato === b.stato) return;
     if (b.stato === 'Inviata' && a.stato !== 'Pronta') throw new Error('Si invia solo una fattura Pronta');
     if (b.stato === 'Pagata' && a.stato !== 'Inviata') throw new Error('Pagata solo dopo l’invio');
     if (b.stato === 'Pronta' && !t.righe_fattura.some((r) => r.fattura_id === b.id)) throw new Error('Fattura senza righe');
