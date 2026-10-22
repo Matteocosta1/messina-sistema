@@ -12,6 +12,9 @@ permissions:
   contents: read
 jobs:
   pubblica:
+    # finché gli account non sono aperti non parte (niente mail di errore): si accende con la variabile
+    # di repository MESSINA_ATTIVO = si (Settings → Secrets and variables → Actions → Variables)
+    if: vars.MESSINA_ATTIVO == 'si'
     uses: ./.github/workflows/_pubblica.yml
     with:
       ambiente: prova

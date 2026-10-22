@@ -74,6 +74,8 @@ Poi, nel progetto:
 
 ## Fase 4 · Primo deploy
 
+**Interruttore.** Finché gli account non sono aperti, «Prova» e «Backup» non partono, così non arrivano mail di errore. Si accendono creando la variabile di repository `MESSINA_ATTIVO` con valore `si` (gratis): GitHub → Settings → Secrets and variables → Actions → Variables ([link](https://github.com/Matteocosta1/messina-sistema/settings/variables/actions)). Va creata quando Secrets e Variables qui sotto sono pronti.
+
 0. **Versioni bloccate** (una volta sola, su un Mac con Node 22): nella cartella del progetto `npm install`, poi mettere su GitHub il file `package-lock.json` che si crea. Il deploy usa `npm ci`, che installa esattamente quelle versioni: senza il file il deploy si ferma apposta. Poi in GitHub → Settings → Code security attivare **Dependabot** (gratis), che segnala librerie e azioni da aggiornare e propone di bloccare le azioni al loro commit.
 
 1. GitHub → Settings → **Environments** ([link](https://github.com/Matteocosta1/messina-sistema/settings/environments)): tre ambienti.

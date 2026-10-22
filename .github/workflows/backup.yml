@@ -11,6 +11,8 @@ permissions:
   contents: read
 jobs:
   backup:
+    # finché database e R2 non esistono non parte (niente mail di errore): si accende con MESSINA_ATTIVO = si
+    if: vars.MESSINA_ATTIVO == 'si'
     runs-on: ubuntu-24.04
     environment: backup   # ambiente senza approvazione: altrimenti la copia notturna aspetterebbe un sì ogni notte
     steps:
