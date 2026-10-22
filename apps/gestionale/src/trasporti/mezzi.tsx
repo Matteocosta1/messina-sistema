@@ -38,14 +38,14 @@ export function Mezzi() {
     <div className="row">{TIPI.map(([k, l]) => <Chip key={k} on={f === k} onClick={() => setF(k)}>{l}</Chip>)}</div>
     {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
-    <div className="glass tbox"><table className="t"><thead><tr><th>Targa</th><th>Tipo</th><th>Sponda</th><th>Portata</th><th>Autista</th><th>Telepass</th><th>Satellitare</th><th>Scadenza</th><th>Oggi</th></tr></thead><tbody>
+    <div className="glass tbox"><table className="t"><thead><tr><th>Targa</th><th>Tipo</th><th>Sponda</th><th>Autista</th><th>Telepass</th><th>Satellitare</th><th>Scadenza</th><th>Oggi</th></tr></thead><tbody>
       {list.length ? list.map((m) => { const o = oggi(m); const sc = scad(m);
-        return <tr key={m.id}><td><b>{m.targa}</b></td><td>{m.tipo}</td><td>{m.sponda ? 'Sì' : 'No'}</td><td>{m.portata_kg != null ? `${Number(m.portata_kg).toLocaleString('it-IT')} kg · ${m.bancali ?? '—'} bancali` : '—'}</td>
+        return <tr key={m.id}><td><b>{m.targa}</b></td><td>{m.tipo}</td><td>{m.sponda ? 'Sì' : 'No'}</td>{/* Da decidere (STATO): la colonna Portata non è nel mockup */}
           <td><select className="input" aria-label={'Autista fisso del mezzo ' + m.targa} value={m.autista_id ?? ''} disabled={az.inCorso} onChange={(e) => fisso(m, e.target.value)} style={{ padding: '6px 8px', minWidth: 130 }}>
             <option value="">—</option>{dati.autisti.map((a: any) => <option key={a.id} value={a.id}>{a.nome}</option>)}</select></td>
           <td>{m.telepass ?? '—'}</td><td>{m.satellitare ? <Pill tone="ok">Collegato</Pill> : <span className="lbl">—</span>}</td>
           <td>{vicino(m.revisione, 30) || vicino(m.assicurazione, 30) ? <span className="miss">{sc}</span> : sc}</td><td>{o === 'Fermo' ? <Pill tone="red">Fermo</Pill> : <Pill tone="dark">{o}</Pill>}</td></tr>; })
-        : <tr><td colSpan={9} className="lbl">Nessun mezzo di questo tipo.</td></tr>}
+        : <tr><td colSpan={8} className="lbl">Nessun mezzo di questo tipo.</td></tr>}
     </tbody></table></div>
   </>);
 }
@@ -107,6 +107,8 @@ export function Telepass() {
     .sort((a, b) => b.flag - a.flag || b.mese - a.mese);
   const cur = R.find((r) => r.n === sel) ?? R[0];
   const somma = (f: (p: any) => boolean) => P.filter(f).reduce((s, p) => s + Number(p.importo), 0);
+  void Btn;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const visto = (p: any) => az.esegui(() => db.from('telepass_controllati').insert({ telepass_id: p.id, da: io.id }));
   return (<>
     <div className="grid g4">
@@ -124,7 +126,7 @@ export function Telepass() {
       </tbody></table></div>
       {cur && <div className="glass" style={{ flex: '1 1 600px', minWidth: 0 }}><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Passaggi di {cur.n}</div><div className="tbox"><table className="t nw"><thead><tr><th>Giorno</th><th>Ora</th><th>Tratta</th><th>Importo</th><th>Nota</th></tr></thead><tbody>
         {cur.l.map((m: any) => <tr key={m.id} className={daCtrl(m) ? 'korow' : ''}><td>{giornoCorto(m.quando)}</td><td>{hm(m.quando)}</td><td>{m.entrata} → {m.uscita}</td><td>{eur(Number(m.importo))}</td>
-          <td>{m.controllo ? <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{m.controllo}{daCtrl(m) && <Btn ghost sm onClick={() => visto(m)} disabled={az.inCorso}>Visto</Btn>}</span> : <span className="lbl">Nel giro</span>}</td></tr>)}
+          <td>{/* Da decidere (STATO): «Visto» (telepass_controllati) non è nel mockup */}{m.controllo ? (daCtrl(m) ? m.controllo : <span className="lbl">{m.controllo} · visto</span>) : <span className="lbl">Nel giro</span>}</td></tr>)}
       </tbody></table></div></div>}
     </div>
     <p className="lbl" style={{ margin: 0 }}>Ogni apparato Telepass è legato al suo mezzo, e dal giro del giorno il programma sa chi guidava. I passaggi arrivano da Telepass (collegamento da chiedere al referente Telepass Business, almeno ogni mezz’ora) e finiscono nei costi. Da scrivere nell’informativa e da far vedere al consulente del lavoro prima di usarli per valutare gli autisti.</p>

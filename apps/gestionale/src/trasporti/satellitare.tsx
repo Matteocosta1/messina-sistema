@@ -47,12 +47,14 @@ export function Satellitare() {
   const litri = G.filter((g) => g.litri != null);
   const vista = (id: string) => az.esegui(() => db.rpc('anomalia_vista', { p_id: id }));
   return (<>
-    <Permesso cosa="satellitare" />
+    {/* Da decidere (STATO): il riquadro dell'accordo art. 4 e della conservazione (Permesso) non è nel mockup.
+        Le regole restano: senza accordo il database non accetta posizioni. */}
+    {void Permesso}
     <div className="grid g4">
       <div className="glass card"><div className="lbl">Mezzi in giro</div><div className="big">{G.length}</div><div className="lbl">posizione dal satellitare</div></div>
       <div className="glass card"><div className="lbl">Km oggi</div><div className="big">{Math.round(kmF)}</div><div className="lbl">{kmP ? `previsti ${Math.round(kmP)}` : 'previsti: servono le fermate del giro'}</div></div>
       <div className="glass card"><div className="lbl">Da guardare</div><div className="big">{A.filter((a) => a.grave && !a.vista_il).length}</div><div className="lbl">deviazioni, soste, rifornimenti</div></div>
-      <div className="glass card"><div className="lbl">Gasolio</div><div className="big">{litri.length ? (litri.reduce((s, g) => s + Number(g.litri), 0)).toLocaleString('it-IT') + ' l' : '—'}</div><div className="lbl">carte carburante e km a confronto</div></div>
+      <div className="glass card"><div className="lbl">Gasolio a {new Date().toLocaleDateString('it-IT', { month: 'long' })}</div><div className="big">{litri.length ? (litri.reduce((s, g) => s + Number(g.litri), 0)).toLocaleString('it-IT') + ' l' : '—'}</div><div className="lbl">carte carburante e km a confronto</div></div>
     </div>
     <Errore testo={az.errore} />
     {!G.length ? <Msg>Nessun dato dal satellitare oggi. Si attiva quando colleghiamo il fornitore del satellitare dei mezzi (docs/SETUP.md) e ogni mezzo ha il suo codice in Mezzi.</Msg>
@@ -69,11 +71,11 @@ export function Satellitare() {
           <div className="list">{sue(cur).length ? sue(cur).map((a) => <div key={a.id} className="li">
             <span className="row between" style={{ width: '100%' }}><b>{a.tipo}</b><span className="row" style={{ gap: 6 }}>
               <Pill tone={a.grave && !a.vista_il ? 'red' : undefined}>{hm(a.dalle)}{a.alle && a.alle !== a.dalle ? '–' + hm(a.alle) : ''}</Pill>
-              {a.grave && !a.vista_il && <Btn ghost sm onClick={() => vista(a.id)} disabled={az.inCorso}>Vista</Btn>}</span></span>
+              {/* Da decidere (STATO): «Vista» non è nel mockup */}{void vista}</span></span>
             <span className="lbl">{a.dettaglio}{a.luogo ? ' · ' + a.luogo : ''}</span></div>)
             : <div className="lbl" style={{ padding: 10 }}>Nessuna anomalia: ha seguito il giro.</div>}</div>
         </div>}
       </div>}
-    <p className="lbl" style={{ margin: 0 }}>Il programma confronta ogni giorno il percorso del satellitare con il giro: le strade parallele vicine non contano, le deviazioni lontane e le soste fuori dalle fermate sì. In più: carte carburante contro km, rifornimenti lontani dal giro, motore acceso da fermo, Telepass contro posizione. Lo vede solo la Direzione.</p>
+    <p className="lbl" style={{ margin: 0 }}>Il programma confronta ogni giorno il percorso del satellitare con il giro: le strade parallele vicine non contano, le deviazioni lontane e le soste fuori dalle fermate sì. In più: carte carburante contro km, rifornimenti lontani dal giro, motore acceso da fermo, Telepass contro posizione. Il satellitare già montato sui mezzi si collega tramite il suo fornitore [nome da comunicare].</p>
   </>);
 }

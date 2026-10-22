@@ -30,7 +30,7 @@ export function Portale() {
     const fr = f.current; if (!fr) return;
     let ro: ResizeObserver | null = null;
     const misura = () => { try { const d = fr.contentDocument; if (!d) return; fr.style.height = Math.max(420, d.documentElement.scrollHeight) + 'px'; } catch { /* altro dominio: altezza fissa */ } };
-    const carica = () => { try { const d = fr.contentDocument; if (!d) return; const st = d.createElement('style'); st.textContent = 'html,body{background:transparent!important}'; d.head.appendChild(st);
+    const carica = () => { try { const d = fr.contentDocument; if (!d) return; const st = d.createElement('style'); st.textContent = 'html,body{background:transparent!important}.wrap{padding:0!important;max-width:none!important}'; d.head.appendChild(st);
       ro = new ResizeObserver(misura); ro.observe(d.documentElement); misura(); } catch { /* */ } };
     fr.addEventListener('load', carica);
     return () => { fr.removeEventListener('load', carica); ro?.disconnect(); };

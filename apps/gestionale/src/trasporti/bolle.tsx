@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Btn, Chip, Msg, Pill, Warn } from '@messina/ui';
 import { MailView, useApp, useAzione, useDati, useStato, giornoLungo, giornoCorto, hm, eur, eur0, domaniISO, oggiISO, Mese, Errore, type Mail } from '../core';
 
@@ -53,8 +53,8 @@ export function Bolle({ scelta }: { scelta?: string }) {
   const ok = cur?.stato === 'Confermata';
   const manca: string[] = cur?.dati_mancanti ?? [];
   const conferma = () => az.esegui(() => db.from('bolle').update({ stato: 'Confermata' }).eq('id', cur!.id)).then((x) => x && set({ msg: 'ok' }));
+  void NonConsegnate; void Completa;   // Da decidere (STATO): «Non consegnate» e «Completa» non sono nel mockup
   return (<>
-    <NonConsegnate />
     <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
       <div className="glass" style={{ flex: '1 1 280px', padding: 8, minWidth: 0 }}>
         <div className="row between" style={{ padding: '8px 10px' }}><b>Da confermare</b><span className="lbl">{dati.nuove.length} {dati.nuove.length === 1 ? 'bolla' : 'bolle'}</span></div>
@@ -75,19 +75,14 @@ export function Bolle({ scelta }: { scelta?: string }) {
           <div><div className="lbl">Data</div><b>{giornoLungo(cur.data_consegna)}</b></div>
           <div><div className="lbl">Fascia</div><b>{cur.fascia ?? 'Da definire'}</b></div>
           <div><div className="lbl">Colli</div><b>{cur.colli_previsti ?? '—'}{cur.bancali ? ` · ${cur.bancali} bancali` : ''}</b></div>
-          <div><div className="lbl">Peso</div><b>{cur.peso_kg != null ? `${Number(cur.peso_kg).toLocaleString('it-IT')} kg` : '—'}</b></div>
-          {cur.contrassegno != null && <div><div className="lbl">Contrassegno</div><b>{eur(Number(cur.contrassegno))}</b></div>}
-          {cur.valore_merce != null && <div><div className="lbl">Valore della merce</div><b>{eur(Number(cur.valore_merce))}</b></div>}
+          {/* Da decidere (STATO): Peso, Contrassegno e Valore della merce non sono nel mockup */}
           <div><div className="lbl">Accessori</div><b>{cur.accessori?.length ? cur.accessori.join(', ') : '—'}</b></div>
           {manca.length > 0 && !ok && <div className="bad"><div className="lbl">Manca</div><b className="miss">{manca.join(' e ')}</b></div>}
         </div>
-        {manca.length > 0 && !ok && <Completa bolla={cur} />}
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}><div className="lbl">Prezzo dalle tariffe del cliente</div>
-          {prezzo && prezzo.length > 0 ? <div className="stack" style={{ gap: 4, marginTop: 6 }}>
-            {prezzo.map((r: any) => <div key={r.voce} className="row between"><span>{r.voce}{Number(r.quantita) !== 1 ? ` × ${Number(r.quantita).toLocaleString('it-IT')}` : ''}</span>
-              {r.problema ? <span className="miss">{r.problema}</span> : <b>{eur(Number(r.totale))}</b>}</div>)}
-            <div className="row between" style={{ borderTop: '1px solid var(--line)', paddingTop: 4 }}><span>Totale</span><b>{eur(prezzo.reduce((a: number, r: any) => a + Number(r.totale), 0))}</b></div>
-          </div> : <div>€ —</div>}</div>
+        {/* Da decidere (STATO): il modulo per scrivere il dato mancante (Completa) e il prezzo voce per voce non sono nel mockup */}
+        <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}><div className="lbl">Tariffa applicata dal contratto</div>
+          <div>Base del cliente + accessori · totale <b>{prezzo && prezzo.length ? eur(prezzo.reduce((a: number, r: any) => a + Number(r.totale), 0)) : '€ —'}</b>
+            {prezzo?.some((r: any) => r.problema) && <span className="miss"> · {prezzo.filter((r: any) => r.problema).map((r: any) => r.problema).join(', ')}</span>}</div></div>
         {(s.msg === 'ok' || ok) && <Msg azione="Vai al Traffico" onAzione={() => vai('traffico')}>Bolla confermata: è nei giri di domani e gli accessori sono già sull’app dell’autista. Al cliente parte la mail di conferma.</Msg>}
         {s.msg === 'chiesto' && <ScriviCliente a={cur.clienti?.email} oggetto={`Spedizione del ${giornoLungo(cur.data_consegna)}`} avviso="Mail al cliente pronta, con la domanda sul dato mancante."
           testo={`Buongiorno,\nper organizzare la spedizione ci manca: ${manca.join(', ').toLowerCase()}. Ce lo potete indicare?\nGrazie`} onChiudi={() => set({ msg: '' })} />}
@@ -183,6 +178,11 @@ export function Traffico({ scelto }: { scelto?: string }) {
     giri.forEach((g, i) => { g.vincoli = vincoli[i] ?? []; });
     return { bolle, giri: giri.sort((a, b) => String(a.dipendenti?.nome).localeCompare(String(b.dipendenti?.nome))), prep: prep[0] ?? null, ora: Number(imp[0]?.valore ?? 15) };
   }, [giorno]);
+  // il mockup mostra un giorno solo: quello dei giri pronti da controllare (domani, o il prossimo giorno lavorativo).
+  // La scelta Oggi / Domani / giorno lavorativo è in STATO «Da decidere».
+  const { dati: conGiri } = useDati((d) => giornoTraffico ? Promise.resolve(null) : d.from<any>('giri').select('data').in('data', [domaniISO(), prossimoLavorativo()]), []);
+  useEffect(() => { if (!giornoTraffico && conGiri?.length && !conGiri.some((x) => x.data === giorno)) setGiorno(conGiri.map((x) => x.data).sort()[0]); }, [conGiri]);
+  void giorni;
   if (!dati) return null;
   const assegnate = new Set(dati.giri.flatMap((g) => g.fermate.filter((f: any) => f.esito === 'Da fare').map((f: any) => f.bolla_id)));
   const libere = dati.bolle.filter((b) => !assegnate.has(b.id));
@@ -198,8 +198,7 @@ export function Traffico({ scelto }: { scelto?: string }) {
     ? 'Giri di oggi confermati: ogni autista li trova già in ordine nella sua app.'
     : `Giri di ${nome === 'Domani' ? 'domani' : nome.toLowerCase()} ${dataBreve(giorno)} confermati: quel mattino ogni autista li trova già in ordine nella sua app.`)));
   return (<>
-    <div className="row">{giorni.map((x) => <Chip key={x} on={giorno === x} onClick={() => setGiorno(x)}>{nomeGiorno(x)}</Chip>)}</div>
-    <div className="glass card row between"><span><b>{nome}</b> <span className="lbl">{dataBreve(giorno)} · {tot} fermate · {dati.giri.length} mezzi</span></span>
+    <div className="glass card row between"><span><b>{nome}</b> <span className="lbl">{tot} fermate in questi giri · {dati.giri.length} mezzi</span></span>
       <div className="row">{!dati.giri.length ? null : daConfermare.length ? <Btn onClick={conferma} disabled={az.inCorso || bloccati.length > 0}>Conferma</Btn> : <Pill tone="ok">Confermati</Pill>}</div></div>
     {ok && !daConfermare.length && <Msg>{ok}</Msg>}
     {bloccati.length > 0 && <Warn>{bloccati.map((g) => `Giro di ${g.dipendenti?.nome ?? '—'}: ${g.vincoli.join('; ')}`).join(' · ')}. Spostate le fermate su un altro mezzo, poi confermate.</Warn>}
@@ -227,7 +226,25 @@ export function Traffico({ scelto }: { scelto?: string }) {
           {libere.map((b) => <li key={b.id}>{b.clienti?.nome} · {b.fascia ?? b.citta ?? '—'}</li>)}
         </ul><p className="lbl" style={{ margin: '8px 0 0' }}>Aprite un giro e premete «+ Aggiungi fermata».</p></> : <p className="lbl" style={{ margin: '10px 0 0' }}>Tutto assegnato.</p>}</div>
     </div>
+    {dati.giri.length > 0 && <MappaGiri giri={dati.giri} km={km} nome={nome} />}
   </>);
+}
+
+/** mappaGiri() del mockup: i percorsi del giorno, uno per mezzo, con i numeri dei giri veri */
+function MappaGiri({ giri, km, nome }: { giri: any[]; km: number | null; nome: string }) {
+  const COL = ['#111214', '#5b5e66', '#9a9da5'];
+  const R = ['M60 160 L120 90 L175 70 L230 60 L290 80', 'M60 160 L130 170 L200 150 L250 175', 'M60 160 L110 220 L190 240 L280 230'];
+  const pts = [[120, 90], [175, 70], [230, 60], [290, 80], [130, 170], [200, 150], [250, 175], [110, 220], [190, 240], [280, 230]];
+  const ottim = km != null;   // i km ci sono solo con l'ottimizzatore per camion
+  return <div className="glass card mappa"><div className="row between"><b>Percorsi di {nome === 'Domani' ? 'domani' : nome.toLowerCase()}</b>{ottim && <Pill tone="ok">Ottimizzati per camion</Pill>}</div>
+    <svg viewBox="0 0 340 280" style={{ width: '100%', maxWidth: 520, display: 'block', margin: '10px auto 0' }} role="img" aria-label="Mappa dei giri">
+      <rect x="0" y="0" width="340" height="280" rx="16" fill="rgba(17,18,20,.03)" />
+      <path d="M0 120 Q170 100 340 140" stroke="rgba(17,18,20,.08)" strokeWidth="10" fill="none" /><path d="M150 0 Q160 140 140 280" stroke="rgba(17,18,20,.08)" strokeWidth="8" fill="none" />
+      {giri.slice(0, 3).map((_, i) => <path key={i} d={R[i]} stroke={COL[i]} strokeWidth="3" fill="none" strokeLinejoin="round" />)}
+      {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="6" fill="#fff" stroke="#111214" strokeWidth="2" />)}
+      <rect x="44" y="146" width="32" height="28" rx="6" fill="#111214" /><text x="60" y="190" textAnchor="middle" fontSize="11" fontWeight="700" fill="#111214">Lacchiarella</text></svg>
+    <div className="grid g4" style={{ marginTop: 8 }}><div><div className="lbl">Km totali</div><b style={{ fontSize: 22 }}>{km != null ? Math.round(km) : '—'}</b></div><div><div className="lbl">Mezzi usati</div><b style={{ fontSize: 22 }}>{giri.length}</b></div><div><div className="lbl">Gasolio stimato</div><b style={{ fontSize: 22 }}>—</b></div></div>
+    <p className="lbl" style={{ margin: '8px 0 0' }}>Strade per camion (altezza, peso, ZTL), fasce orarie dei clienti, sponda dove serve. Il navigatore dell’autista riceve il giro già in ordine.</p></div>;
 }
 
 /** mappa schematica del solo giro: le fermate in ordine (le coordinate vere arrivano con l'ottimizzatore per camion) */

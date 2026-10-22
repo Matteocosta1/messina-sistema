@@ -23,9 +23,8 @@ export function Clienti({ scelto, titolo }: { scelto?: string; titolo: (t: strin
   if (!dati) return null;
   if (c) return <Scheda c={c} />;
   return (<>
-    <div className="row between"><Btn onClick={() => setNuovo(!nuovo)}>{nuovo ? 'Chiudi' : 'Nuovo cliente'}</Btn>
-      {io.ruolo !== 'bolle' && <Btn ghost onClick={() => setListino(!listino)}>{listino ? 'Chiudi' : 'Listino'}</Btn>}</div>
-    {listino && <Listino />}
+    {/* Da decidere (STATO): il Listino base (Listino) non è nel mockup */}
+    <div className="row between"><Btn onClick={() => setNuovo(!nuovo)}>{nuovo ? 'Chiudi' : 'Nuovo cliente'}</Btn>{void io}{void listino}{void setListino}</div>
     {nuovo && <NuovoCliente onFatto={(id) => { setNuovo(false); vai('clienti/' + id); }} />}
     <div className="glass tbox"><table className="t"><thead><tr><th>Cliente</th><th>Cosa spedisce</th><th>Referente interno</th><th>Contratto fino al</th><th>Spedizioni mese</th></tr></thead><tbody>
       {dati.clienti.map((x) => <tr key={x.id} className="click" onClick={() => vai('clienti/' + x.id)}><td><b>{x.nome}</b>{x.stato === 'Potenziale' && <> <Pill tone="red">Potenziale</Pill></>}</td><td>{x.cosa_spedisce ?? '—'}</td><td>{x.referente_interno ?? '—'}</td><td>{fmtData(x.contratto_al)}</td><td>{dati.n(x.id)}</td></tr>)}
@@ -106,16 +105,21 @@ function Scheda({ c }: { c: any }) {
     ? <span className="row" style={{ gap: 6 }}><Pill tone="red">Da approvare</Pill>{dir && !mod && <><Btn sm onClick={() => approva(t, true)} disabled={az.inCorso}>Approva</Btn><Btn ghost sm onClick={() => approva(t, false)} disabled={az.inCorso}>Rifiuta</Btn></>}
       {t.motivo && <span className="lbl">{t.motivo}</span>}</span>
     : <span className="lbl">dal {fmtData(t.valida_dal)}</span>;
-  const tabella = (righe: any[], vuoto: string) => <div className="tbox"><table className="t"><thead><tr><th>Voce</th><th>Come si conta</th><th>Zona</th><th>Scaglione</th><th>Minimo</th><th>Prezzo</th><th>Stato</th></tr></thead><tbody>
-    {righe.map((t) => <tr key={t.id}><td><b>{t.voce}</b>{t.quando && <div className="lbl">{t.quando}</div>}</td><td>{comeSiConta(t.unita)}</td><td>{t.zona ?? '—'}</td><td>{scaglione(t)}</td><td>{minimo(t)}</td><td>{prezzo(t)}</td><td>{stato(t)}</td></tr>)}
+  // colonne del mockup; Scaglione, Minimo e Stato (approvazione) compaiono solo modificando le tariffe o quando ci sono (Da decidere, STATO)
+  const extraCol = mod || T.some((t) => t.scaglione_su || t.minimo != null || t.stato !== 'Attiva');
+  const tabBase = (righe: any[], vuoto: string) => <div className="tbox"><table className="t"><thead><tr><th>Voce</th><th>Unità</th><th>Zona</th>{extraCol && <><th>Scaglione</th><th>Minimo</th></>}<th>Prezzo</th>{extraCol && <th>Stato</th>}</tr></thead><tbody>
+    {righe.map((t) => <tr key={t.id}><td><b>{t.voce}</b></td><td>{comeSiConta(t.unita)}</td><td>{t.zona ?? '—'}</td>{extraCol && <><td>{scaglione(t)}</td><td>{minimo(t)}</td></>}<td>{prezzo(t)}</td>{extraCol && <td>{stato(t)}</td>}</tr>)}
     {!righe.length && <tr><td colSpan={7} className="lbl">{vuoto}</td></tr>}
+  </tbody></table></div>;
+  const tabExtra = (righe: any[], vuoto: string) => <div className="tbox"><table className="t"><thead><tr><th>Voce</th><th>Come si conta</th>{extraCol && <><th>Zona</th><th>Scaglione</th><th>Minimo</th></>}<th>Prezzo</th><th>Quando scatta</th>{extraCol && <th>Stato</th>}</tr></thead><tbody>
+    {righe.map((t) => <tr key={t.id}><td><b>{t.voce}</b></td><td>{comeSiConta(t.unita)}</td>{extraCol && <><td>{t.zona ?? '—'}</td><td>{scaglione(t)}</td><td>{minimo(t)}</td></>}<td>{prezzo(t)}</td><td className="lbl">{t.quando ?? '—'}</td>{extraCol && <td>{stato(t)}</td>}</tr>)}
+    {!righe.length && <tr><td colSpan={8} className="lbl">{vuoto}</td></tr>}
   </tbody></table></div>;
   return (<>
     <div className="row between"><Btn ghost onClick={() => vai('clienti')}>Tutti i clienti</Btn>
       <div className="row"><Btn ghost sm onClick={contratto}>Contratto PDF</Btn>
-        {!anag && !mod && <Btn ghost sm onClick={() => setAnag(Object.fromEntries([...ANAG.map(([k]) => [k, c[k] ?? '']), ['iva_natura', c.iva_natura ?? ''], ['split_payment', !!c.split_payment], ['traccia_asset', !!c.traccia_asset], ['eccezioni', c.eccezioni ?? ''], ['esigenze', c.esigenze ?? '']]))}>Anagrafica</Btn>}
         {puoTariffe && !anag && (mod ? <><Btn sm onClick={salva} disabled={az.inCorso}>Salva</Btn><Btn ghost sm onClick={() => setMod(null)}>Annulla</Btn></>
-          : <Btn sm onClick={() => { setMsg(''); setMod({ righe: {}, nuove: [], dal: oggiISO() }); }}>Tariffe</Btn>)}</div></div>
+          : <Btn sm onClick={() => { setMsg(''); setMod({ righe: {}, nuove: [], dal: oggiISO() }); }}>Modifica tariffe</Btn>)}</div></div>
     {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
     <div className="grid g4">
@@ -124,7 +128,8 @@ function Scheda({ c }: { c: any }) {
       <div className="glass card"><div className="lbl">Contratto</div><b>dal {fmtData(c.contratto_dal)} al {fmtData(c.contratto_al)}</b></div>
       <div className="glass card"><div className="lbl">Fatturazione</div><b>{c.fatturazione ?? '[mensile o a spedizione]'}</b></div>
     </div>
-    <div className="glass card stack">
+    {/* Da decidere (STATO): «Anagrafica per la fattura» (P.IVA, PEC, codice destinatario, IVA, split payment, asset) non è nel mockup */}
+    {anag && <><div className="glass card stack">
       <div className="row between"><b>Anagrafica per la fattura</b>{dati.manca.length > 0 && !anag && <span className="miss">Manca: {dati.manca.join(', ')}</span>}</div>
       {anag ? <>
         <div className="grid g2">{ANAG.map(([k, l, type]) => <label key={k} className="field"><span className="lbl">{l}</span><input className="input" type={type ?? 'text'} value={anag[k]} maxLength={k === 'provincia' ? 2 : k === 'cap' ? 5 : undefined}
@@ -141,9 +146,9 @@ function Scheda({ c }: { c: any }) {
       </> : <div className="kv">{ANAG.map(([k, l]) => <div key={k}><div className="lbl">{l}</div><b>{c[k] || '—'}</b></div>)}
         <div><div className="lbl">IVA</div><b>{c.iva_natura ? 'Natura ' + c.iva_natura : Number(c.iva_aliquota ?? 22) + '%'}{c.split_payment ? ' · split payment' : ''}</b></div>
         <div><div className="lbl">Asset</div><b>{c.traccia_asset ? 'Sì' : 'No'}</b></div></div>}
-    </div>
-    <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Tariffa base</div>{tabella(base, puoTariffe ? 'Nessuna tariffa base: premi «Tariffe».' : 'Nessuna tariffa base: la inserisce il commerciale.')}</div>
-    <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Accessori e voci extra</div>{tabella(extra, 'Nessuna voce extra.')}
+    </div></>}
+    <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Tariffa base</div>{tabBase(base, puoTariffe ? 'Nessuna tariffa base: premi «Tariffe».' : 'Nessuna tariffa base: la inserisce il commerciale.')}</div>
+    <div className="glass"><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Accessori e voci extra</div>{tabExtra(extra, 'Nessuna voce extra.')}
       {mod && <div className="stack" style={{ padding: 14, gap: 8 }}>
         {mod.nuove.map((n, i) => <div key={i} className="row" style={{ gap: 6 }}>
           {inp(n.voce, (v) => cambiaNuova(n, 'voce', v), 'Voce', 130)}
@@ -161,6 +166,8 @@ function Scheda({ c }: { c: any }) {
         <span className="lbl">Un prezzo cambiato non cancella il vecchio: il vecchio vale fino al giorno prima, così le bolle già fatte restano col loro prezzo. Serve la Direzione sotto il listino base, per un cliente nuovo o per una data passata (possibile solo se le bolle di quei giorni non sono già in una fattura inviata).</span>
       </div>}
     </div>
+    <div className="grid g2"><div className="glass card"><b>Eccezioni e accordi</b><p style={{ margin: '8px 0 0' }}>{c.eccezioni || '[sconti, minimi, accordi particolari: li inserisce la Direzione]'}</p></div>
+      <div className="glass card"><b>Cosa chiede il cliente</b><p style={{ margin: '8px 0 0' }}>{c.esigenze || '—'}</p></div></div>
   </>);
 }
 
@@ -211,7 +218,7 @@ export function Fatturazione() {
   const [msg, setMsg] = useState('');
   const [aperta, setAperta] = useState<string | null>(null);
   const [nuova, setNuova] = useState(false);
-  const { dati } = useDati((d) => d.from<any>('fatture').select('*,clienti(nome),fatture_bolle(bolla_id,valida)').eq('azienda', 'trasporti').order('creata_il', { ascending: false }).limit(300), []);
+  const { dati } = useDati((d) => d.from<any>('fatture').select('*,clienti(nome),fatture_bolle(bolla_id,valida),righe_fattura(voce,quantita)').eq('azienda', 'trasporti').order('creata_il', { ascending: false }).limit(300), []);
   if (!dati) return null;
   const F = dati.filter((f) => f.periodo === mese || APERTE.includes(f.stato) || (f.stato === 'Inviata' && f.periodo < mese));
   const pronte = F.filter((f) => f.stato === 'Pronta');
@@ -224,25 +231,23 @@ export function Fatturazione() {
   const esiti = () => az.prendi(() => db.fn<any>('fatture-in-cloud', { azione: 'esiti' })).then((r) => r && setMsg(`Esiti aggiornati: ${r.scartate ? r.scartate + ' scartate dallo SdI, da correggere' : 'nessuno scarto'}.`));
   const cur = dati.find((f) => f.id === aperta);
   if (cur) return <Dettaglio f={cur} sola={sola} onChiudi={(t) => { setAperta(null); if (t) setMsg(t); }} />;
+  // Da decidere (STATO): scelta del mese, «Chiudi mese», «Esiti», colonne Mese/Bolle/Imponibile/IVA/SdI non sono nel mockup.
+  // Le fatture del mese le prepara comunque «Chiudi mese» (rpc chiudi_mese), che resta nel codice.
+  void chiudi; void esiti; void setMese; void mesePrima;
+  const pagata = (f: any) => az.esegui(() => db.from('fatture').update({ stato: 'Pagata' }).eq('id', f.id)).then((ok) => ok && setMsg(`Pagamento di ${f.clienti?.nome} registrato: sale l’Incassato in Home.`));
+  const voci = (f: any) => (f.righe_fattura ?? []).filter((r: any) => !/^(Base|Consegna|Ritiro e consegna|Spedizion)/i.test(r.voce)).map((r: any) => `${r.voce} ×${Number(r.quantita).toLocaleString('it-IT')}`).join(' · ') || '—';
   return (<>
-    <div className="row between">
-      <div className="row">{[mesePrima(), meseISO()].map((m) => <Chip key={m} on={mese === m} onClick={() => { setMese(m); setMsg(''); }}>{nomeMese(m)}</Chip>)}</div>
-      {!sola && <div className="row"><Btn onClick={chiudi} disabled={az.inCorso}>Chiudi mese</Btn>
-        {pronte.length > 0 && <Btn onClick={() => invia(pronte)} disabled={az.inCorso}>Invia</Btn>}
-        <Btn ghost onClick={esiti} disabled={az.inCorso}>Esiti</Btn>
-        <Btn ghost onClick={() => setNuova(!nuova)}>{nuova ? 'Chiudi' : 'Nuova'}</Btn></div>}
-    </div>
+    <div className="glass tbox"><table className="t"><thead><tr><th>Cliente</th><th>Consegne</th><th>Accessori ed extra</th><th>Totale</th><th>Stato</th><th>Incasso</th></tr></thead><tbody>
+      {F.map((f) => <tr key={f.id} className="click" onClick={() => setAperta(f.id)}>
+        <td><b>{f.clienti?.nome}</b></td><td>{nBolle(f) || '—'}</td><td>{voci(f)}</td><td>{eur(Number(f.totale))}</td><td>{pillStato(f)}</td>
+        <td onClick={(e) => e.stopPropagation()}>{f.stato === 'Pagata' ? <Pill tone="ok">Pagata</Pill> : f.stato === 'Inviata' && !sola ? <Btn ghost sm onClick={() => pagata(f)} disabled={az.inCorso}>Pagata</Btn> : <span className="lbl">—</span>}</td></tr>)}
+      {!F.length && <tr><td colSpan={6} className="lbl">Nessuna fattura per {nomeMese(mese).toLowerCase()}.</td></tr>}
+    </tbody></table></div>
     {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
+    {!sola && <div className="row">{pronte.length > 0 && <Btn onClick={() => invia(pronte)} disabled={az.inCorso}>Invia</Btn>}<Btn ghost onClick={() => setNuova(!nuova)}>{nuova ? 'Chiudi' : 'Nuova'}</Btn>
+      <span className="lbl">Ogni voce della fattura rimanda alla sua consegna. Quando il cliente paga, premi «Pagata»: sale l’Incassato in Home.</span></div>}
     {nuova && <NuovaFattura onFatto={(id) => { setNuova(false); setAperta(id); }} />}
-    <div className="glass tbox"><table className="t"><thead><tr><th>Cliente</th><th>Mese</th><th>Bolle</th><th>Imponibile</th><th>IVA</th><th>Totale</th><th>Stato</th><th>SdI</th><th /></tr></thead><tbody>
-      {F.map((f) => <tr key={f.id} className="click" onClick={() => setAperta(f.id)}>
-        <td><b>{f.clienti?.nome}</b>{f.tipo === 'Nota di credito' && <div className="lbl">Nota di credito</div>}{f.problema && <div className="miss" style={{ fontSize: 13 }}>{f.problema}</div>}</td>
-        <td>{f.periodo ? nomeMese(f.periodo) : '—'}</td><td>{nBolle(f) || '—'}</td><td>{eur(Number(f.imponibile))}</td><td>{f.split_payment ? <span className="lbl">split</span> : eur(Number(f.iva))}</td>
-        <td><b>{eur(Number(f.totale))}</b></td><td>{pillStato(f)}</td><td className="lbl">{f.sdi_esito ?? '—'}</td><td><span className="go">Apri</span></td></tr>)}
-      {!F.length && <tr><td colSpan={9} className="lbl">Nessuna fattura per {nomeMese(mese).toLowerCase()}: premi «Chiudi mese».</td></tr>}
-    </tbody></table></div>
-    <span className="lbl">«Chiudi mese» mette in fattura ogni bolla consegnata e non ancora fatturata, con le tariffe del giorno della consegna. Una bolla sta in una sola fattura. Le spedizioni in giacenza aspettano la chiusura della giacenza.</span>
   </>);
 }
 

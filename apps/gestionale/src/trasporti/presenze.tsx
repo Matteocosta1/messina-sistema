@@ -58,7 +58,7 @@ export function Presenze({ tab }: { tab?: string }) {
   }, []);
   if (!dati) return null;
   return (<>
-    <div className="row">{TABS.map(([k, l]) => <Chip key={k} on={t === k} onClick={() => vai('presenze/' + k)}>{l}{k === 'correzioni' && <Badge n={dati.nFix} />}{k === 'allarmi' && <Badge n={dati.nAll} />}{k === 'telefoni' && <Badge n={dati.nTel} />}</Chip>)}</div>
+    <div className="row">{TABS.filter(([k]) => k !== 'telefoni' || t === 'telefoni').map(([k, l]) => <Chip key={k} on={t === k} onClick={() => vai('presenze/' + k)}>{l}{k === 'correzioni' && <Badge n={dati.nFix} />}{k === 'allarmi' && <Badge n={dati.nAll} />}{k === 'telefoni' && <Badge n={dati.nTel} />}</Chip>)}</div>
     {t === 'oggi' && <Oggi nFix={dati.nFix} />}
     {t === 'correzioni' && <Correzioni />}
     {t === 'allarmi' && <Allarmi n={dati.nAll} />}
@@ -78,8 +78,8 @@ function Oggi({ nFix }: { nFix: number }) {
     <div className="grid g4">
       <div className="glass card"><div className="lbl">Presenti ora</div><div className="big">{presenti}</div><div className="lbl">su {P.length}</div></div>
       <div className="glass card"><div className="lbl">In ritardo</div><div className="big">{P.filter((p) => String(p.stato).startsWith('Ritardo')).length}</div></div>
-      <div className="glass card"><div className="lbl">Assenti</div><div className="big">{P.filter((p) => !p.entrata).length}</div></div>
-      <div className="glass card"><div className="lbl">Uscite da sistemare</div><div className="big">{nFix}</div><div className="lbl">dei giorni scorsi</div></div>
+      <div className="glass card"><div className="lbl">Ferie e malattia</div><div className="big">{P.filter((p) => !p.entrata).length}</div></div>
+      <div className="glass card"><div className="lbl">Uscite da sistemare</div><div className="big">{nFix}</div><div className="lbl">di ieri</div></div>
     </div>
     <div className="glass tbox"><table className="t" style={{ minWidth: 720 }}><thead><tr><th>Dipendente</th><th>Reparto</th><th>Contratto</th><th>Entrata</th><th>Uscita</th><th>Stato</th></tr></thead><tbody>
       {P.map((d) => <tr key={d.dipendente_id}><td><b>{d.nome}</b></td><td>{d.reparto ?? '—'}</td><td>{d.ore_settimana ? `${Number(d.ore_settimana)} h a settimana` : '—'}</td><td>{hm(d.entrata)}</td><td>{hm(d.uscita)}</td>
@@ -198,19 +198,19 @@ function Ferie() {
   return (<>
     {s.msg && <Msg>{s.msg}</Msg>}
     <Errore testo={az.errore} />
-    <div className="glass tbox"><table className="t nw" style={{ minWidth: 1100 }}><thead><tr><th>Dipendente</th><th>L’anno</th><th>Ferie maturate</th><th>Godute</th><th>Restano</th><th>Permessi spettanti</th><th>Usati</th><th>Restano</th><th>Da guardare</th><th /></tr></thead><tbody>
+    <div className="glass tbox"><table className="t nw" style={{ minWidth: 1100 }}><thead><tr><th>Dipendente</th>{s.mod && <th>L’anno</th>}<th>Ferie maturate</th><th>Godute</th><th>Restano</th><th>Permessi spettanti</th><th>Usati</th><th>Restano</th><th>Da guardare</th></tr></thead><tbody>
       {dati.D.map((d) => {
         const f = dati.F.find((x) => x.dipendente_id === d.id);
         const nota = !d.ferie_anno ? 'Manca quanto spetta l’anno (contratto)' : f && Number(f.ferie_godute) < 10 && new Date().getMonth() >= 8 ? 'Meno di 2 settimane godute quest’anno: va pianificato entro dicembre' : '';
-        return <tr key={d.id}><td><b>{d.nome}</b>{d.assunto_il && <div className="lbl">dal {new Date(d.assunto_il + 'T12:00:00').toLocaleDateString('it-IT')}</div>}</td>
-          <td>{s.mod === d.id ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>{inp(s.ferie, 'ferie', 'Ferie l’anno in giorni')} gg {inp(s.permessi, 'permessi', 'Permessi l’anno in ore')} h
+        return <tr key={d.id}><td><b>{d.nome}</b></td>
+          {/* Da decidere (STATO): la colonna «L’anno» e il tasto «Cambia» (quanto spetta l’anno, data di assunzione) non sono nel mockup */}
+          {s.mod && <td>{s.mod === d.id ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>{inp(s.ferie, 'ferie', 'Ferie l’anno in giorni')} gg {inp(s.permessi, 'permessi', 'Permessi l’anno in ore')} h
             <input className="input" type="date" style={{ minHeight: 32, padding: '4px 8px' }} aria-label="Assunto il" value={s.assunto} onChange={(e) => set({ assunto: e.target.value })} /></span>
-            : d.ferie_anno != null || d.permessi_anno != null ? `${n(d.ferie_anno)} gg · ${n(d.permessi_anno)} h` : <span className="lbl">—</span>}</td>
+            : d.ferie_anno != null || d.permessi_anno != null ? `${n(d.ferie_anno)} gg · ${n(d.permessi_anno)} h` : <span className="lbl">—</span>}</td>}
           <td>{f ? n(f.ferie_maturate) + ' gg' : '—'}</td><td>{f ? n(f.ferie_godute) + ' gg' : '—'}</td><td><b>{f ? n(f.ferie_maturate - f.ferie_godute) + ' gg' : '—'}</b></td>
           <td>{f ? n(f.permessi_spettanti) + ' h' : '—'}</td><td>{f ? n(f.permessi_usati) + ' h' : '—'}</td><td><b>{f ? n(f.permessi_spettanti - f.permessi_usati) + ' h' : '—'}</b></td>
           <td>{nota ? <span className="miss">{nota}</span> : <span className="lbl">—</span>}</td>
-          <td>{s.mod === d.id ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><Btn sm onClick={() => salva(d.id)} disabled={az.inCorso}>Salva</Btn><Btn ghost sm onClick={() => set({ mod: '' })}>Annulla</Btn></span>
-            : <Btn ghost sm onClick={() => set({ mod: d.id, ferie: d.ferie_anno == null ? '' : String(d.ferie_anno), permessi: d.permessi_anno == null ? '' : String(d.permessi_anno), assunto: d.assunto_il ?? '', msg: '' })}>Cambia</Btn>}</td></tr>; })}
+          {s.mod === d.id && <td><span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><Btn sm onClick={() => salva(d.id)} disabled={az.inCorso}>Salva</Btn><Btn ghost sm onClick={() => set({ mod: '' })}>Annulla</Btn></span></td>}</tr>; })}
       {!dati.D.length && <tr><td colSpan={10} className="lbl">Nessun dipendente.</td></tr>}
     </tbody></table></div>
     <p className="lbl" style={{ margin: 0 }}>Ferie e permessi maturano da soli il primo di ogni mese, un dodicesimo di quanto spetta l’anno (dal mese di assunzione, se entro il 15). Quanto spetta lo dice il contratto collettivo di ciascuno. Per legge almeno 4 settimane di ferie l’anno: 2 da godere nell’anno, le altre entro i 18 mesi dopo.</p>

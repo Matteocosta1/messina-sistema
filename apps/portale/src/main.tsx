@@ -2,13 +2,13 @@
 // (shell con menu laterale, schede in vetro, tabelle). Ogni cliente vede solo il suo:
 // lo decidono i permessi del database (RLS); il portale in più filtra per cliente.
 import '@messina/dati/prova-tutto';   // stessi dati di prova in tutti i programmi
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@messina/ui/mockup.css';
 import '@messina/ui/produzione.css';
 import { collega, entraInProva, onCambioProva, type Config, type Db } from '@messina/dati';
 import { motoreDiProva, ELENCO_PROVA } from '@messina/dati/prova';
-import { Badge, Btn, Chip, Msg, Pill, Search, Stat, Card } from '@messina/ui';
+import { Btn, Chip, Msg, Pill, Stat, Card } from '@messina/ui';
 
 declare global { interface Window { MESSINA?: Config } }
 const cfg = window.MESSINA;
@@ -70,8 +70,8 @@ function useApriFile() {
   return { apri, msg };
 }
 
-// ------------------------------------------------------------------ menu
-const NAV_TUTTI: [string, string][] = [['home', 'Home'], ['magazzino', 'Magazzino'], ['asset', 'Asset'], ['spedizioni', 'Spedizioni'], ['giacenze', 'Giacenze'], ['fatture', 'Fatture']];
+// ------------------------------------------------------------------ menu (P_NAV del mockup)
+const NAV: [string, string][] = [['home', 'Home'], ['spedizioni', 'Spedizioni'], ['magazzino', 'Magazzino'], ['giacenze', 'Giacenze'], ['fatture', 'Fatture']];
 const leggiPercorso = () => decodeURIComponent(location.hash.replace(/^#\/?/, '')) || 'home';
 
 // link della mail «Password dimenticata»: Supabase torna qui con #access_token=…&type=recovery
@@ -87,7 +87,6 @@ function Portale() {
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [percorso, setPercorso] = useState(leggiPercorso());
   const [giro, setGiro] = useState(0);
-  const [cerca, setCerca] = useState('');
   const carica = useCallback(async () => {
     await entraInProva(db, window.MESSINA);   // solo in Prova, se la pagina indica l'utente di esempio
     const s = db.auth.sessione();
@@ -100,7 +99,7 @@ function Portale() {
   }, []);
   useEffect(() => { carica(); }, [carica]);
   useEffect(() => {
-    const f = () => { setPercorso(leggiPercorso()); setCerca(''); window.scrollTo(0, 0); };
+    const f = () => { setPercorso(leggiPercorso()); window.scrollTo(0, 0); };
     window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f);
   }, []);
   const vai = useCallback((p: string) => { location.hash = '#/' + p; }, []);
@@ -114,314 +113,252 @@ function Portale() {
       <p className="lbl" style={{ margin: 0 }}>Il portale è per i clienti: il tuo accesso è sul gestionale.</p>
       <Btn onClick={() => db.auth.logout().then(() => location.reload())}>Esci</Btn></div></div>);
   return (
-    <AppCtx.Provider value={{ db, io, clienti, vai, percorso, aggiorna, giro, cerca }}>
-      <Shell cerca={cerca} onCerca={setCerca} />
+    <AppCtx.Provider value={{ db, io, clienti, vai, percorso, aggiorna, giro, cerca: '' }}>
+      <Shell />
     </AppCtx.Provider>
   );
 }
 
-function Shell(p: { cerca: string; onCerca: (v: string) => void }) {
+/** testa del portale del mockup (portbar): «Area clienti» e le cinque schede in riga.
+ *  «Cerca» ed «Esci» non sono nel mockup: le funzioni restano, dove metterle è in STATO «Da decidere». */
+function Shell() {
   const { io, clienti, vai, percorso } = useApp();
-  const NAV = NAV_TUTTI.filter(([id]) => id !== 'asset' || clienti.some((c) => c.traccia_asset));
   const cur0 = percorso.split('/')[0] || 'home';
   const cur = NAV.some(([id]) => id === cur0) ? cur0 : 'home';
   const nome = clienti.find((c) => c.id === io.cliente_id)?.nome ?? io.nome;
-  const titolo = NAV.find((n) => n[0] === cur)?.[1] ?? 'Home';
-  const nav = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const n = nav.current; if (!n || window.innerWidth > 760) return;
-    const on = n.querySelector<HTMLElement>('.nav.on'); if (on) n.scrollLeft = on.offsetLeft - n.clientWidth / 2 + on.clientWidth / 2;
-  }, [cur]);
-  const corpo = { home: <Home />, magazzino: <Magazzino />, asset: <Asset />, spedizioni: <Spedizioni />, giacenze: <Giacenze />, fatture: <Fatture /> }[cur] ?? <Home />;
+  const asset = clienti.some((c) => c.traccia_asset);
+  const corpo = { home: asset ? <HomeAsset /> : <Home />, spedizioni: asset ? <SpedizioniAsset /> : <Spedizioni />, magazzino: asset ? <Asset /> : <Magazzino />, giacenze: <Giacenze />, fatture: <Fatture /> }[cur] ?? <Home />;
   return (
-    <div className="wrap">
-      <div className="gest">
-        <nav className="side glass" aria-label="Sezioni del portale" ref={nav}>
-          <div className="co"><b>MESSINA</b><span className="lbl">{nome}</span></div>
-          {NAV.map(([id, n]) => <button key={id} type="button" className={'nav' + (cur === id ? ' on' : '')} aria-current={cur === id ? 'page' : undefined} onClick={() => vai(id)}>{n}</button>)}
-          <button type="button" className="nav esci" onClick={() => db.auth.logout().then(() => location.reload())}>Esci</button>
-        </nav>
-        <div className="content">
-          <div className="chead">
-            <div><div className="lbl">{dataLunga()} · {nome}{db.modo === 'prova' ? ' · Prova' : ''}</div><h2>{titolo}</h2></div>
-            {cur !== 'home' && <div className="row"><Search id="s-portale" value={p.cerca} onChange={p.onCerca} /></div>}
-          </div>
-          {corpo}
-        </div>
+    <div className="wrap" style={{ paddingTop: 0 }}>
+      <div className="glass portbar">
+        <div className="row between"><b style={{ fontSize: 17 }}>Messina Autotrasporti <span style={{ fontWeight: 500 }}>· Area clienti</span></b><span className="lbl">{location.host || 'portale.[dominio]'} · entra {nome}</span></div>
+        <div className="row" style={{ gap: 6 }}>{NAV.map(([id, n]) => <Chip key={id} on={cur === id} onClick={() => vai(id)}>{n}</Chip>)}</div>
       </div>
+      <div className="stack">{corpo}</div>
     </div>
   );
 }
 
 // ------------------------------------------------------------------ dati comuni
-interface Bolla { id: string; numero: string | null; cliente_id: string; tipo: string; data_consegna: string | null; fascia: string | null; destinatario: string | null; citta: string | null;
-  colli_previsti: number | null; stato: string; colli?: { letto_entrata: string | null; letto_carico: string | null; letto_consegna: string | null }[]; fermate?: { id: string; esito: string; firmata: boolean; foto_bolla: string | null; chiusa_il: string | null }[] }
+interface Bolla { id: string; numero: string | null; cliente_id: string; tipo: string; data_consegna: string | null; fascia: string | null; destinatario: string | null; indirizzo?: string | null; citta: string | null;
+  colli_previsti: number | null; accessori?: string[]; stato: string; colli?: { letto_entrata: string | null; letto_carico: string | null; letto_consegna: string | null }[]; fermate?: { id: string; esito: string; firmata: boolean; foto_bolla: string | null; nitidezza?: number | null; chiusa_il: string | null }[] }
 const useBolle = () => {
   const { clienti } = useApp();
-  return useDati((d) => d.from<Bolla>('bolle').select('id,numero,cliente_id,tipo,data_consegna,fascia,destinatario,citta,colli_previsti,stato,colli(letto_entrata,letto_carico,letto_consegna),fermate(id,esito,firmata,foto_bolla,chiusa_il)')
+  return useDati((d) => d.from<Bolla>('bolle').select('id,numero,cliente_id,tipo,data_consegna,fascia,destinatario,indirizzo,citta,colli_previsti,accessori,stato,colli(letto_entrata,letto_carico,letto_consegna),fermate(id,esito,firmata,foto_bolla,nitidezza,chiusa_il)')
     .in('cliente_id', clienti.map((c) => c.id)).neq('tipo', 'Magazzino').order('data_consegna', { ascending: false }).limit(300), [clienti]);
 };
 interface Bancale { id: string; codice: string; cliente: string; posto: string | null; creato_il: string }
 interface Contenuto { id: string; bancale_id: string; articolo: string; quantita: number; codici: string[]; inserito: string; il: string }
+const oggiLoc = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 
-// ------------------------------------------------------------------ Home
+// ------------------------------------------------------------------ Home (cliente con il magazzino: Snam nel mockup)
 function Home() {
-  const { clienti, vai } = useApp();
+  const { clienti } = useApp();
   const live = clienti.some((c) => c.portale_live);
   const { dati: bolle } = useBolle();
   const { dati: bancali } = useDati((d) => live ? d.rpc<Bancale[]>('portale_bancali') : Promise.resolve([] as Bancale[]), [live]);
+  const ids = (bancali ?? []).map((b) => b.id);
+  const { dati: cont } = useDati((d) => ids.length ? d.from<Contenuto>('contenuto').select('id,bancale_id,codici').in('bancale_id', ids) : Promise.resolve([] as Contenuto[]), [ids.join(',')]);
   const { dati: giac } = useDati((d) => d.from<any>('giacenze').select('id,bolla_id').is('chiusa_il', null), []);
-  const { dati: fatt } = useDati((d) => d.from<any>('fatture').select('id,stato,imponibile,iva').in('cliente_id', clienti.map((c) => c.id)).in('stato', ['Inviata', 'Pagata']), [clienti]);
-  const mieBolle = new Set((bolle ?? []).map((b) => b.id));
-  const nGiac = (giac ?? []).filter((g) => mieBolle.has(g.bolla_id)).length;
-  const inCorso = (bolle ?? []).filter((b) => ['Nuova', 'Confermata', 'In giro'].includes(b.stato));
-  const daPagare = (fatt ?? []).filter((f) => f.stato === 'Inviata');
-  const ultime = (bolle ?? []).slice(0, 6);
+  const mie = new Set((bolle ?? []).map((b) => b.id));
+  const nGiac = (giac ?? []).filter((g) => mie.has(g.bolla_id)).length;
+  const oggi = (bolle ?? []).filter((b) => b.data_consegna === oggiLoc());
+  const consegnate = oggi.filter((b) => ['Consegnata', 'Fatturata'].includes(b.stato)).length;
+  const entratiOggi = (bancali ?? []).filter((b) => b.creato_il.slice(0, 10) === oggiLoc()).length;
+  // ultimi movimenti: le letture dei colli delle sue spedizioni, dalla più recente
+  const mov = (bolle ?? []).flatMap((b) => {
+    const c = b.colli ?? []; const out: [string, string][] = [];
+    const ultimo = (k: 'letto_entrata' | 'letto_carico' | 'letto_consegna') => c.map((x) => x[k]).filter(Boolean).sort().pop() as string | undefined;
+    const n = (k: 'letto_entrata' | 'letto_carico' | 'letto_consegna') => c.filter((x) => x[k]).length;
+    const nome = `${b.numero ?? 'Spedizione'}${b.citta ? ' · ' + b.citta : ''}`;
+    if (ultimo('letto_consegna')) out.push([ultimo('letto_consegna')!, `${nome}: consegnata, ${n('letto_consegna')} di ${b.colli_previsti} colli`]);
+    else if (ultimo('letto_carico')) out.push([ultimo('letto_carico')!, `${nome}: ${n('letto_carico')} di ${b.colli_previsti} colli caricati sul mezzo`]);
+    if (ultimo('letto_entrata')) out.push([ultimo('letto_entrata')!, `${nome}: ${n('letto_entrata')} di ${b.colli_previsti} colli entrati in magazzino`]);
+    return out;
+  }).filter((x) => x[0].slice(0, 10) === oggiLoc()).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 5);
   return (<>
     <div className="grid g4">
-      <Stat label="Spedizioni in corso" value={bolle ? num(inCorso.length) : '…'} sub={`${(bolle ?? []).filter((b) => b.data_consegna === new Date().toISOString().slice(0, 10)).length} in consegna oggi`} />
-      {live && <Stat label="Bancali in magazzino" value={bancali ? num(bancali.length) : '…'} sub="aggiornati in tempo reale" />}
-      <Stat label="In giacenza" value={giac ? num(nGiac) : '…'} sub={nGiac ? 'da riconsegnare' : 'nessuna'} alert={nGiac > 0} />
-      <Stat label="Fatture da pagare" value={fatt ? num(daPagare.length) : '…'} sub={eur(daPagare.reduce((a, f) => a + Number(f.imponibile) + Number(f.iva ?? 0), 0)) + ' IVA compresa'} />
+      <Stat label="Spedizioni di oggi" value={bolle ? num(oggi.length) : '…'} sub={consegnate ? (consegnate === 1 ? '1 consegnata' : consegnate + ' consegnate') : 'nessuna ancora consegnata'} />
+      <Stat label="Bancali da noi" value={bancali ? num(bancali.length) : '…'} sub={entratiOggi ? entratiOggi + ' entrati oggi' : 'aggiornato in tempo reale'} />
+      <Stat label="Seriali" value={cont ? num(cont.reduce((a, c) => a + (c.codici?.length ?? 0), 0)) : '…'} sub="ognuno con il suo posto" />
+      <Stat label="Giacenze" value={giac ? num(nGiac) : '…'} sub={nGiac ? 'riconsegna da chiedere' : 'nessuna'} />
     </div>
-    <div className="grid g2">
-      <div className="glass card"><h3 style={{ fontSize: 18, marginBottom: 6 }}>Ultime spedizioni</h3><div className="list">
-        {ultime.length ? ultime.map((b) => { const [s, c] = STATO[b.stato] ?? [b.stato, undefined]; return (
-          <button key={b.id} type="button" className="li" onClick={() => vai('spedizioni')}>
-            <span className="row between" style={{ width: '100%' }}><span>{b.destinatario ?? '—'}{b.citta ? ', ' + b.citta : ''}</span><Pill tone={c}>{s}</Pill></span>
-            <span className="lbl">{b.numero ? 'Bolla ' + b.numero + ' · ' : ''}{giornoCorto(b.data_consegna)} · {num(b.colli_previsti)} colli</span>
-          </button>); }) : <div className="lbl" style={{ padding: 14 }}>{bolle ? 'Nessuna spedizione.' : 'Carico…'}</div>}
-      </div></div>
-      <div className="glass card"><h3 style={{ fontSize: 18, marginBottom: 6 }}>Da guardare</h3><div className="list">
-        {nGiac > 0 && <button type="button" className="li" onClick={() => vai('giacenze')}><span className="row between" style={{ width: '100%' }}><span>{nGiac === 1 ? '1 spedizione in giacenza' : nGiac + ' spedizioni in giacenza'}: scegliete il giorno di riconsegna</span><Pill tone="red">Giacenze</Pill></span></button>}
-        {daPagare.length > 0 && <button type="button" className="li" onClick={() => vai('fatture')}><span className="row between" style={{ width: '100%' }}><span>{daPagare.length === 1 ? '1 fattura da pagare' : daPagare.length + ' fatture da pagare'}</span><Pill>Fatture</Pill></span></button>}
-        {live && <button type="button" className="li" onClick={() => vai('magazzino')}><span className="row between" style={{ width: '100%' }}><span>Il vostro magazzino, con tutti i seriali</span><Pill>Magazzino</Pill></span></button>}
-        {!nGiac && !daPagare.length && !live && <div className="lbl" style={{ padding: 14 }}>Tutto in ordine.</div>}
-      </div></div>
-    </div>
+    <div className="glass card"><h3 style={{ fontSize: 18, marginBottom: 6 }}>Ultimi movimenti</h3><div className="list">
+      {mov.length ? mov.map(([t, x], i) => <div key={i} className="li"><span className="row between" style={{ width: '100%' }}><span>{x}</span><span className="lbl">{hm(t)}</span></span></div>)
+        : <div className="lbl" style={{ padding: 12 }}>Nessun movimento oggi.</div>}
+    </div></div>
   </>);
 }
 
+// ------------------------------------------------------------------ Asset (telefoni per utente: Econocom per UniCredit nel mockup)
+interface Asset { id: string; cliente_id: string; imei: string; modello: string | null; cespite: string | null; utente: string | null; sede: string | null; stato: string; accessori?: string[] | null; cliente_finale?: string | null;
+  entrato_il: string; spedito_il: string | null; bancali?: { codice: string } | null; bolle?: { numero: string | null } | null }
+const useAsset = () => {
+  const { clienti } = useApp();
+  const ids = clienti.filter((c) => c.traccia_asset).map((c) => c.id);
+  return useDati((d) => d.from<Asset>('asset').select('id,cliente_id,imei,modello,cespite,utente,sede,stato,accessori,cliente_finale,entrato_il,spedito_il,bancali(codice),bolle(numero)')
+    .in('cliente_id', ids).order('entrato_il', { ascending: false }).limit(5000), [ids.join(',')]);
+};
+const statoAsset = (x: string) => x === 'Spedito' ? <Pill tone="ok">Spedito</Pill> : x === 'In magazzino' ? <Pill>{x}</Pill> : <Pill tone="dark">{x === 'Abbinato' ? 'Preparato' : x}</Pill>;
+const dove = (a: Asset) => a.stato === 'Spedito' ? (a.bolle?.numero ? 'Bolla ' + a.bolle.numero : '—') : !a.cespite ? 'Cespite da abbinare' : a.bancali?.codice ?? '—';
+const finale = (a: Asset) => a.cliente_finale ?? '';
+function HomeAsset() {
+  const { dati: A } = useAsset();
+  const n = (x: string) => (A ?? []).filter((a) => a.stato === x).length;
+  const chi = [...new Set((A ?? []).map(finale).filter(Boolean))].join(', ');
+  return (<>
+    <div className="grid g4">
+      <Stat label={`Device ${chi || ''} ricevuti`.replace('  ', ' ')} value={A ? num(A.length) : '…'} />
+      <Stat label="Preparati" value={A ? num(n('Abbinato')) : '…'} sub="doppio cespite applicato" />
+      <Stat label="Spediti" value={A ? num(n('Spedito')) : '…'} sub="con busta di reso" />
+      <Stat label="Resi rientrati" value={A ? num(n('Rientrato')) : '…'} sub="telefoni usati in deposito" />
+    </div>
+    <p className="lbl" style={{ margin: 0 }}>Ogni sparo, carico e scarico si vede qui subito. Ogni sera parte anche il file Excel IMEI · Cespite · Utente.</p>
+  </>);
+}
+const ASSET_COL = ['IMEI', 'Cespite', 'Utente', 'Sede', 'Accessori', 'Stato'];
+const rigaAsset = (a: Asset, ultima: string) => <tr key={a.id}><td>{a.imei}</td><td><b>{a.cespite ?? '—'}</b></td><td>{a.utente ?? '—'}</td><td>{[finale(a), a.sede].filter(Boolean).join(' · ') || '—'}</td>
+  <td className="lbl">{a.accessori?.length ? a.accessori.join(', ') : '—'}</td><td>{statoAsset(a.stato)}</td><td>{ultima}</td></tr>;
+function SpedizioniAsset() {
+  const { dati: A } = useAsset();
+  const L = (A ?? []).filter((a) => a.stato !== 'In magazzino');
+  return (<>
+    <div className="lbl">Richieste di {[...new Set(L.map(finale).filter(Boolean))].join(', ') || 'utenti'}: ogni mail indica gli utenti del giorno. Il programma le trasforma in ordini.</div>
+    <Tabella colonne={[...ASSET_COL, 'Tracciamento']} minWidth={980} righe={L.length} vuoto={A ? 'Nessuna spedizione.' : 'Carico…'}>
+      {L.slice(0, 500).map((a) => rigaAsset(a, a.stato === 'Spedito' ? (a.bolle?.numero ? 'Bolla ' + a.bolle.numero : '—') : dove(a)))}
+    </Tabella>
+  </>);
+}
+function Asset() {
+  const { dati: A } = useAsset();
+  return (<>
+    <Tabella colonne={[...ASSET_COL, 'Busta']} minWidth={980} righe={(A ?? []).length} vuoto={A ? 'Nessun telefono.' : 'Carico…'}>
+      {(A ?? []).slice(0, 500).map((a) => rigaAsset(a, dove(a)))}
+    </Tabella>
+    <div className="grid g2"><div className="glass card"><b>Doppio cespite</b><p className="lbl" style={{ margin: '6px 0 0' }}>Etichetta piccola sul retro del telefono e grande sulla scatola, stesso numero. L’app non chiude la preparazione finché non le ha lette tutte e due.</p></div>
+      <div className="glass card"><b>Reso dell’usato</b><p className="lbl" style={{ margin: '6px 0 0' }}>In ogni scatola una busta SDA con l’etichetta di reso già stampata per il telefono vecchio.</p></div></div>
+  </>);
+}
+/** il file serale (asset_csv / asset_file) non è nel mockup: resta pronto, dove metterlo è in STATO «Da decidere» */
+export async function fileAsset(cliente: Cliente) { return scarica(`asset-${cliente.nome}-${new Date().toISOString().slice(0, 10)}.csv`, await db.rpc<string>('asset_csv', { p_cliente: cliente.id })); }
+
 // ------------------------------------------------------------------ Magazzino (in tempo reale)
 function Magazzino() {
-  const { clienti, cerca } = useApp();
+  const { clienti } = useApp();
   const live = clienti.some((c) => c.portale_live);
   const [tick, setTick] = useState(0);
   const [sel, setSel] = useState<string | null>(null);
-  const [agg, setAgg] = useState(new Date().toISOString());
-  useEffect(() => { if (!live) return; const t = setInterval(() => { setTick((x) => x + 1); setAgg(new Date().toISOString()); }, 30000); return () => clearInterval(t); }, [live]);
+  useEffect(() => { if (!live) return; const t = setInterval(() => setTick((x) => x + 1), 30000); return () => clearInterval(t); }, [live]);
   const { dati: bancali, errore } = useDati((d) => live ? d.rpc<Bancale[]>('portale_bancali') : Promise.resolve([] as Bancale[]), [live, tick]);
   const ids = (bancali ?? []).map((b) => b.id);
   const { dati: cont } = useDati((d) => ids.length ? d.from<Contenuto>('contenuto').select('id,bancale_id,articolo,quantita,codici,inserito,il').in('bancale_id', ids) : Promise.resolve([] as Contenuto[]), [ids.join(',')]);
   if (!live) return <Card><b>Magazzino in tempo reale</b><p className="lbl" style={{ margin: '6px 0 0' }}>Non è attivo per il vostro contratto. Per attivarlo scrivete al vostro referente in Messina.</p></Card>;
   const conta = (b: string) => (cont ?? []).filter((c) => c.bancale_id === b);
-  const piu = (bancali?.map((b) => b.cliente) ?? []).some((c, _i, a) => c !== a[0]);
-  const vis = (bancali ?? []).filter((b) => trova(cerca, b.codice, b.posto, b.cliente, ...conta(b.id).flatMap((c) => [c.articolo, ...c.codici])));
-  const pezzi = (cont ?? []).reduce((a, c) => a + c.quantita, 0);
+  const nuovi = (bancali ?? []).filter((b) => b.creato_il.slice(0, 10) === oggiLoc()).length;
   const cur = bancali?.find((b) => b.id === sel) ?? null;
-  const righe = cur ? conta(cur.id) : [];
   return (<>
-    <div className="grid g4">
-      <Stat label="Bancali" value={bancali ? num(bancali.length) : '…'} />
-      <Stat label="Pezzi" value={cont ? num(pezzi) : '…'} />
-      <Stat label="Seriali" value={cont ? num((cont ?? []).reduce((a, c) => a + c.codici.length, 0)) : '…'} sub={`aggiornato alle ${hm(agg)}`} />
-    </div>
+    <div className="row between"><span className="lbl">Aggiornato in tempo reale, 24 ore su 24</span>{nuovi > 0 && <Pill tone="dark">{nuovi} nuovi oggi</Pill>}</div>
     {errore && <div className="warn">{errore}</div>}
+    <Tabella colonne={['Bancale', 'Posto', 'Contenuto', 'Seriali', '']} righe={(bancali ?? []).length} vuoto={bancali ? 'Nessun bancale in magazzino.' : 'Carico…'}>
+      {(bancali ?? []).map((b) => { const c = conta(b.id); const oggi = b.creato_il.slice(0, 10) === oggiLoc(); return (
+        <tr key={b.id} style={oggi ? { background: 'var(--ok-soft)' } : undefined}>
+          <td><b>{b.codice}</b></td><td>{b.posto ?? <span className="lbl">In movimento</span>}</td><td>{c.map((x) => x.articolo).join(', ') || '—'}</td>
+          <td>{num(c.reduce((a, x) => a + (x.codici?.length ?? 0), 0))} · <button type="button" className="lbl" style={{ border: 0, background: 'none', padding: 0, cursor: 'pointer', font: 'inherit', textDecoration: 'underline' }} onClick={() => setSel(sel === b.id ? null : b.id)}>SN… elenco</button></td>
+          <td>{oggi ? <Pill tone="ok">Entrato oggi</Pill> : null}</td></tr>); })}
+    </Tabella>
     {cur && <div className="glass card stack">
-      <div className="row between"><h3 style={{ fontSize: 20 }}>Contenuto · {cur.codice}</h3><span className="row"><span className="lbl">{cur.posto ?? 'In movimento'}{piu ? ' · ' + cur.cliente : ''}</span><Btn ghost sm onClick={() => setSel(null)}>Chiudi</Btn></span></div>
-      <div className="tbox"><table className="t"><thead><tr><th>Articolo</th><th>Quantità</th><th>Seriali</th><th>Inserito</th><th>Ora</th></tr></thead><tbody>
-        {righe.length ? righe.map((c) => <tr key={c.id} className={c.inserito === 'Manuale' ? 'korow' : ''}><td><b>{c.articolo}</b></td><td>{num(c.quantita)}</td>
-          <td style={{ fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace', fontSize: 13 }}>{c.codici.length ? c.codici.join(', ') : <span className="lbl">—</span>}</td><td>{c.inserito}</td><td>{quando(c.il)}</td></tr>)
-          : <tr><td colSpan={5} className="lbl">Bancale vuoto.</td></tr>}
-      </tbody></table></div>
-      <p className="lbl" style={{ margin: 0 }}>Le righe in rosso sono state cambiate a mano in magazzino; tutto il resto è letto con la pistola.</p>
+      <div className="row between"><b>{cur.codice} · seriali</b><Btn ghost sm onClick={() => setSel(null)}>Chiudi</Btn></div>
+      <div style={{ fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace', fontSize: 13, lineHeight: 1.7 }}>{conta(cur.id).flatMap((c) => c.codici).join(', ') || '—'}</div>
     </div>}
-    <Tabella colonne={['Bancale', 'Posto', ...(piu ? ['Cliente'] : []), 'Cosa c’è', 'Pezzi', 'Da']} righe={vis.length} vuoto={bancali ? (cerca ? 'Nessun bancale con questo codice o seriale.' : 'Nessun bancale in magazzino.') : 'Carico…'}>
-      {vis.map((b) => { const c = conta(b.id); return (
-        <tr key={b.id} className="click" style={sel === b.id ? { background: 'var(--soft)' } : undefined} onClick={() => setSel(b.id)}>
-          <td><b>{b.codice}</b></td><td>{b.posto ?? <span className="lbl">In movimento</span>}</td>{piu && <td>{b.cliente}</td>}
-          <td>{c.map((x) => x.articolo).join(', ') || <span className="lbl">—</span>}</td><td>{num(c.reduce((a, x) => a + x.quantita, 0))}</td><td>{giornoCorto(b.creato_il)}</td>
-        </tr>); })}
-    </Tabella>
-    <p className="lbl" style={{ margin: 0 }}>Si aggiorna da solo ogni 30 secondi. Cercate un seriale o un IMEI per sapere in che bancale si trova.</p>
-  </>);
-}
-
-// ------------------------------------------------------------------ Asset
-// Telefoni per utente (es. UniCredit): IMEI, cespite, utente, dove si trova o con che bolla è uscito; file di oggi e dei giorni passati.
-interface Asset { id: string; cliente_id: string; imei: string; modello: string | null; cespite: string | null; utente: string | null; sede: string | null; stato: string;
-  entrato_il: string; spedito_il: string | null; bancali?: { codice: string } | null; bolle?: { numero: string | null } | null }
-const scarica = (nome: string, testo: string) => {
-  const u = URL.createObjectURL(new Blob(['﻿' + testo], { type: 'text/csv;charset=utf-8' }));
-  const a = document.createElement('a'); a.href = u; a.download = nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000);
-};
-function Asset() {
-  const { clienti, cerca } = useApp();
-  const conAsset = clienti.filter((c) => c.traccia_asset);
-  const [f, setF] = useState('Tutti');
-  const [msg, setMsg] = useState<string | null>(null);
-  const { dati: A, errore } = useDati((d) => d.from<Asset>('asset').select('id,cliente_id,imei,modello,cespite,utente,sede,stato,entrato_il,spedito_il,bancali(codice),bolle(numero)')
-    .in('cliente_id', conAsset.map((c) => c.id)).order('entrato_il', { ascending: false }).limit(5000), [conAsset.map((c) => c.id).join(',')]);
-  const { dati: F } = useDati((d) => d.from<{ cliente_id: string; giorno: string; righe: number }>('asset_file').select('cliente_id,giorno,righe').in('cliente_id', conAsset.map((c) => c.id)).order('giorno', { ascending: false }).limit(30), [conAsset.length]);
-  const lista = (A ?? []).filter((a) => (f === 'Tutti' || a.stato === f) && trova(cerca, a.imei, a.cespite, a.utente, a.sede, a.modello, a.bolle?.numero));
-  const n = (x: string) => (A ?? []).filter((a) => a.stato === x).length;
-  const oggi = async (c: Cliente) => { setMsg(null); try { scarica(`asset-${c.nome}-${new Date().toISOString().slice(0, 10)}.csv`, await db.rpc<string>('asset_csv', { p_cliente: c.id })); } catch (e) { setMsg((e as Error).message); } };
-  const giorno = async (x: { cliente_id: string; giorno: string }) => { setMsg(null);
-    try { const r = await db.from<{ csv: string }>('asset_file').select('csv').eq('cliente_id', x.cliente_id).eq('giorno', x.giorno).single(); scarica(`asset-${clienti.find((c) => c.id === x.cliente_id)?.nome ?? ''}-${x.giorno}.csv`, r.csv); }
-    catch (e) { setMsg((e as Error).message); } };
-  return (<>
-    <div className="grid g4">
-      <Stat label="In magazzino" value={A ? num(n('In magazzino') + n('Abbinato') + n('Rientrato')) : '…'} sub={A ? `${num(n('Abbinato'))} con cespite e utente` : undefined} />
-      <Stat label="Spediti" value={A ? num(n('Spedito')) : '…'} />
-      <Stat label="Rientrati" value={A ? num(n('Rientrato')) : '…'} />
-    </div>
-    {errore && <div className="warn">{errore}</div>}
-    {msg && <div className="warn">{msg}</div>}
-    <div className="row">{['Tutti', 'In magazzino', 'Abbinato', 'Spedito', 'Rientrato'].map((x) => <Chip key={x} on={f === x} onClick={() => setF(x)}>{x}</Chip>)}</div>
-    <Tabella colonne={['IMEI', 'Modello', 'Cespite', 'Utente', 'Sede', 'Stato', 'Dove', 'Entrato']} minWidth={900} righe={lista.length} vuoto={A ? 'Nessun telefono.' : 'Carico…'}>
-      {lista.slice(0, 500).map((a) => <tr key={a.id}><td style={{ fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace', fontSize: 13 }}><b>{a.imei}</b></td><td>{a.modello ?? '—'}</td><td>{a.cespite ?? '—'}</td><td>{a.utente ?? '—'}</td>
-        <td className="lbl">{a.sede ?? '—'}</td><td>{a.stato === 'Spedito' ? <Pill tone="ok">Spedito</Pill> : a.stato === 'Rientrato' ? <Pill tone="red">Rientrato</Pill> : <Pill>{a.stato}</Pill>}</td>
-        <td>{a.stato === 'Spedito' ? (a.bolle?.numero ? 'Bolla ' + a.bolle.numero : '—') : a.bancali?.codice ?? '—'}</td><td>{quando(a.entrato_il)}</td></tr>)}
-    </Tabella>
-    <Card><div className="row between"><b>File</b>{conAsset.map((c) => <Btn key={c.id} sm onClick={() => oggi(c)}>{conAsset.length > 1 ? 'Oggi · ' + c.nome : 'Oggi'}</Btn>)}</div>
-      <div className="list" style={{ marginTop: 8 }}>{(F ?? []).length ? F!.map((x) => <button key={x.cliente_id + x.giorno} type="button" className="li" onClick={() => giorno(x)}>
-        <span className="row between" style={{ width: '100%' }}><span>{giornoCorto(x.giorno)}{conAsset.length > 1 ? ' · ' + (clienti.find((c) => c.id === x.cliente_id)?.nome ?? '') : ''}</span><span className="lbl">{num(x.righe)} righe</span></span></button>)
-        : <div className="lbl" style={{ padding: 10 }}>Il file si prepara ogni sera.</div>}</div></Card>
   </>);
 }
 
 // ------------------------------------------------------------------ Spedizioni
-const FILTRI = ['Tutte', 'In corso', 'Consegnate', 'Giacenza'] as const;
+const scarica = (nome: string, testo: string) => {
+  const u = URL.createObjectURL(new Blob(['﻿' + testo], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = u; a.download = nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000);
+};
 function Spedizioni() {
-  const { cerca, clienti } = useApp();
-  const [f, setF] = useState<(typeof FILTRI)[number]>('Tutte');
   const { dati: bolle, errore } = useBolle();
+  const [pod, setPod] = useState<string | null>(null);
   const file = useApriFile();
-  const gruppo = (b: Bolla) => ['Nuova', 'Confermata', 'In giro'].includes(b.stato) ? 'In corso' : ['Consegnata', 'Fatturata'].includes(b.stato) ? 'Consegnate' : ['Giacenza', 'Non consegnata'].includes(b.stato) ? 'Giacenza' : 'Altro';
-  const vis = (bolle ?? []).filter((b) => (f === 'Tutte' || gruppo(b) === f) && trova(cerca, b.numero, b.destinatario, b.citta));
-  const conta = (x: string) => (bolle ?? []).filter((b) => gruppo(b) === x).length;
-  const piu = clienti.length > 1;
+  const vis = bolle ?? [];
+  const cur = vis.find((b) => b.id === pod);
+  const fer = (b: Bolla) => (b.fermate ?? []).find((x) => x.esito === 'Consegnata');
   return (<>
-    <div className="row">{FILTRI.map((x) => <Chip key={x} on={f === x} onClick={() => setF(x)}>{x}{x === 'Giacenza' ? <Badge n={conta('Giacenza')} /> : null}</Chip>)}</div>
     {errore && <div className="warn">{errore}</div>}
     {file.msg && <Msg>{file.msg}</Msg>}
-    <Tabella colonne={['Bolla', 'Giorno', ...(piu ? ['Cliente'] : []), 'Destinatario', 'Colli', 'Stato', 'Firma']} minWidth={760} righe={vis.length} vuoto={bolle ? 'Nessuna spedizione.' : 'Carico…'}>
-      {vis.map((b) => {
-        const [s, c] = STATO[b.stato] ?? [b.stato, undefined];
-        const colli = b.colli ?? []; const mag = b.tipo === 'Ritiro';
-        const letti = colli.filter((k) => b.stato === 'Consegnata' || b.stato === 'Fatturata' ? k.letto_consegna : mag ? k.letto_entrata : k.letto_carico).length;
-        const ferm = (b.fermate ?? []).find((x) => x.foto_bolla && x.esito === 'Consegnata');
-        return (
-          <tr key={b.id}>
-            <td><b>{b.numero ?? <span className="lbl">In preparazione</span>}</b><div className="lbl">{b.tipo}</div></td>
-            <td>{giornoCorto(b.data_consegna)}{b.fascia ? <div className="lbl">{b.fascia}</div> : null}</td>
-            {piu && <td>{clienti.find((x) => x.id === b.cliente_id)?.nome}</td>}
-            <td>{b.destinatario ?? '—'}{b.citta ? <div className="lbl">{b.citta}</div> : null}</td>
-            <td>{colli.length ? `${num(letti)} di ${num(b.colli_previsti)}` : num(b.colli_previsti)}</td>
-            <td><Pill tone={c}>{s}</Pill></td>
-            <td>{ferm ? <Btn ghost sm onClick={() => file.apri('bolle', ferm.foto_bolla)}>Foto</Btn> : <span className="lbl">—</span>}</td>
-          </tr>);
-      })}
+    <Tabella colonne={['Spedizione', 'Destinatario', 'Colli', 'Stato', '']} righe={vis.length} vuoto={bolle ? 'Nessuna spedizione.' : 'Carico…'}>
+      {vis.map((b) => { const [s, c] = STATO[b.stato] ?? [b.stato, undefined]; const f = fer(b);
+        return <tr key={b.id}><td><b>{b.numero ?? <span className="lbl">In preparazione</span>}</b></td>
+          <td>{[b.destinatario, [b.indirizzo, b.citta].filter(Boolean).join(', ')].filter(Boolean).join(' · ') || '—'}</td><td>{num(b.colli_previsti)} {b.colli_previsti === 1 ? 'collo' : 'colli'}</td>
+          <td><Pill tone={c}>{s}</Pill></td><td>{f ? <Btn ghost sm onClick={() => setPod(pod === b.id ? null : b.id)}>{pod === b.id ? 'Chiudi' : 'Prova di consegna'}</Btn> : null}</td></tr>; })}
     </Tabella>
-    <p className="lbl" style={{ margin: 0 }}>Ogni collo è letto con la pistola al carico e alla consegna. Quando la consegna è fatta, «Foto» apre la bolla firmata dal destinatario.</p>
+    {cur && (() => { const f = fer(cur)!; const colli = cur.colli ?? []; return <div className="glass card stack">
+      <div className="row between"><h3 style={{ fontSize: 20 }}>Prova di consegna · {cur.numero}</h3>{f.firmata ? <Pill tone="ok">Firmata</Pill> : <Pill>Senza firma</Pill>}</div>
+      <div className="grid g4"><div><div className="lbl">Consegnata</div><b>{quando(f.chiusa_il)}</b></div><div><div className="lbl">Posizione</div><b>{[cur.indirizzo, cur.citta].filter(Boolean).join(', ') || '—'}</b></div>
+        <div><div className="lbl">Colli</div><b>{colli.filter((x) => x.letto_consegna).length} su {cur.colli_previsti} scansionati</b></div><div><div className="lbl">Accessori</div><b>{cur.accessori?.length ? cur.accessori.join(', ') : '—'}</b></div></div>
+      <div className="row" style={{ gap: 12, alignItems: 'stretch' }}>
+        <button type="button" className="ph" onClick={() => file.apri('bolle', f.foto_bolla)} style={{ flex: '1 1 220px', aspectRatio: '3/4', maxWidth: 260, flexDirection: 'column', gap: 8, padding: 16, alignItems: 'stretch', justifyContent: 'flex-start', background: '#fff', boxShadow: 'inset 0 0 0 1px var(--line)', border: 0, cursor: 'pointer', font: 'inherit', textAlign: 'left' }}>
+          <b style={{ fontSize: 12 }}>DDT {cur.numero}</b><span style={{ height: 6, background: 'var(--soft)', borderRadius: 4 }} /><span style={{ height: 6, background: 'var(--soft)', borderRadius: 4, width: '80%' }} /><span style={{ height: 6, background: 'var(--soft)', borderRadius: 4, width: '60%' }} />
+          <span className="lbl" style={{ marginTop: 'auto' }}>Foto della bolla{f.nitidezza != null ? ' · nitidezza ' + f.nitidezza : ''}</span></button>
+        <div className="lbl" style={{ flex: '1 1 200px' }}>Firma, foto della bolla, ora e posizione arrivano dall’app dell’autista nel momento della consegna. Il cliente non deve più chiedere la bolla firmata per mail.</div></div>
+    </div>; })()}
   </>);
 }
 
 // ------------------------------------------------------------------ Giacenze
 interface Giacenza { id: string; bolla_id: string; motivo: string; dal: string; riconsegna_il: string | null; bolle: { numero: string | null; destinatario: string | null; indirizzo: string | null; citta: string | null; cliente_id: string } | null;
   richieste_riconsegna?: { id: string; data: string; nota: string | null; gestita_il: string | null }[] }
+/** il primo giorno lavorativo da domani: la riconsegna proposta dal tasto del mockup («Riconsegna giovedì») */
+const proposto = () => { const d = new Date(); do d.setDate(d.getDate() + 1); while (d.getDay() === 0 || d.getDay() === 6); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const nomeG = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long' });
 function Giacenze() {
-  const { cerca, clienti, aggiorna } = useApp();
+  const { clienti, aggiorna } = useApp();
   const ids = clienti.map((c) => c.id);
   const { dati, errore } = useDati((d) => d.from<Giacenza>('giacenze').select('id,bolla_id,motivo,dal,riconsegna_il,bolle(numero,destinatario,indirizzo,citta,cliente_id),richieste_riconsegna(id,data,nota,gestita_il)').is('chiusa_il', null).order('dal'), []);
-  const [sel, setSel] = useState<string | null>(null);
-  const [data, setData] = useState(domani());
-  const [nota, setNota] = useState('');
-  const [msg, setMsg] = useState<string | null>(null);
+  const { dati: tar } = useDati((d) => d.from<any>('tariffe').select('cliente_id,voce,unita,prezzo').in('cliente_id', ids).eq('voce', 'Giacenza'), [ids.join(',')]);
   const [err, setErr] = useState<string | null>(null);
   const [attesa, setAttesa] = useState(false);
-  const G = (dati ?? []).filter((g) => g.bolle && ids.includes(g.bolle.cliente_id) && trova(cerca, g.bolle.numero, g.bolle.destinatario, g.bolle.citta, g.motivo));
-  const cur = G.find((g) => g.id === sel) ?? G[0];
-  const rich = (g: Giacenza) => (g.richieste_riconsegna ?? []).find((r) => !r.gestita_il);
-  const giorni = (d: string) => Math.max(0, Math.round((Date.now() - new Date(d + 'T00:00:00').getTime()) / 86400000));
-  const chiedi = async () => {
-    if (!cur) return; setAttesa(true); setErr(null); setMsg(null);
-    try { await db.rpc('richiedi_riconsegna', { p_giacenza: cur.id, p_data: data, p_nota: nota.trim() || null }); setMsg(`Richiesta inviata per ${giornoCorto(data).toLowerCase()}: l’ufficio conferma la data e la spedizione torna nei giri.`); setNota(''); aggiorna(); }
+  const G = (dati ?? []).filter((g) => g.bolle && ids.includes(g.bolle.cliente_id));
+  const chiedi = async (g: Giacenza) => {
+    setAttesa(true); setErr(null);
+    try { await db.rpc('richiedi_riconsegna', { p_giacenza: g.id, p_data: proposto(), p_nota: null }); aggiorna(); }
     catch (e) { setErr((e as Error).message); } finally { setAttesa(false); }
   };
   if (errore) return <div className="warn">{errore}</div>;
   if (!dati) return <p className="lbl">Carico…</p>;
-  if (!G.length) return <Msg>Nessuna spedizione in giacenza.</Msg>;
-  const r = cur ? rich(cur) : undefined;
-  return (
-    <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
-      <div className="glass" style={{ flex: '1 1 280px', padding: 8, minWidth: 0 }}>
-        <div className="row between" style={{ padding: '8px 10px' }}><b>In magazzino</b><span className="lbl">{G.length === 1 ? '1 spedizione' : G.length + ' spedizioni'}</span></div>
-        <div className="list">{G.map((g) => (
-          <button key={g.id} type="button" className={'li' + (cur?.id === g.id ? ' on' : '')} onClick={() => { setSel(g.id); setMsg(null); setErr(null); }}>
-            <span className="row between" style={{ width: '100%' }}><b>{g.bolle?.destinatario ?? '—'}</b>{rich(g) ? <Pill tone="ok">Richiesta inviata</Pill> : <Pill tone="red">Da prenotare</Pill>}</span>
-            <span className="lbl">{g.motivo} · dal {giornoCorto(g.dal).toLowerCase()}</span>
-          </button>))}</div>
-      </div>
-      {cur && <div className="glass card stack" style={{ flex: '2 1 420px', minWidth: 0 }}>
-        <div className="row between"><h3 style={{ fontSize: 22, letterSpacing: '-.02em' }}>{cur.bolle?.destinatario ?? '—'} · giacenza</h3><span className="lbl">Bolla {cur.bolle?.numero ?? '—'}</span></div>
-        <div className="kv">
-          <div><div className="lbl">Destinatario</div><b>{[cur.bolle?.destinatario, cur.bolle?.citta].filter(Boolean).join(', ') || '—'}</b></div>
-          <div><div className="lbl">Motivo della mancata consegna</div><b>{cur.motivo}</b></div>
-          <div><div className="lbl">In giacenza dal</div><b>{giornoCorto(cur.dal)}</b></div>
-          <div><div className="lbl">Giorni</div><b>{giorni(cur.dal)}</b></div>
-          <div><div className="lbl">Riconsegna</div><b>{r ? 'Chiesta per ' + giornoCorto(r.data).toLowerCase() : 'Da prenotare'}</b></div>
-        </div>
-        {msg && <Msg>{msg}</Msg>}
-        {err && <div className="warn">{err}</div>}
-        <div className="stack" style={{ gap: 8, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-          <div className="row">
-            <label className="field" style={{ flex: '0 1 200px' }}><span className="lbl">Giorno di riconsegna</span><input className="input" type="date" min={domani()} value={data} onChange={(e) => setData(e.target.value)} /></label>
-            <label className="field" style={{ flex: '1 1 220px' }}><span className="lbl">Nota per l’autista</span><input className="input" value={nota} placeholder="Orari, piano, referente" onChange={(e) => setNota(e.target.value)} /></label>
-          </div>
-          <div className="row"><Btn onClick={chiedi} disabled={attesa || !data}>{r ? 'Cambia' : 'Chiedi'}</Btn><span className="lbl">La giacenza costa ogni giorno secondo il vostro contratto: prima si riconsegna, meno si paga.</span></div>
-        </div>
-      </div>}
-    </div>
-  );
+  if (!G.length) return <div className="glass card lbl">Nessuna giacenza.</div>;
+  const costo = (g: Giacenza) => { const t = (tar ?? []).find((x) => x.cliente_id === g.bolle?.cliente_id); return t ? ` · ${eur(Number(t.prezzo)).replace(',00', '')} ${t.unita === 'giorno' ? 'al giorno' : 'a ' + t.unita}` : ''; };
+  return (<>
+    {err && <div className="warn">{err}</div>}
+    {G.map((g) => { const r = (g.richieste_riconsegna ?? []).find((x) => !x.gestita_il); return (
+      <div key={g.id} className="glass card stack">
+        <div className="row between"><b>{g.bolle?.numero ?? '—'} · {[g.bolle?.destinatario, g.bolle?.citta].filter(Boolean).join(', ')}</b><Pill tone="red">Giacenza</Pill></div>
+        <div className="lbl">{g.motivo} · da {giornoCorto(g.dal).toLowerCase()}{costo(g)}</div>
+        {r ? <Msg>Richiesta inviata: riconsegna {nomeG(r.data)}. Ti arriva la conferma appena l’ufficio la mette in giro.</Msg>
+          : <div className="row"><Btn onClick={() => chiedi(g)} disabled={attesa}>Riconsegna {nomeG(proposto())}</Btn><Btn ghost>Reso al mittente</Btn></div>}
+      </div>); })}
+  </>);
 }
 
 // ------------------------------------------------------------------ Fatture
-interface Fattura { id: string; numero: string | null; periodo: string | null; data: string | null; imponibile: number; iva: number; stato: string; pagata_il: string | null; pdf: string | null; cliente_id: string;
-  righe_fattura?: { voce: string; quantita: number; prezzo: number; totale: number }[] }
-const mese = (p: string | null) => { if (!p) return '—'; const s = new Date(p + '-15').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); return s[0].toUpperCase() + s.slice(1); };
+interface Fattura { id: string; numero: string | null; periodo: string | null; data: string | null; imponibile: number; iva: number; stato: string; pagata_il: string | null; pdf: string | null; cliente_id: string }
+const mese = (p: string | null) => { if (!p) return '—'; const s = new Date(p + '-15').toLocaleDateString('it-IT', { month: 'long' }); return s[0].toUpperCase() + s.slice(1); };
 function Fatture() {
-  const { cerca, clienti } = useApp();
-  const { dati, errore } = useDati((d) => d.from<Fattura>('fatture').select('id,numero,periodo,data,imponibile,iva,stato,pagata_il,pdf,cliente_id,righe_fattura(voce,quantita,prezzo,totale)')
+  const { clienti } = useApp();
+  const { dati, errore } = useDati((d) => d.from<Fattura>('fatture').select('id,numero,periodo,data,imponibile,iva,stato,pagata_il,pdf,cliente_id')
     .in('cliente_id', clienti.map((c) => c.id)).in('stato', ['Inviata', 'Pagata']).order('data', { ascending: false }), [clienti]);
-  const [sel, setSel] = useState<string | null>(null);
   const file = useApriFile();
-  const vis = (dati ?? []).filter((f) => trova(cerca, f.numero, mese(f.periodo)));
-  const cur = vis.find((f) => f.id === sel);
-  const daPagare = (dati ?? []).filter((f) => f.stato === 'Inviata');
+  const vis = dati ?? [];
   return (<>
-    <div className="grid g4">
-      <Stat label="Da pagare" value={dati ? eur(daPagare.reduce((a, f) => a + Number(f.imponibile) + Number(f.iva), 0)) : '…'} sub={daPagare.length === 1 ? '1 fattura, IVA compresa' : daPagare.length + ' fatture, IVA compresa'} />
-      <Stat label="Pagate quest’anno" value={dati ? num((dati ?? []).filter((f) => f.stato === 'Pagata' && (f.pagata_il ?? '').slice(0, 4) === String(new Date().getFullYear())).length) : '…'} />
-    </div>
     {errore && <div className="warn">{errore}</div>}
     {file.msg && <Msg>{file.msg}</Msg>}
-    {cur && <div className="glass card stack">
-      <div className="row between"><h3 style={{ fontSize: 20 }}>Fattura {cur.numero ?? ''} · {mese(cur.periodo)}</h3><span className="row"><Btn sm onClick={() => file.apri('documenti', cur.pdf)}>PDF</Btn><Btn ghost sm onClick={() => setSel(null)}>Chiudi</Btn></span></div>
-      <div className="tbox"><table className="t"><thead><tr><th>Voce</th><th>Quantità</th><th>Prezzo</th><th>Totale</th></tr></thead><tbody>
-        {(cur.righe_fattura ?? []).map((r, i) => <tr key={i}><td><b>{r.voce}</b></td><td>{num(r.quantita)}</td><td>{eur(r.prezzo)}</td><td>{eur(r.totale)}</td></tr>)}
-      </tbody></table></div>
-      <div className="row between"><span className="lbl">Imponibile {eur(cur.imponibile)} · IVA {eur(cur.iva)}</span><b>Totale {eur(Number(cur.imponibile) + Number(cur.iva))}</b></div>
-    </div>}
-    <Tabella colonne={['Numero', 'Mese', 'Data', 'Totale', 'Stato', '']} minWidth={680} righe={vis.length} vuoto={dati ? 'Nessuna fattura.' : 'Carico…'}>
-      {vis.map((f) => (
-        <tr key={f.id} className="click" style={sel === f.id ? { background: 'var(--soft)' } : undefined} onClick={() => setSel(f.id)}>
-          <td><b>{f.numero ?? '—'}</b></td><td>{mese(f.periodo)}</td><td>{giornoCorto(f.data)}</td><td>{eur(Number(f.imponibile) + Number(f.iva))}</td>
-          <td>{f.stato === 'Pagata' ? <Pill tone="ok">Pagata</Pill> : <Pill tone="dark">Da pagare</Pill>}</td>
-          <td><Btn ghost sm onClick={() => { file.apri('documenti', f.pdf); }}>PDF</Btn></td>
-        </tr>))}
+    <Tabella colonne={['Fattura', 'Periodo', 'Importo', 'Stato', '']} righe={vis.length} vuoto={dati ? 'Nessuna fattura.' : 'Carico…'}>
+      {vis.map((f) => <tr key={f.id}><td><b>{f.numero ?? '—'}</b></td><td>{mese(f.periodo)}</td><td>{eur(Number(f.imponibile) + Number(f.iva))}</td>
+        <td>{f.stato === 'Pagata' ? <Pill tone="ok">Pagata</Pill> : <Pill>Da pagare</Pill>}</td><td><Btn ghost sm onClick={() => file.apri('documenti', f.pdf)}>PDF</Btn></td></tr>)}
     </Tabella>
-    <p className="lbl" style={{ margin: 0 }}>Ogni voce della fattura viene dalle vostre bolle e dalle tariffe del contratto. Per una domanda su una fattura scrivete all’amministrazione.</p>
+    <p className="lbl" style={{ margin: 0 }}>Ogni riga della fattura rimanda alla sua spedizione, con la prova di consegna.</p>
   </>);
 }
 

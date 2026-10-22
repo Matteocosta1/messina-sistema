@@ -2,20 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { Btn, Chip, Msg, Pill, Warn, Badge } from '@messina/ui';
 import { useApp, useAzione, useDati, useStato, hm, quando, num, oggiISO, Errore } from '../core';
 
-const TABS: [string, string][] = [['pianta', 'Pianta'], ['controllo', 'Controllo'], ['mov', 'Movimenti'], ['missioni', 'Missioni'], ['asset', 'Asset'], ['storico', 'Storico']];
+// sotto-schede del mockup; «Asset» esiste nel codice ma non nel mockup: si apre solo da link (Cerca), vedi STATO «Da decidere»
+const TABS: [string, string][] = [['pianta', 'Pianta'], ['controllo', 'Controllo'], ['mov', 'Movimenti'], ['missioni', 'Missioni'], ['storico', 'Storico']];
+const NASCOSTE = ['asset'];
 const pad = (n: number) => String(n).padStart(2, '0');
 
 export function Magazzino({ tab }: { tab?: string }) {
   const { vai } = useApp();
   const [tab0, scelto] = (tab ?? '').split(':');
-  const t = TABS.some(([k]) => k === tab0) ? tab0 : 'pianta';
+  const t = TABS.some(([k]) => k === tab0) || NASCOSTE.includes(tab0) ? tab0 : 'pianta';
   const [cli, setCli] = useState('Tutti');
   const { dati } = useDati(async (d) => {
     const [cc, clienti] = await Promise.all([
       d.from<any>('controllo_colli').select('*'),
       d.from<any>('bancali').select('clienti(nome)').is('uscito_il', null),
     ]);
-    return { cc, nomi: [...new Set(clienti.map((b) => b.clienti?.nome).filter(Boolean))].sort() as string[] };
+    const st = await d.from<any>('storico').select('chi_nome,cosa,operazione,quando').eq('azienda', 'trasporti').in('operazione', ['Entrata', 'Uscita']).order('quando', { ascending: false }).limit(300);
+    return { cc, st, nomi: [...new Set(clienti.map((b) => b.clienti?.nome).filter(Boolean))].sort() as string[] };
   }, []);
   if (!dati) return null;
   const ko = dati.cc.filter((r) => r.letti !== r.attesi && r.letti > 0).length;
@@ -23,7 +26,7 @@ export function Magazzino({ tab }: { tab?: string }) {
     <div className="row">{TABS.map(([k, l]) => <Chip key={k} on={t === k} onClick={() => vai('magazzino/' + k)}>{l}{k === 'controllo' && <Badge n={ko} />}</Chip>)}</div>
     <div className="row">{['Tutti', ...dati.nomi].map((x) => <Chip key={x} on={cli === x} onClick={() => setCli(x)}>{x}</Chip>)}</div>
     {t === 'pianta' && <Pianta cli={cli} />}
-    {t === 'controllo' && <Controllo cc={dati.cc} cli={cli} />}
+    {t === 'controllo' && <Controllo cc={dati.cc} cli={cli} st={dati.st} />}
     {t === 'mov' && <Movimenti cli={cli} />}
     {t === 'missioni' && <Missioni />}
     {t === 'asset' && <Asset cli={cli} imei={scelto} />}
@@ -125,7 +128,9 @@ function Contenuto({ posto, bancali }: { posto: any; bancali: any[] }) {
 }
 
 // ------------------------------------------------------------------ Controllo
-function Controllo({ cc, cli }: { cc: any[]; cli: string }) {
+function Controllo({ cc, cli, st }: { cc: any[]; cli: string; st: any[] }) {
+  // «Chi» del mockup: l'ultima persona che ha letto i colli di quel cliente in quel verso (dallo Storico)
+  const chi = (r: any) => st.find((x) => String(x.cosa).startsWith(r.cliente) && x.operazione === (r.tipo === 'Magazzino' || r.tipo === 'Ritiro' ? 'Entrata' : 'Uscita'))?.chi_nome ?? '—';
   const list = cc.filter((r) => cli === 'Tutti' || r.cliente === cli).sort((a, b) => (b.ultima_lettura ?? '').localeCompare(a.ultima_lettura ?? ''));
   const ko = cc.filter((r) => r.letti !== r.attesi && r.letti > 0).length;
   const entrata = (r: any) => r.tipo === 'Magazzino' || r.tipo === 'Ritiro';
@@ -134,11 +139,11 @@ function Controllo({ cc, cli }: { cc: any[]; cli: string }) {
     : `Manca${r.attesi - r.letti === 1 ? ' 1 collo' : 'no ' + (r.attesi - r.letti) + ' colli'}: spedizione ferma, non parte`;
   return (<>
     {ko ? <Warn n={ko}>Colli</Warn> : <Msg>Tutto torna.</Msg>}
-    <div className="glass tbox"><table className="t" style={{ minWidth: 820 }}><thead><tr><th>Ora</th><th>Bolla</th><th>Cliente</th><th>Movimento</th><th>Colli in bolla</th><th>Scansionati</th><th>Esito</th></tr></thead><tbody>
+    <div className="glass tbox"><table className="t" style={{ minWidth: 820 }}><thead><tr><th>Ora</th><th>Bolla</th><th>Cliente</th><th>Movimento</th><th>Colli in bolla</th><th>Scansionati</th><th>Chi</th><th>Esito</th></tr></thead><tbody>
       {list.map((r) => { const ok = r.letti === r.attesi; return <tr key={r.bolla_id} className={ok ? 'okrow' : r.letti ? 'korow' : ''}>
         <td>{hm(r.ultima_lettura)}</td><td>{r.numero ?? '—'}</td><td><b>{r.cliente}</b></td><td>{entrata(r) ? 'Entrata' : 'Uscita'}</td>
-        <td>{num(r.attesi)}</td><td>{num(r.letti)}</td><td>{esito(r)}</td></tr>; })}
-      {!list.length && <tr><td colSpan={7} className="lbl">Nessuna spedizione in movimento.</td></tr>}
+        <td>{num(r.attesi)}</td><td>{num(r.letti)}</td><td>{r.letti ? chi(r) : '—'}</td><td>{esito(r)}</td></tr>; })}
+      {!list.length && <tr><td colSpan={8} className="lbl">Nessuna spedizione in movimento.</td></tr>}
     </tbody></table></div>
     <p className="lbl" style={{ margin: 0 }}>Una spedizione con un collo non scansionato non può partire: il mezzo resta fermo finché i numeri non tornano.</p>
   </>);
@@ -192,7 +197,8 @@ function Missioni() {
       </div>
       <div className="glass card stack"><b>Nuova missione</b><div className="lbl">Tutto il magazzino, una zona, uno scaffale o un cliente. Al magazziniere arriva come compito obbligatorio.</div>
         <div className="row">{['Tutto', 'Zona', 'Scaffale', 'Cliente'].map((x) => <Chip key={x} on={ambito === x} onClick={() => setAmbito(x)}>{x}</Chip>)}</div>
-        {ambito !== 'Tutto' && <input className="input" aria-label={ambito} placeholder={ph[ambito]} value={filtro} onChange={(e) => setFiltro(e.target.value)} />}
+        {/* Da decidere (STATO): il campo per scrivere quale zona, scaffale o cliente non è nel mockup */}
+        {void ph}{void setFiltro}
         <Errore testo={az.errore} />
         <div className="row"><Btn onClick={lancia} disabled={az.inCorso || (ambito !== 'Tutto' && !filtro.trim())}>Lancia</Btn></div></div>
     </div>
@@ -207,8 +213,7 @@ function Missioni() {
           <textarea rows={2} placeholder="Cosa è successo" aria-label="Cosa è successo" value={motivi[x.id] ?? ''} onChange={(e) => setMotivi({ ...motivi, [x.id]: e.target.value })}
             style={{ font: 'inherit', padding: 10, borderRadius: 12, border: '1px solid var(--line)', width: '100%', boxSizing: 'border-box' }} />
           {errSbl === x.id && <div className="miss">Scrivi cosa è successo prima di sbloccare.</div>}
-          <div className="row"><Btn onClick={() => sblocca(x, 'sblocca_posto')} disabled={az.inCorso}>Sblocca</Btn><Btn ghost onClick={() => sblocca(x, 'rettifica_posto')} disabled={az.inCorso}>Rettifica</Btn>
-            <span className="lbl">Sblocca: era un errore di lettura, il magazzino resta com’è. Rettifica: il magazzino diventa quello trovato.</span></div></>}
+          <div className="row"><Btn onClick={() => sblocca(x, 'sblocca_posto')} disabled={az.inCorso}>Sblocca</Btn>{/* Da decidere (STATO): «Rettifica» (rpc rettifica_posto) non è nel mockup */}</div></>}
       </div>; })}
     <p className="lbl" style={{ margin: 0 }}>Il magazziniere vede l’elenco di quello che dovrebbe esserci e lo scansiona nell’ordine che vuole. Se qualcosa manca o è in più il posto non si chiude: resta bloccato finché l’ufficio non scrive cosa è successo. Tutto resta nello Storico.</p>
   </>);
