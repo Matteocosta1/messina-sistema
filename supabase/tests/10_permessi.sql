@@ -40,7 +40,7 @@ select pg_temp.come('00000000-0000-0000-0000-000000000008');
 select pg_temp.verifica((select count(*) from public.bancali) = 2, 'Corporation vede solo i suoi 2 bancali');
 select pg_temp.verifica((select count(*) from public.bolle) = 0, 'Corporation non vede le bolle');
 select pg_temp.verifica((select count(*) from public.device) = 4, 'Corporation vede i suoi device');
-select pg_temp.verifica((select incassato_oggi from public.incassi_corporation) = 206, 'incassato oggi = 229 - 23');
+select pg_temp.verifica((select incassato_oggi from public.incassi_corporation) = 189.95, 'incassato oggi = 229 - 23 di commissione - 16,05 di IVA sul margine');
 select pg_temp.verifica((select recuperato_pct from public.lotti_conti where codice = 'L-014') > 0, 'il lotto recupera');
 reset role;
 

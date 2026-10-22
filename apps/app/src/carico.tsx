@@ -7,10 +7,12 @@ import { comprimi } from './foto';
 import { qrSvg } from './qr';
 
 type Scr = 'scan' | 'scheda' | 'grado' | 'prezzo' | 'bancale' | 'nuovoB' | 'fatto';
-interface Scheda { seriale: string; marca: string; modello: string; cpu: string; gpu: string; ram: string; disco: string; schermo: string; verificato?: boolean; nel_ddt?: boolean; batteria?: string | null }
-const VUOTA: Scheda = { seriale: '', marca: '', modello: '', cpu: '', gpu: '', ram: '', disco: '', schermo: '' };
+interface Scheda { seriale: string; tipo: 'PC' | 'Telefono'; marca: string; modello: string; cpu: string; gpu: string; ram: string; disco: string; schermo: string; memoria: string; colore: string; verificato?: boolean; nel_ddt?: boolean; batteria?: string | null }
+const VUOTA: Scheda = { seriale: '', tipo: 'PC', marca: '', modello: '', cpu: '', gpu: '', ram: '', disco: '', schermo: '', memoria: '', colore: '', batteria: '' };
+/** batteria in percentuale (dal report «89%» o scritta a mano) */
+const batteriaPct = (x: string | null | undefined) => { const n = parseInt(String(x ?? '').replace(/\D+/g, ''), 10); return Number.isFinite(n) && n >= 0 && n <= 100 ? n : null; };
 const DIFETTI = ['Graffi sul coperchio', 'Ammaccatura', 'Tastiera lucida', 'Segni sullo schermo', 'Batteria sotto 80%', 'Manca un tasto'];
-const CANALI = ['eBay', 'Subito', 'Back Market', 'Refurbed', 'Sito'];
+const CANALI = ['eBay', 'Subito', 'Back Market', 'Refurbed', 'Amazon', 'Sito'];
 const BASE: Record<string, number> = { A: 289, B: 249, C: 209, D: 169 };
 
 function Passi({ cur }: { cur: Scr }) {
@@ -32,13 +34,17 @@ export function Carico() {
   const [grado, setGrado] = useState('B');
   const [difetti, setDifetti] = useState<Record<string, boolean>>({});
   const [prezzo, setPrezzo] = useState(BASE.B);
-  const [canali, setCanali] = useState<Record<string, boolean>>({ eBay: true, Subito: true, 'Back Market': true, Refurbed: true, Sito: false });
+  const [canali, setCanali] = useState<Record<string, boolean>>({ eBay: true, Subito: true, 'Back Market': true, Refurbed: true, Amazon: false, Sito: false });
   const [banc, setBanc] = useState<{ codice: string; id: string; posto: string; pezzi: number | null } | null>(null);
   const [fatto, setFatto] = useState<{ banc: string; posto: string } | null>(null);
   const [lettura, setLettura] = useState(false);
   const vai = (s: Scr) => { setScr(s); az.setErrore(null); window.scrollTo(0, 0); };
 
-  const { dati: lotto } = useDati((d) => d.from<any>('lotti').select('id,codice,pezzi,costo').order('acquistato_il', { ascending: false }).limit(1).then((r) => r[0] ?? null, () => null), []);
+  // il lotto si sceglie tra quelli aperti (il più recente è già scelto); in un lotto chiuso non entra più niente
+  const { dati: aperti } = useDati((d) => d.from<any>('lotti').select('id,codice,pezzi,costo').eq('stato', 'Aperto').order('acquistato_il', { ascending: false }).then((r) => r, () => [] as any[]), []);
+  const [lottoId, setLottoId] = useState<string | null>(null);
+  const lotto = (aperti ?? []).find((l) => l.id === lottoId) ?? aperti?.[0] ?? null;
+  const { dati: proposto } = useDati((d) => scheda.modello ? d.rpc<number | null>('prezzo_proposto', { p_modello: scheda.modello, p_grado: grado }).then((x) => x, () => null) : Promise.resolve(null), [scheda.modello, grado]);
   const { dati: caricati } = useDati((d) => lotto ? d.from<any>('device').select('id').eq('lotto_id', lotto.id).then((r) => r.length) : Promise.resolve(0), [lotto?.id]);
   const { dati: simili } = useDati((d) => scheda.modello ? d.from<any>('device').select('prezzo,prezzo_minimo,grado').eq('modello', scheda.modello).eq('grado', grado) : Promise.resolve([] as any[]), [scheda.modello, grado]);
   const { dati: stage } = useDati((d) => scheda.seriale ? d.from<any>('stage_pc').select('esito,certificato').eq('seriale', scheda.seriale).limit(1).then((r) => r[0] ?? null, () => null) : Promise.resolve(null), [scheda.seriale]);
@@ -46,8 +52,10 @@ export function Carico() {
   const minimo = costoPezzo ? Math.ceil(costoPezzo * 1.2 / 10) * 10 : null;
   const prezzi = (simili ?? []).map((x) => Number(x.prezzo)).filter((x) => x > 0);
 
-  // prezzo proposto: quello dei computer uguali già caricati con lo stesso grado, altrimenti la base del grado
-  useEffect(() => { if (scr !== 'grado' && scr !== 'prezzo') return; if (prezzi.length) setPrezzo(Math.round(prezzi.sort((a, b) => a - b)[Math.floor(prezzi.length / 2)])); }, [simili]);
+  // prezzo proposto: quello fissato per modello e grado (o la media degli ultimi venduti), poi quello degli uguali già caricati, altrimenti la base del grado
+  useEffect(() => { if (scr !== 'grado' && scr !== 'prezzo') return;
+    if (proposto != null && Number(proposto) > 0) setPrezzo(Math.round(Number(proposto)));
+    else if (prezzi.length) setPrezzo(Math.round(prezzi.sort((a, b) => a - b)[Math.floor(prezzi.length / 2)])); }, [simili, proposto]);
 
   // 1 · foto del seriale
   const cam = useFotocamera();
@@ -61,7 +69,7 @@ export function Carico() {
       return db.fn<Scheda>('leggi-seriale', { percorso: p });
     });
     setLettura(false);
-    if (r) { setScheda({ ...VUOTA, ...Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v ?? ''])) } as Scheda); setManuale(!r.seriale); vibra(); vai('scheda'); }
+    if (r) { setScheda({ ...VUOTA, tipo: scheda.tipo, ...Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v ?? ''])) } as Scheda); setManuale(!r.seriale); vibra(); vai('scheda'); }
   };
   const scattaFoto = async () => { const b = await cam.scatta(); if (b) leggiFoto(b); else file.current?.click(); };
 
@@ -80,18 +88,19 @@ export function Carico() {
     if (!banc) return;
     const siti = CANALI.filter((x) => canali[x]);
     const r = await az.esegui(() => db.from('device').insert({
-      seriale: scheda.seriale.trim(), tipo: 'PC', marca: scheda.marca || null, modello: scheda.modello || null, cpu: scheda.cpu || null, gpu: scheda.gpu || null,
+      seriale: scheda.seriale.trim(), tipo: scheda.tipo, memoria: scheda.memoria || null, colore: scheda.colore || null, batteria: batteriaPct(scheda.batteria), marca: scheda.marca || null, modello: scheda.modello || null, cpu: scheda.cpu || null, gpu: scheda.gpu || null,
       ram: scheda.ram || null, disco: scheda.disco || null, schermo: scheda.schermo || null, grado, difetti: DIFETTI.filter((x) => difetti[x]),
-      lotto_id: lotto?.id ?? null, bancale_id: banc.id, costo: costoPezzo ? Math.round(costoPezzo * 100) / 100 : null, prezzo, prezzo_minimo: minimo && minimo <= prezzo ? minimo : null,
+      lotto_id: lotto?.id ?? null, bancale_id: banc.id, prezzo, prezzo_minimo: minimo && minimo <= prezzo ? minimo : null,
       stato: 'Disponibile', siti, foto: foto ? [foto] : [] }));
     if (r !== undefined) { setFatto({ banc: banc.codice, posto: banc.posto }); vibra(); vai('fatto'); }
   };
-  const ricomincia = () => { setScheda(VUOTA); setFoto(null); setGrado('B'); setDifetti({}); setPrezzo(BASE.B); setBanc(null); setFatto(null); setManuale(false); vai('scan'); };
+  const ricomincia = () => { setScheda({ ...VUOTA, tipo: scheda.tipo }); setFoto(null); setGrado('B'); setDifetti({}); setPrezzo(BASE.B); setBanc(null); setFatto(null); setManuale(false); vai('scan'); };
 
   if (scr === 'scan') return (
     <div className="pscr">
       <Passi cur="scan" />
-      {lotto && <div className="lbl">Lotto {lotto.codice} · {caricati ?? 0} di {lotto.pezzi} caricati</div>}
+      {(aperti?.length ?? 0) > 1 && <div className="row" style={{ gap: 8 }}>{aperti!.map((l) => <button key={l.id} type="button" className={'chipbtn' + (lotto?.id === l.id ? ' on' : '')} onClick={() => setLottoId(l.id)}>{l.codice}</button>)}</div>}
+      {lotto ? <div className="lbl">Lotto {lotto.codice} · {caricati ?? 0} di {lotto.pezzi} caricati</div> : aperti && <div className="lbl">Nessun lotto aperto: si carica senza lotto.</div>}
       <div className="cam" style={{ position: 'relative', overflow: 'hidden' }}>
         <video ref={cam.video} playsInline muted style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: cam.pronta ? 'block' : 'none' }} />
         <div className="camtxt" style={{ position: 'relative', ...(cam.pronta ? { marginTop: 'auto', background: 'rgba(0,0,0,.45)', borderRadius: 12, padding: '8px 10px' } : {}) }}>
@@ -101,16 +110,19 @@ export function Carico() {
       <input ref={file} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => { const x = e.target.files?.[0]; e.target.value = ''; if (x) leggiFoto(x); }} />
       <div className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
         <button type="button" className="bigbtn" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} onClick={scattaFoto} {...(lettura ? off : {})}>{KI.cam()}Foto</button>
-        <button type="button" className="bigbtn ghost" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} onClick={() => { setScheda(VUOTA); setManuale(true); vai('scheda'); }}>{KI.pen()}Manuale</button>
+        <button type="button" className="bigbtn ghost" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} onClick={() => { setScheda({ ...VUOTA, tipo: scheda.tipo }); setManuale(true); vai('scheda'); }}>{KI.pen()}Manuale</button>
       </div>
     </div>);
 
   if (scr === 'scheda') {
-    const campi: [keyof Scheda, string][] = [['marca', 'Marca'], ['modello', 'Modello'], ['cpu', 'Processore'], ['ram', 'RAM'], ['disco', 'Disco'], ['schermo', 'Schermo'], ['gpu', 'Scheda video']];
+    const campi: [keyof Scheda, string][] = scheda.tipo === 'Telefono'
+      ? [['marca', 'Marca'], ['modello', 'Modello'], ['memoria', 'Memoria'], ['batteria', 'Batteria %'], ['colore', 'Colore']]
+      : [['marca', 'Marca'], ['modello', 'Modello'], ['cpu', 'Processore'], ['ram', 'RAM'], ['disco', 'Disco'], ['schermo', 'Schermo'], ['gpu', 'Scheda video']];
     const pronta = !!scheda.seriale.trim() && !!scheda.modello.trim();
     return (
       <div className="pscr">
         <Passi cur="scheda" />
+        <div className="row" style={{ gap: 8 }}>{(['PC', 'Telefono'] as const).map((x) => <button key={x} type="button" className={'chipbtn' + (scheda.tipo === x ? ' on' : '')} onClick={() => setScheda({ ...scheda, tipo: x })}>{x}</button>)}</div>
         {manuale ? <label className="pcard" style={{ padding: '12px 14px', display: 'block' }}><div className="lbl">Seriale</div>
           <input className="input" value={scheda.seriale} onChange={(e) => setScheda({ ...scheda, seriale: e.target.value.toUpperCase() })} autoCapitalize="characters" autoCorrect="off" style={{ marginTop: 6 }} /></label>
           : <div className="pcard row between" style={{ padding: '12px 14px' }}><div><div className="lbl">Letto dalla foto</div><b style={{ fontSize: 18 }}>{scheda.seriale}</b></div>
@@ -119,10 +131,10 @@ export function Carico() {
         {!manuale && <div className="ptitle" style={{ fontSize: 24 }}>{[scheda.marca, scheda.modello].filter(Boolean).join(' ') || 'Modello non letto'}</div>}
         <div className="pcard" style={{ padding: '4px 14px' }}>
           {campi.filter(([k]) => manuale || (k !== 'marca' && k !== 'modello')).map(([k, l]) => <div key={k} className="kvp">
-            <span>{l}</span>{manuale ? <input aria-label={l} value={String(scheda[k] ?? '')} onChange={(e) => setScheda({ ...scheda, [k]: e.target.value })}
+            <span>{l}</span>{manuale || scheda.tipo === 'Telefono' ? <input aria-label={l} value={String(scheda[k] ?? '')} onChange={(e) => setScheda({ ...scheda, [k]: e.target.value })}
               style={{ font: 'inherit', fontWeight: 700, textAlign: 'right', border: 0, background: 'transparent', minWidth: 0, flex: 1 }} /> : <b>{String(scheda[k] || '—')}</b>}</div>)}
           {stage && <div className="kvp"><span>Cancellazione dati</span><b>{stage.esito === 'Formattato' || stage.esito === 'In vendita' ? 'Completata' : stage.esito}</b></div>}
-          {scheda.batteria && <div className="kvp" style={{ border: 0 }}><span>Batteria dal report</span><b>{scheda.batteria}</b></div>}
+          {scheda.tipo === 'PC' && scheda.batteria && <div className="kvp" style={{ border: 0 }}><span>Batteria dal report</span><b>{scheda.batteria}</b></div>}
         </div>
         <div style={{ flex: 1 }} />
         <button type="button" className="bigbtn" onClick={() => vai('grado')} {...(pronta ? {} : off)}>Avanti</button>

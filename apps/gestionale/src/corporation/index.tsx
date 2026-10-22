@@ -36,7 +36,7 @@ export function Corporation() {
 function Home() {
   const { vai } = useApp();
   const [per, setPer] = useState<'Oggi' | 'Mese'>('Oggi');
-  const { dati: dev } = useDati((db) => db.from<any>('device').select('id,stato,siti,caricato_il').neq('stato', 'Venduto'));
+  const { dati: dev } = useDati((db) => db.from<any>('device').select('id,stato,siti,caricato_il,prezzo,prezzo_confermato_da').neq('stato', 'Venduto'));
   const { dati: ven } = useDati((db) => db.from<any>('vendite').select('canale,venduto_il').gte('venduto_il', meseISO() + '-01'));
   const { dati: ord } = useDati((db) => db.from<any>('ordini').select('id,stato,entro').in('stato', ['Da preparare', 'Pronto']));
   const { dati: inc } = useDati((db) => db.from<any>('incassi_corporation').select('*'));
@@ -59,7 +59,9 @@ function Home() {
   const nFermi = dev.filter(fermo).length, nResi = dev.filter((d) => d.stato === 'Reso').length, l = lic?.[0]?.valore;
   const guarda: [string, string, string, boolean][] = [];
   if (nFermi) guarda.push([nFermi === 1 ? '1 PC fermo da oltre 60 giorni' : `${nFermi} PC fermi da oltre 60 giorni`, 'inv', 'Inventario', true]);
-  if (nResi) guarda.push([nResi === 1 ? '1 reso aperto' : `${nResi} resi aperti`, 'ordini', 'Ordini', false]);
+  if (nResi) guarda.push([nResi === 1 ? '1 reso da rimettere in vendita' : `${nResi} resi da rimettere in vendita`, 'inv', 'Inventario', false]);
+  const nConf = (dev ?? []).filter((d) => d.prezzo != null && !d.prezzo_confermato_da).length;
+  if (nConf && (io.ruolo === 'vendite' || io.ruolo === 'direzione')) guarda.push([nConf === 1 ? '1 prezzo da confermare' : `${nConf} prezzi da confermare`, 'inv', 'Inventario', false]);
   if (ord.length) guarda.push([ord.length === 1 ? '1 ordine da spedire' : `${ord.length} ordini da spedire`, 'ordini', 'Ordini', false]);
   if (fall?.length) guarda.push([fall.length === 1 ? '1 postazione interrotta allo stage' : `${fall.length} postazioni interrotte allo stage`, 'stage', 'Stage Computer', true]);
   if (l && l.rimaste < 100) guarda.push([`Licenze Certus: chiavetta ${l.chiavetta} quasi finita`, 'stage', 'Stage Computer', false]);
@@ -72,8 +74,8 @@ function Home() {
       <div className="glass card"><div className="lbl">Dispositivi in magazzino</div><div className="big">{num(dev.length)}</div><div className="lbl">{num(inVendita)} in vendita</div></div>
       <div className="glass card"><div className="lbl">Venduti questo mese</div><div className="big">{num(ven.length)}</div><div className="lbl">online {num(ven.length - persona)} · di persona {num(persona)}</div></div>
       <div className="glass card"><div className="lbl">Ordini da spedire</div><div className="big">{num(ord.length)}</div><div className="lbl">{entro ? 'entro le ' + hm(entro) : 'nessuna scadenza'}</div></div>
-      <div className="glass card"><div className="lbl">Incassato oggi</div><div className="big">{eur0(i.incassato_oggi)}</div><div className="lbl">al netto delle commissioni</div></div>
-      <div className="glass card"><div className="lbl">Incassato {Mese().toLowerCase()}</div><div className="big">{eur0(i.incassato_mese)}</div><div className="lbl">al netto delle commissioni</div></div>
+      <div className="glass card"><div className="lbl">Incassato oggi</div><div className="big">{eur0(i.incassato_oggi)}</div><div className="lbl">netto di commissioni, spese, IVA e resi</div></div>
+      <div className="glass card"><div className="lbl">Incassato {Mese().toLowerCase()}</div><div className="big">{eur0(i.incassato_mese)}</div><div className="lbl">netto di commissioni, spese, IVA e resi</div></div>
     </div>
     <div className="glass card stack">
       <div className="row between"><h3 style={{ fontSize: 18 }}>Stage</h3><div className="row" style={{ gap: 4 }}>{(['Oggi', 'Mese'] as const).map((x) => <Chip key={x} on={per === x} onClick={() => setPer(x)}>{x}</Chip>)}</div></div>
@@ -120,7 +122,7 @@ function MailCorp({ onCerca }: { onCerca: (v: string) => void }) {
       const all = m.allegati?.find((a) => /ddt/i.test(a.nome)) ?? m.allegati?.[0];
       esegui = () => {
         if (!lotto || !all) { setFatto({ id: m.id, testo: !lotto ? 'Nella mail non c’è il codice di un lotto conosciuto.' : 'La mail non ha allegati.', dove: 'lotti' }); return; }
-        az.esegui(() => db.from('lotti').update({ ddt: all.percorso ?? `mail/${m.id}/${all.nome}` }).eq('id', lotto.id))
+        az.esegui(() => db.from('lotti_documenti').insert({ lotto_id: lotto.id, tipo: 'DDT', percorso: all.percorso ?? `mail/${m.id}/${all.nome}`, nome: all.nome }))
           .then((ok) => ok && setFatto({ id: m.id, testo: `DDT caricato nel lotto ${lotto.codice}.`, dove: 'lotti' }));
       };
     }
@@ -137,17 +139,22 @@ function MailCorp({ onCerca }: { onCerca: (v: string) => void }) {
 }
 
 // ------------------------------------------------------------------ Lotti
+// Un lotto è aperto finché si caricano i PC; alla chiusura il costo si divide sui PC caricati e la somma torna esatta.
 function Lotti({ q }: { q: string }) {
   const { db, io } = useApp();
-  const [sel, setSel] = useState<string | null>(null);
-  const [msg, setMsg] = useState('');
+  const [s, set] = useStato({ sel: null as string | null, msg: '', nuovo: false, codice: '', fornitore: '', data: oggiISO(), pezzi: '', costo: '', chiudi: false, nota: '' });
   const file = useRef<HTMLInputElement>(null);
   const { dati: L } = useDati((d) => d.from<any>('lotti_conti').select('*').order('acquistato_il', { ascending: false }));
+  const { dati: Q } = useDati((d) => d.from<any>('lotti_quadratura').select('*'));
+  const { dati: docs } = useDati((d) => d.from<any>('lotti_documenti').select('*').order('caricato_il', { ascending: false }));
   const { dati: dev } = useDati((d) => d.from<any>('device').select('id,stato,caricato_il').neq('stato', 'Venduto'));
   const az = useAzione();
-  if (!L || !dev) return null;
+  if (!L || !dev || !Q) return null;
+  const scrive = io.ruolo === 'vendite' || io.ruolo === 'amministrazione';
+  const qd = (id: string) => Q.find((x) => x.id === id) ?? {};
   const pezzi = L.reduce((a, l) => a + Number(l.pezzi), 0), costo = L.reduce((a, l) => a + Number(l.costo), 0);
-  const cur = L.find((l) => l.id === sel) ?? L[0];
+  const cur = L.find((l) => l.id === s.sel) ?? L[0];
+  const cq = cur ? qd(cur.id) : {};
   const lista = L.filter((l) => has(q, l.codice));
   const carica = async (fs: FileList | null) => {
     if (!fs?.length || !cur) return;
@@ -156,91 +163,168 @@ function Lotti({ q }: { q: string }) {
       for (const f of Array.from(fs)) {
         const percorso = `lotti/${cur.id}/${Date.now()}-${f.name.replace(/[^\w.-]+/g, '_')}`;
         await db.storage.carica('documenti', percorso, f);
-        await db.from('lotti').update(/ddt/i.test(f.name) ? { ddt: percorso } : { fattura: percorso }).eq('id', cur.id);
+        await db.from('lotti_documenti').insert({ lotto_id: cur.id, tipo: /ddt/i.test(f.name) ? 'DDT' : /fatt/i.test(f.name) ? 'Fattura' : 'Altro', percorso, nome: f.name });
         nomi.push(f.name);
       }
     });
-    if (ok) setMsg(`${nomi.length === 1 ? 'Documento caricato' : 'Documenti caricati'} nel lotto ${cur.codice}: ${nomi.join(', ')}.`);
+    if (ok) set({ msg: `${nomi.length === 1 ? 'Documento caricato' : 'Documenti caricati'} nel lotto ${cur.codice}: ${nomi.join(', ')}.` });
     if (file.current) file.current.value = '';
   };
-  const acquisto = (d: string) => { const s = new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { month: 'short', year: 'numeric' }).replace('.', ''); return s[0].toUpperCase() + s.slice(1); };
+  const apri = (x: any) => az.esegui(async () => { window.open(await db.storage.link('documenti', x.percorso), '_blank', 'noopener'); });
+  const crea = () => az.esegui(() => db.from('lotti').insert({ codice: s.codice.trim().toUpperCase(), fornitore: s.fornitore.trim() || null, acquistato_il: s.data,
+    pezzi: Number(s.pezzi), costo: Number(s.costo.replace(',', '.')) })).then((ok) => ok && set({ nuovo: false, msg: `Lotto ${s.codice.trim().toUpperCase()} aperto: dall’app si caricano i PC in questo lotto.`, codice: '', fornitore: '', pezzi: '', costo: '' }));
+  const chiudi = () => az.esegui(() => db.rpc('chiudi_lotto', { p_lotto: cur.id, p_nota: s.nota.trim() || null }))
+    .then((ok) => ok && set({ chiudi: false, nota: '', msg: Number(cq.caricati) === 1 ? `Lotto ${cur.codice} chiuso: ${eur0(cur.costo)} tutti sull’unico PC caricato.` : `Lotto ${cur.codice} chiuso: ${eur0(cur.costo)} divisi sui ${num(cq.caricati)} PC caricati, la somma torna esatta.` }));
+  const acquisto = (d: string) => { const x = new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { month: 'short', year: 'numeric' }).replace('.', ''); return x[0].toUpperCase() + x.slice(1); };
+  const dCur = (docs ?? []).filter((x) => x.lotto_id === cur?.id);
+  const pronto = s.codice.trim() && s.data && Number(s.pezzi) > 0 && Number(s.costo.replace(',', '.')) >= 0 && s.costo.trim();
   return (<>
     <div className="grid g4">
       <div className="glass card"><div className="lbl">Costo medio reale per PC</div><div className="big">{eur0(pezzi ? costo / pezzi : 0)}</div><div className="lbl">calcolato su tutti i lotti</div></div>
-      <div className="glass card"><div className="lbl">Lotti aperti</div><div className="big">{L.filter((l) => Number(l.venduti) < Number(l.pezzi)).length}</div></div>
+      <div className="glass card"><div className="lbl">Lotti aperti</div><div className="big">{Q.filter((l) => l.stato === 'Aperto').length}</div></div>
       <div className="glass card"><div className="lbl">Fermi da oltre 60 giorni</div><div className="big">{dev.filter(fermo).length}</div><div className="lbl">conviene svendere</div></div>
     </div>
-    <div className="glass tbox"><table className="t"><thead><tr><th>Lotto</th><th>Acquisto</th><th>Pezzi</th><th>Costo</th><th>Venduti</th><th>Incassato finora</th><th>Recuperato</th></tr></thead><tbody>
-      {lista.length ? lista.map((r) => <tr key={r.id} className="click" onClick={() => setSel(r.id)} style={cur?.id === r.id ? { background: 'var(--soft)' } : undefined}>
-        <td><b>{r.codice}</b></td><td>{acquisto(r.acquistato_il)}</td><td>{num(r.pezzi)}</td><td>{eur0(r.costo)}</td><td>{num(r.venduti)}</td><td><b>{eur0(r.incassato)}</b></td><td>{Math.round(Number(r.recuperato_pct))}%</td></tr>)
-        : <tr><td colSpan={7} className="lbl">Nessun lotto.</td></tr>}
-    </tbody></table></div>
-    {msg && <Msg>{msg}</Msg>}
+    {s.msg && <Msg>{s.msg}</Msg>}
     <Errore testo={az.errore} />
-    <input ref={file} type="file" multiple accept=".pdf,image/*,.xml,.xlsx,.csv" hidden onChange={(e) => carica(e.target.files)} />
-    {io.ruolo !== 'commercialista' && <div className="row"><Btn onClick={() => file.current?.click()} disabled={az.inCorso || !cur}>Carica fattura d’acquisto e DDT</Btn><span className="lbl">Il programma confronta i seriali del DDT con l’archivio dei PC lavorati.{cur ? ` Lotto scelto: ${cur.codice}.` : ''}</span></div>}
+    {scrive && (s.nuovo ? <div className="glass card stack">
+      <b>Nuovo lotto</b>
+      <div className="row" style={{ alignItems: 'flex-end' }}>
+        <label className="field"><span className="lbl">Codice</span><input className="input" style={{ maxWidth: 120 }} placeholder="L-016" value={s.codice} onChange={(e) => set({ codice: e.target.value })} /></label>
+        <label className="field"><span className="lbl">Fornitore</span><input className="input" value={s.fornitore} onChange={(e) => set({ fornitore: e.target.value })} /></label>
+        <label className="field"><span className="lbl">Acquisto</span><input className="input" type="date" value={s.data} onChange={(e) => set({ data: e.target.value })} /></label>
+        <label className="field"><span className="lbl">Pezzi nel DDT</span><input className="input" style={{ maxWidth: 110 }} inputMode="numeric" value={s.pezzi} onChange={(e) => set({ pezzi: e.target.value.replace(/\D/g, '') })} /></label>
+        <label className="field"><span className="lbl">Costo €</span><input className="input" style={{ maxWidth: 130 }} inputMode="decimal" value={s.costo} onChange={(e) => set({ costo: e.target.value })} /></label>
+      </div>
+      <div className="row"><Btn onClick={crea} disabled={az.inCorso || !pronto}>Apri</Btn><Btn ghost onClick={() => set({ nuovo: false })}>Annulla</Btn></div>
+    </div> : <div className="row"><Btn onClick={() => set({ nuovo: true, msg: '' })}>Nuovo</Btn></div>)}
+    <div className="glass tbox"><table className="t nw"><thead><tr><th>Lotto</th><th>Acquisto</th><th>Pezzi</th><th>Caricati</th><th>Costo</th><th>Venduti</th><th>Incassato</th><th>Recuperato</th><th>Stato</th></tr></thead><tbody>
+      {lista.length ? lista.map((r) => { const x = qd(r.id); return <tr key={r.id} className="click" onClick={() => set({ sel: r.id, chiudi: false })} style={cur?.id === r.id ? { background: 'var(--soft)' } : undefined}>
+        <td><b>{r.codice}</b></td><td>{acquisto(r.acquistato_il)}</td><td>{num(r.pezzi)}</td><td>{num(x.caricati)}</td><td>{eur0(r.costo)}</td><td>{num(r.venduti)}</td><td><b>{eur0(r.incassato)}</b></td><td>{Math.round(Number(r.recuperato_pct))}%</td>
+        <td>{x.stato === 'Chiuso' ? <Pill tone="dark">Chiuso</Pill> : <Pill>Aperto</Pill>}</td></tr>; })
+        : <tr><td colSpan={9} className="lbl">Nessun lotto.</td></tr>}
+    </tbody></table></div>
+    <p className="lbl" style={{ margin: 0 }}>L’incassato è netto: tolte commissioni, spese, IVA del margine e rimborsi dei resi.</p>
+    {cur && <div className="glass card stack">
+      <div className="row between"><h3 style={{ fontSize: 18 }}>Lotto {cur.codice}</h3>{cq.stato === 'Chiuso' ? <Pill tone="dark">Chiuso</Pill> : <Pill>Aperto</Pill>}</div>
+      <div className="grid g4">
+        <div><div className="lbl">Pezzi nel DDT</div><b>{num(cq.pezzi_dichiarati)}</b></div>
+        <div><div className="lbl">Caricati</div><b className={Number(cq.caricati) !== Number(cq.pezzi_dichiarati) ? 'miss' : undefined}>{num(cq.caricati)}</b></div>
+        <div><div className="lbl">Costo diviso</div><b>{eur0(cq.costo_ripartito)}</b></div>
+        <div><div className="lbl">Differenza</div><b className={Number(cq.differenza) !== 0 ? 'miss' : undefined}>{eur0(cq.differenza)}</b></div>
+      </div>
+      <div className="list">{dCur.length ? dCur.map((x) => <button key={x.id} type="button" className="li" onClick={() => apri(x)}><span className="row between" style={{ width: '100%' }}><span>{x.nome ?? x.percorso.split('/').pop()}</span><Pill>{x.tipo}</Pill></span></button>)
+        : <div className="lbl" style={{ padding: 10 }}>Nessun documento.</div>}</div>
+      <input ref={file} type="file" multiple accept=".pdf,image/*,.xml,.xlsx,.csv" hidden onChange={(e) => carica(e.target.files)} />
+      {scrive && <div className="row">
+        <Btn ghost onClick={() => file.current?.click()} disabled={az.inCorso}>Carica</Btn>
+        {cq.stato === 'Aperto' && !s.chiudi && <Btn onClick={() => set({ chiudi: true, msg: '' })}>Chiudi</Btn>}
+      </div>}
+      {scrive && s.chiudi && <div className="stack" style={{ gap: 8 }}>
+        <div>{Number(cq.caricati) === Number(cq.pezzi_dichiarati) ? `Caricati tutti i ${num(cq.caricati)} PC del DDT: il costo si divide in parti uguali.`
+          : `Nel DDT ci sono ${num(cq.pezzi_dichiarati)} pezzi, caricati ${num(cq.caricati)}: scrivi cosa manca o cosa c’è in più.`}</div>
+        {Number(cq.caricati) !== Number(cq.pezzi_dichiarati) && <input className="input" placeholder="Nota" value={s.nota} onChange={(e) => set({ nota: e.target.value })} />}
+        <div className="row"><Btn onClick={chiudi} disabled={az.inCorso || (Number(cq.caricati) !== Number(cq.pezzi_dichiarati) && !s.nota.trim())}>Conferma</Btn><Btn ghost onClick={() => set({ chiudi: false })}>Annulla</Btn></div>
+      </div>}
+    </div>}
   </>);
 }
 
 // ------------------------------------------------------------------ Inventario
+const SITI = ['Sito', 'Back Market', 'Refurbed', 'eBay', 'Subito', 'Amazon'];
 function Inventario({ q }: { q: string }) {
   const { db, io } = useApp();
-  const [s, set] = useStato({ vista: 'tabella', brand: 'Tutti', grado: 'Tutti', apri: '' as string });
+  const [s, set] = useStato({ vista: 'tabella', brand: 'Tutti', grado: 'Tutti', stato: 'Tutti', apri: '' as string });
   const { dati: D } = useDati((d) => d.from<any>('device').select('*,lotti(codice),bancali(codice,posti(codice))').order('caricato_il', { ascending: false }).limit(2000));
   if (!D) return null;
   const marche = ['Tutti', ...Array.from(new Set(['Lenovo', 'HP', 'Dell', 'Apple', ...D.map((d) => d.marca).filter(Boolean)]))];
-  const list = D.filter((d) => (s.brand === 'Tutti' || d.marca === s.brand) && (s.grado === 'Tutti' || d.grado === s.grado)
-    && has(q, d.seriale, d.modello, d.marca, d.lotti?.codice, d.bancali?.codice, d.bancali?.posti?.codice));
+  const daConfermare = (d: any) => d.stato !== 'Venduto' && d.prezzo != null && !d.prezzo_confermato_da;
+  const perStato = (d: any) => s.stato === 'Tutti' || (s.stato === 'Da confermare' ? daConfermare(d) : s.stato === 'Resi' ? d.stato === 'Reso' : d.stato === s.stato);
+  const list = D.filter((d) => (s.brand === 'Tutti' || d.marca === s.brand) && (s.grado === 'Tutti' || d.grado === s.grado) && perStato(d)
+    && has(q, d.seriale, d.modello, d.marca, d.lotti?.codice, d.bancali?.codice, d.bancali?.posti?.codice, d.colore, d.memoria));
   const posto = (d: any) => d.bancali?.posti?.codice ?? (d.bancali ? 'Ricevimento' : '—');
-  const filters = <div className="row">
+  const nConf = D.filter(daConfermare).length;
+  const filters = <div className="stack" style={{ gap: 8 }}><div className="row">
     {marche.map((x) => <Chip key={x} on={s.brand === x} onClick={() => set({ brand: x })}>{x}</Chip>)}<span style={{ width: 8 }} />
     {['Tutti', 'A', 'B', 'C', 'D'].map((x) => <Chip key={x} on={s.grado === x} onClick={() => set({ grado: x })}>{x === 'Tutti' ? 'Tutti i gradi' : 'Grado ' + x}</Chip>)}
     <div className="row" style={{ marginLeft: 'auto', gap: 4, padding: 4, borderRadius: 999 }}>
       <Chip on={s.vista === 'schede'} onClick={() => set({ vista: 'schede' })}>Schede</Chip><Chip on={s.vista === 'tabella'} onClick={() => set({ vista: 'tabella' })}>Tabella</Chip></div>
-  </div>;
+  </div><div className="row">
+    {['Tutti', 'Disponibile', 'In carico', 'Da confermare', 'Resi', 'Fermo', 'Venduto'].map((x) => <Chip key={x} on={s.stato === x} onClick={() => set({ stato: x })}>{x === 'Da confermare' && nConf ? `${x} · ${nConf}` : x}</Chip>)}
+  </div></div>;
   const empty = <div className="glass card lbl">Nessun computer con questi filtri.</div>;
   const aperto = D.find((d) => d.id === s.apri);
+  const spec = (d: any) => d.tipo === 'Telefono' ? [d.marca, d.memoria, d.colore, d.batteria != null ? `batteria ${d.batteria}%` : null] : [d.marca, d.cpu, d.gpu, d.ram, d.disco];
   return (<>
     {filters}
-    {aperto && <Scheda d={aperto} onChiudi={() => set({ apri: '' })} io={io.id} db={db} />}
+    {aperto && <Scheda key={aperto.id} d={aperto} onChiudi={() => set({ apri: '' })} vendite={io.ruolo === 'vendite'} db={db} />}
     {!list.length ? empty : s.vista === 'schede'
       ? <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))' }}>{list.map((d) => (
         <div key={d.id} className="glass card stack" style={{ gap: 8, cursor: 'pointer' }} onClick={() => set({ apri: d.id })}>
           <div className="ph">{LAPTOP}</div><div className="row between"><b>{d.modello}</b>{d.grado && <Pill tone="dark">{d.grado}</Pill>}</div>
-          <div className="lbl">{[d.marca, d.cpu, d.gpu, d.ram, d.disco].filter(Boolean).join(' · ')}</div>
+          <div className="lbl">{spec(d).filter(Boolean).join(' · ')}</div>
           <div className="lbl">Seriale {d.seriale} · {d.bancali?.codice ?? '—'} · {posto(d)}</div>
-          <div className="row between"><span style={{ fontSize: 20, fontWeight: 800 }}>{d.prezzo != null ? eur0(d.prezzo) : '€ —'}</span><span className="lbl">{d.stato}</span></div>
+          <div className="row between"><span style={{ fontSize: 20, fontWeight: 800 }}>{d.prezzo != null ? eur0(d.prezzo) : '€ —'}</span><span className="lbl">{daConfermare(d) ? 'Da confermare' : d.stato}</span></div>
           <div className="lbl">{d.siti?.join(', ') || '—'}</div>
         </div>))}</div>
       : <div className="glass tbox"><table className="t nw" style={{ minWidth: 1700 }}><thead><tr>{['Seriale', 'Marchio', 'Modello', 'Processore', 'Scheda video', 'RAM', 'Disco', 'Schermo', 'Grado', 'Difetti', 'Lotto', 'Bancale', 'Posto', 'Costo', 'Prezzo', 'Stato', 'Siti', 'Giorni'].map((c) => <th key={c}>{c}</th>)}</tr></thead><tbody>
         {list.map((d) => <tr key={d.id} className="click" onClick={() => set({ apri: d.id })} style={s.apri === d.id ? { background: 'var(--soft)' } : undefined}>
-          <td>{d.seriale}</td><td>{d.marca}</td><td><b>{d.modello}</b></td><td>{d.cpu}</td><td>{d.gpu}</td><td>{d.ram}</td><td>{d.disco}</td><td>{d.schermo}</td>
+          <td>{d.seriale}</td><td>{d.marca}</td><td><b>{d.modello}</b></td>
+          {d.tipo === 'Telefono' ? <><td colSpan={2} className="lbl">{[d.memoria, d.colore].filter(Boolean).join(' · ') || '—'}</td><td colSpan={3} className="lbl">{d.batteria != null ? `Batteria ${d.batteria}%` : '—'}</td></>
+            : <><td>{d.cpu}</td><td>{d.gpu}</td><td>{d.ram}</td><td>{d.disco}</td><td>{d.schermo}</td></>}
           <td>{d.grado && <Pill tone="dark">{d.grado}</Pill>}</td><td className="lbl">{d.difetti?.join(', ') || '—'}</td><td>{d.lotti?.codice ?? '—'}</td><td>{d.bancali?.codice ?? '—'}</td><td>{posto(d)}</td>
-          <td>{d.costo != null ? eur0(d.costo) : '—'}</td><td><b>{d.prezzo != null ? eur0(d.prezzo) : '—'}</b></td><td>{statoPill(d.stato)}</td><td className="lbl">{d.siti?.join(', ') || '—'}</td><td>{giorniDa(d.caricato_il)}</td></tr>)}
+          <td>{d.costo != null ? eur0(d.costo) : '—'}</td><td><b>{d.prezzo != null ? eur0(d.prezzo) : '—'}</b>{daConfermare(d) && <div className="lbl">da confermare</div>}</td><td>{statoPill(d.stato)}</td><td className="lbl">{d.siti?.join(', ') || '—'}</td><td>{giorniDa(d.caricato_il)}</td></tr>)}
       </tbody></table></div>}
   </>);
 }
 
-const SITI = ['Back Market', 'Refurbed', 'eBay', 'Subito', 'Amazon', 'Sito'];
-/** scheda di un computer: grado, prezzo e siti si cambiano qui (le regole le fa il database) */
-function Scheda({ d, onChiudi, io, db }: { d: any; onChiudi: () => void; io: string; db: any }) {
-  const [g, setG] = useState<string>(d.grado ?? 'B');
-  const [p, setP] = useState<string>(d.prezzo != null ? String(d.prezzo) : '');
-  const [siti, setSiti] = useState<string[]>(d.siti ?? []);
-  const [ok, setOk] = useState(false);
+/** scheda di un computer: grado, prezzo e siti si cambiano qui; conferma, vendita, reso e fermo passano dalle funzioni del database */
+function Scheda({ d, onChiudi, vendite, db }: { d: any; onChiudi: () => void; vendite: boolean; db: any }) {
+  const [s, set] = useStato({ g: d.grado ?? 'B', p: d.prezzo != null ? String(d.prezzo) : '', siti: (d.siti ?? []) as string[], msg: '', apri: '' as '' | 'vendi' | 'fermo' | 'rimetti',
+    canale: 'eBay', prezzo: d.prezzo != null ? String(d.prezzo) : '', comm: '', spese: '', rif: '', motivo: '', bancale: d.bancali?.codice ?? '' });
   const az = useAzione();
-  const salva = () => az.esegui(() => db.from('device').update({ grado: g, prezzo: p === '' ? null : Number(p.replace(',', '.')), siti, ...(Number(p) !== Number(d.prezzo) ? { prezzo_confermato_da: io } : {}) }).eq('id', d.id))
-    .then((x: boolean) => x && setOk(true));
-  const venduto = d.stato === 'Venduto';
+  const { dati: proposto } = useDati((x) => d.modello && d.grado ? x.rpc<number | null>('prezzo_proposto', { p_modello: d.modello, p_grado: d.grado }).then((v) => v, () => null) : Promise.resolve(null), [d.modello, d.grado]);
+  const n = (v: string) => v.trim() === '' ? 0 : Number(v.replace(',', '.'));
+  const salva = () => az.esegui(() => db.from('device').update({ grado: s.g, prezzo: s.p === '' ? null : n(s.p), siti: s.siti }).eq('id', d.id))
+    .then((x: boolean) => x && set({ msg: 'Salvato: il prezzo e i siti sono aggiornati ovunque.' }));
+  const conferma = () => az.esegui(() => db.rpc('conferma_prezzo', { p_device: d.id })).then((x: boolean) => x && set({ msg: `Prezzo di ${eur0(d.prezzo)} confermato: ora il PC si vede anche sul sito.` }));
+  const vendi = () => az.esegui(() => db.rpc('registra_vendita', { p_seriale: d.seriale, p_canale: s.canale, p_prezzo: n(s.prezzo), p_commissione: n(s.comm), p_spese: n(s.spese), p_riferimento: s.rif.trim() || null }))
+    .then((x: boolean) => x && set({ apri: '', msg: `Venduto su ${s.canale}: tolto dagli altri siti, l’ordine è in Ordini.` }));
+  const ferma = () => az.esegui(() => db.rpc('metti_fermo', { p_device: d.id, p_motivo: s.motivo })).then((x: boolean) => x && set({ apri: '', msg: 'PC fermo: tolto da tutti i siti.' }));
+  const rimetti = () => az.esegui(() => db.rpc('rimetti_in_vendita', { p_device: d.id, p_bancale: s.bancale.trim(), p_prezzo: s.p === '' ? null : n(s.p) }))
+    .then((x: boolean) => x && set({ apri: '', msg: 'Di nuovo disponibile: scegli i siti e premi «Salva».' }));
+  const venduto = d.stato === 'Venduto' || d.stato === 'Smontato';
+  const daConf = !venduto && d.prezzo != null && !d.prezzo_confermato_da;
   return (
     <div className="glass card stack">
-      <div className="row between"><h3 style={{ fontSize: 20 }}>{d.marca} {d.modello}</h3><span className="lbl">Seriale {d.seriale}</span></div>
-      <div className="row"><b style={{ width: 70 }}>Grado</b>{['A', 'B', 'C', 'D'].map((x) => <Chip key={x} on={g === x} onClick={() => !venduto && setG(x)}>{x}</Chip>)}</div>
-      <label className="row"><b style={{ width: 70 }}>Prezzo</b><input className="input" style={{ maxWidth: 160 }} inputMode="decimal" value={p} disabled={venduto} onChange={(e) => setP(e.target.value)} /></label>
-      <div className="row"><b style={{ width: 70 }}>Siti</b>{SITI.map((x) => <Chip key={x} on={siti.includes(x)} onClick={() => !venduto && setSiti(siti.includes(x) ? siti.filter((y) => y !== x) : [...siti, x])}>{x}</Chip>)}</div>
-      {ok && <Msg>Salvato: il prezzo e i siti sono aggiornati ovunque.</Msg>}
+      <div className="row between"><h3 style={{ fontSize: 20 }}>{d.marca} {d.modello}</h3><span className="lbl">{d.tipo === 'Telefono' ? 'IMEI' : 'Seriale'} {d.seriale} · {d.stato}</span></div>
+      {d.tipo === 'Telefono' && <div className="lbl">{[d.memoria, d.colore, d.batteria != null ? `batteria ${d.batteria}%` : null].filter(Boolean).join(' · ') || '—'}</div>}
+      <div className="row"><b style={{ width: 70 }}>Grado</b>{['A', 'B', 'C', 'D'].map((x) => <Chip key={x} on={s.g === x} onClick={() => !venduto && set({ g: x })}>{x}</Chip>)}</div>
+      <label className="row"><b style={{ width: 70 }}>Prezzo</b><input className="input" style={{ maxWidth: 160 }} inputMode="decimal" value={s.p} disabled={venduto} onChange={(e) => set({ p: e.target.value })} />
+        {proposto != null && <span className="lbl">proposto {eur0(proposto)}</span>}{daConf && <Pill tone="red">Da confermare</Pill>}</label>
+      <div className="row"><b style={{ width: 70 }}>Siti</b>{SITI.map((x) => <Chip key={x} on={s.siti.includes(x)} onClick={() => !venduto && d.stato !== 'Reso' && d.stato !== 'Fermo' && set({ siti: s.siti.includes(x) ? s.siti.filter((y) => y !== x) : [...s.siti, x] })}>{x}</Chip>)}</div>
+      {s.apri === 'vendi' && <div className="stack" style={{ gap: 8 }}>
+        <div className="row">{[...SITI, 'Di persona'].map((x) => <Chip key={x} on={s.canale === x} onClick={() => set({ canale: x })}>{x}</Chip>)}</div>
+        <div className="row" style={{ alignItems: 'flex-end' }}>
+          <label className="field"><span className="lbl">Prezzo €</span><input className="input" style={{ maxWidth: 110 }} inputMode="decimal" value={s.prezzo} onChange={(e) => set({ prezzo: e.target.value })} /></label>
+          <label className="field"><span className="lbl">Commissione €</span><input className="input" style={{ maxWidth: 110 }} inputMode="decimal" value={s.comm} onChange={(e) => set({ comm: e.target.value })} /></label>
+          <label className="field"><span className="lbl">Spese €</span><input className="input" style={{ maxWidth: 110 }} inputMode="decimal" value={s.spese} onChange={(e) => set({ spese: e.target.value })} /></label>
+          <label className="field"><span className="lbl">N. ordine</span><input className="input" style={{ maxWidth: 140 }} value={s.rif} onChange={(e) => set({ rif: e.target.value })} /></label>
+        </div>
+        <div className="row"><Btn onClick={vendi} disabled={az.inCorso || !(n(s.prezzo) > 0)}>Conferma</Btn><Btn ghost onClick={() => set({ apri: '' })}>Annulla</Btn></div>
+      </div>}
+      {s.apri === 'fermo' && <div className="row"><input className="input" style={{ maxWidth: 320 }} placeholder="Perché è fermo" value={s.motivo} onChange={(e) => set({ motivo: e.target.value })} />
+        <Btn onClick={ferma} disabled={az.inCorso || !s.motivo.trim()}>Conferma</Btn><Btn ghost onClick={() => set({ apri: '' })}>Annulla</Btn></div>}
+      {s.apri === 'rimetti' && <div className="row"><input className="input" style={{ maxWidth: 200 }} placeholder="Bancale" value={s.bancale} onChange={(e) => set({ bancale: e.target.value.toUpperCase() })} />
+        <Btn onClick={rimetti} disabled={az.inCorso || !s.bancale.trim() || s.p === ''}>Conferma</Btn><Btn ghost onClick={() => set({ apri: '' })}>Annulla</Btn></div>}
+      {s.msg && <Msg>{s.msg}</Msg>}
       <Errore testo={az.errore} />
-      <div className="row">{!venduto && <Btn onClick={salva} disabled={az.inCorso}>Salva</Btn>}<Btn ghost onClick={onChiudi}>Chiudi</Btn></div>
+      <div className="row">
+        {!venduto && d.stato !== 'Reso' && d.stato !== 'Fermo' && <Btn onClick={salva} disabled={az.inCorso}>Salva</Btn>}
+        {vendite && daConf && <Btn onClick={conferma} disabled={az.inCorso}>Conferma</Btn>}
+        {vendite && d.stato === 'Disponibile' && !s.apri && <Btn ghost onClick={() => set({ apri: 'vendi', msg: '' })}>Vendi</Btn>}
+        {vendite && (d.stato === 'Reso' || d.stato === 'Fermo') && !s.apri && <Btn onClick={() => set({ apri: 'rimetti', msg: '' })}>Rimetti</Btn>}
+        {vendite && !venduto && d.stato !== 'Fermo' && !s.apri && <Btn ghost onClick={() => set({ apri: 'fermo', msg: '' })}>Fermo</Btn>}
+        <Btn ghost onClick={onChiudi}>Chiudi</Btn></div>
     </div>
   );
 }
@@ -312,28 +396,48 @@ function Ricambi({ q }: { q: string }) {
 
 // ------------------------------------------------------------------ Ordini
 function Ordini({ q }: { q: string }) {
-  const { db } = useApp();
-  const [msg, setMsg] = useState('');
+  const { db, io } = useApp();
+  const [s, set] = useStato({ msg: '', apri: '', cosa: '' as '' | 'spedito' | 'reso', tracking: '', rimborso: '', motivo: '', rivendibile: true });
   const { dati: O } = useDati((d) => d.from<any>('ordini').select('*,device(marca,modello,grado,seriale,bancali(codice,posti(codice)))').order('creato_il', { ascending: false }).limit(300));
+  const { dati: V } = useDati((d) => io.ruolo === 'vendite' ? d.from<any>('vendite').select('id,ordine_id,prezzo,reso_il,rimborso') : Promise.resolve([] as any[]));
   const az = useAzione();
   if (!O) return null;
+  const vend = (o: any) => (V ?? []).find((v) => v.ordine_id === o.id);
   const etichetta = (o: any) => az.esegui(async () => {
     const r = await db.fn<{ url?: string | null }>('etichetta-spedizione', { ordine_id: o.id });
     if (r?.url) window.open(r.url, '_blank', 'noopener');
-    setMsg(`Etichetta di spedizione pronta per ${o.device?.modello ?? o.riferimento}${o.device?.bancali?.posti?.codice ? `: il PC è nel posto ${o.device.bancali.posti.codice}` : ''}.`);
+    set({ msg: `Etichetta di spedizione pronta per ${o.device?.modello ?? o.riferimento}${o.device?.bancali?.posti?.codice ? `: il PC è nel posto ${o.device.bancali.posti.codice}` : ''}.` });
   });
-  const lista = O.filter((o) => has(q, o.riferimento, o.canale, o.device?.modello, o.device?.seriale, o.cliente));
+  const spedito = (o: any) => az.esegui(() => db.rpc('ordine_spedito', { p_ordine: o.id, p_tracking: s.tracking }))
+    .then((ok) => ok && set({ apri: '', cosa: '', tracking: '', msg: `Ordine ${o.riferimento ?? ''} spedito con il numero ${s.tracking.trim()}.` }));
+  const reso = (o: any, v: any) => az.esegui(() => db.rpc('reso_vendita', { p_vendita: v.id, p_rimborso: Number(s.rimborso.replace(',', '.')), p_motivo: s.motivo, p_rivendibile: s.rivendibile }))
+    .then((ok) => ok && set({ apri: '', cosa: '', rimborso: '', motivo: '', msg: s.rivendibile ? `Reso registrato: ${o.device?.modello ?? 'il PC'} è tra i resi in Inventario, da rimettere in vendita.` : `Reso registrato: ${o.device?.modello ?? 'il PC'} è fermo in Inventario.` }));
+  const lista = O.filter((o) => has(q, o.riferimento, o.canale, o.device?.modello, o.device?.seriale, o.cliente, o.tracking));
+  const statoO = (o: any) => { const v = vend(o); return v?.reso_il ? <Pill tone="red">Reso</Pill> : o.stato === 'Da preparare' ? <Pill>{o.stato}</Pill> : o.stato === 'Annullato' ? <Pill tone="red">{o.stato}</Pill> : <Pill tone="dark">{o.stato}</Pill>; };
   return (<>
-    <p className="lbl" style={{ margin: 0 }}>Un solo inventario: quando un computer si vende su un sito, sparisce subito dagli altri.</p>
-    {msg && <Msg>{msg}</Msg>}
+    <p className="lbl" style={{ margin: 0 }}>Un solo inventario: quando un computer si vende su un sito, sparisce subito dagli altri. Le vendite fatte su un sito a mano si registrano dalla scheda del PC in Inventario («Vendi»).</p>
+    {s.msg && <Msg>{s.msg}</Msg>}
     <Errore testo={az.errore} />
-    <div className="glass tbox"><table className="t" style={{ minWidth: 900 }}><thead><tr><th>Ora</th><th>Sito</th><th>Marchio</th><th>Modello</th><th>Grado</th><th>Seriale</th><th>Posto</th><th>Stato</th><th /></tr></thead><tbody>
-      {lista.length ? lista.map((o) => <tr key={o.id}>
+    <div className="glass tbox"><table className="t nw" style={{ minWidth: 1000 }}><thead><tr><th>Ora</th><th>Sito</th><th>Marchio</th><th>Modello</th><th>Grado</th><th>Seriale</th><th>Posto</th><th>Tracking</th><th>Stato</th><th /></tr></thead><tbody>
+      {lista.length ? lista.map((o) => { const v = vend(o), qui = s.apri === o.id; return <React.Fragment key={o.id}><tr>
         <td>{quandoOrdine(o.creato_il)}</td><td>{o.canale}</td><td>{o.device?.marca ?? '—'}</td><td><b>{o.device?.modello ?? '—'}</b></td><td>{o.device?.grado && <Pill tone="dark">{o.device.grado}</Pill>}</td>
-        <td>{o.device?.seriale ?? '—'}</td><td>{o.device?.bancali?.posti?.codice ?? '—'}</td>
-        <td>{o.stato === 'Da preparare' ? <Pill>{o.stato}</Pill> : o.stato === 'Annullato' ? <Pill tone="red">{o.stato}</Pill> : <Pill tone="dark">{o.stato}</Pill>}</td>
-        <td>{o.stato === 'Da preparare' && <Btn ghost sm disabled={az.inCorso} onClick={() => etichetta(o)}>Etichetta spedizione</Btn>}</td></tr>)
-        : <tr><td colSpan={9} className="lbl">Nessun ordine.</td></tr>}
+        <td>{o.device?.seriale ?? '—'}</td><td>{o.device?.bancali?.posti?.codice ?? '—'}</td><td className="lbl">{o.tracking ?? '—'}</td>
+        <td>{statoO(o)}</td>
+        <td><span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+          {o.stato === 'Da preparare' && <Btn ghost sm disabled={az.inCorso} onClick={() => etichetta(o)}>Etichetta</Btn>}
+          {(o.stato === 'Da preparare' || o.stato === 'Pronto') && <Btn ghost sm onClick={() => set({ apri: o.id, cosa: 'spedito', tracking: '' })}>Spedito</Btn>}
+          {o.stato === 'Spedito' && v && !v.reso_il && <Btn ghost sm onClick={() => set({ apri: o.id, cosa: 'reso', rimborso: String(v.prezzo), motivo: '', rivendibile: true })}>Reso</Btn>}
+        </span></td></tr>
+        {qui && s.cosa === 'spedito' && <tr><td colSpan={10}><span className="row">
+          <input className="input" style={{ maxWidth: 240 }} placeholder="Numero di spedizione" value={s.tracking} onChange={(e) => set({ tracking: e.target.value })} />
+          <Btn sm onClick={() => spedito(o)} disabled={az.inCorso || !s.tracking.trim()}>Conferma</Btn><Btn ghost sm onClick={() => set({ apri: '' })}>Annulla</Btn></span></td></tr>}
+        {qui && s.cosa === 'reso' && v && <tr><td colSpan={10}><span className="row">
+          <label className="field"><span className="lbl">Rimborso €</span><input className="input" style={{ maxWidth: 110 }} inputMode="decimal" value={s.rimborso} onChange={(e) => set({ rimborso: e.target.value })} /></label>
+          <label className="field"><span className="lbl">Motivo</span><input className="input" style={{ maxWidth: 260 }} value={s.motivo} onChange={(e) => set({ motivo: e.target.value })} /></label>
+          <Chip on={s.rivendibile} onClick={() => set({ rivendibile: true })}>Rivendibile</Chip><Chip on={!s.rivendibile} onClick={() => set({ rivendibile: false })}>Fermo</Chip>
+          <Btn sm onClick={() => reso(o, v)} disabled={az.inCorso || !s.motivo.trim() || s.rimborso.trim() === ''}>Conferma</Btn><Btn ghost sm onClick={() => set({ apri: '' })}>Annulla</Btn></span></td></tr>}
+      </React.Fragment>; })
+        : <tr><td colSpan={10} className="lbl">Nessun ordine.</td></tr>}
     </tbody></table></div>
   </>);
 }
