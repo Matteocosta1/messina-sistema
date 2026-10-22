@@ -11,7 +11,9 @@ grant execute on function pg_temp.come(uuid), pg_temp.verifica(boolean, text), p
 insert into public.bolle (id, cliente_id, tipo, data_consegna, destinatario, indirizzo, citta, colli_previsti, accessori, stato, operatore_id) values
   ('40000000-0000-0000-0000-000000000091', '10000000-0000-0000-0000-000000000001', 'Consegna', current_date, 'Snam', 'Via [indirizzo]', 'Milano', 2, '{Sponda}', 'Nuova', '00000000-0000-0000-0000-000000000003'),
   ('40000000-0000-0000-0000-000000000092', '10000000-0000-0000-0000-000000000002', 'Consegna', current_date, 'Apple', 'Via [indirizzo]', 'Rozzano', 1, '{}', 'Nuova', '00000000-0000-0000-0000-000000000003');
-update public.bolle set stato = 'Confermata' where id in ('40000000-0000-0000-0000-000000000091', '40000000-0000-0000-0000-000000000092');
+update public.bolle set stato = 'Confermata', fuori_dai_giri = true where id in ('40000000-0000-0000-0000-000000000091', '40000000-0000-0000-0000-000000000092');
+-- giro e colli li crea il test: via quelli creati in automatico alla conferma
+delete from public.colli where bolla_id in ('40000000-0000-0000-0000-000000000091', '40000000-0000-0000-0000-000000000092');
 insert into public.colli (bolla_id, codice) values ('40000000-0000-0000-0000-000000000091', 'C-91-001'), ('40000000-0000-0000-0000-000000000091', 'C-91-002'),
   ('40000000-0000-0000-0000-000000000092', 'C-92-001');
 insert into public.giri (id, data, mezzo_id, autista_id, zona, stato) values

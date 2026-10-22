@@ -4,7 +4,7 @@ import { motoreProva, type Tabelle, type Relazioni, type RpcProva, type Funzioni
 
 const ora = (h: number, m = 0, giorni = 0) => { const d = new Date(); d.setDate(d.getDate() - giorni); d.setHours(h, m, 0, 0); return d.toISOString(); };
 const oreFa = (h: number) => new Date(Date.now() - h * 3600000).toISOString();
-const g = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const g = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const id = (p: string, n: number) => `${p}-${String(n).padStart(4, '0')}`;
 
 export const UTENTI_PROVA: Record<string, string> = {
@@ -71,7 +71,7 @@ function dati(): Tabelle {
     { id: 'd-mn', azienda: 'corporation', nome: 'Manuel', mansione: 'Stage', reparto: 'Stage', ore_settimana: 40, inizio: '08:00', fine: '17:00', profilo_id: 'u-sta', contratto: 'CCNL Commercio' },
   ];
   t.mezzi = [
-    { id: 'm1', targa: 'GA001AA', tipo: 'Sprinter', sponda: false, autista_id: 'd-a1', telepass: 'TP-01', revisione: g(40), stato: 'Attivo' },
+    { id: 'm1', targa: 'GA001AA', tipo: 'Furgone', sponda: true, autista_id: 'd-a1', telepass: 'TP-01', revisione: g(40), stato: 'Attivo' },
     { id: 'm2', targa: 'GA002BB', tipo: 'Motrice', sponda: true, autista_id: 'd-a2', telepass: 'TP-02', revisione: g(200), stato: 'Attivo' },
     { id: 'm3', targa: 'GA003CC', tipo: 'Bilico', sponda: true, autista_id: 'd-a3', telepass: 'TP-03', revisione: g(12), stato: 'Attivo' },
     { id: 'm4', targa: 'GA004DD', tipo: 'Furgone', sponda: true, autista_id: null, telepass: 'TP-04', revisione: g(90), stato: 'Officina' },
@@ -102,7 +102,9 @@ function dati(): Tabelle {
   for (const bb of t.bolle) for (let k = 1; k <= bb.colli_previsti; k++)
     t.colli.push({ id: crypto.randomUUID(), bolla_id: bb.id, codice: `C${bb.id.slice(-2)}-${String(k).padStart(3, '0')}`,
       letto_entrata: bb.tipo === 'Magazzino' && k < 32 ? oreFa(2) : null, letto_carico: bb.stato === 'In giro' ? oreFa(3) : null, letto_consegna: null });
-  t.giri = [{ id: 'giro1', data: g(0), mezzo_id: 'm1', autista_id: 'd-a1', zona: 'Milano Sud', stato: 'Partito' }];
+  // i giri di oggi li ha confermati il traffico ieri pomeriggio
+  const ieri16 = (() => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(16, 10, 0, 0); return d.toISOString(); })();
+  t.giri = [{ id: 'giro1', data: g(0), mezzo_id: 'm1', autista_id: 'd-a1', zona: 'Milano Sud', stato: 'Partito', confermato_il: ieri16, confermato_da: 'u-tra', da_confermare: [] }];
   t.fermate = ['b-0006', 'b-0007', 'b-0008', 'b-0009', 'b-0010'].map((bid, i) => ({ id: id('f', i + 1), giro_id: 'giro1', bolla_id: bid, ordine: i + 1, esito: 'Da fare', motivo: null, dopo: null, firmata: false, foto_bolla: null, nitidezza: null, chiusa_il: null }));
   t.accessori_extra = [];
   t.giacenze = [

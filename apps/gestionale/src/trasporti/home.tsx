@@ -12,7 +12,7 @@ export function Home() {
   const { vai } = useApp();
   const oggi = oggiISO();
   const { dati } = useDati(async (db) => {
-    const [bolleOggi, nuove, inc, pagate, fermate, an, giac, mezzi, res] = await Promise.all([
+    const [bolleOggi, nuove, inc, pagate, fermate, an, giac, mezzi, res, ferme] = await Promise.all([
       db.from<any>('bolle').select('id,stato,tipo').eq('data_consegna', oggi).neq('tipo', 'Magazzino'),
       db.from<any>('bolle').select('id,dati_mancanti').eq('stato', 'Nuova'),
       db.from<any>('incassi_trasporti').select('*'),
@@ -22,8 +22,9 @@ export function Home() {
       db.from<any>('giacenze_aperte').select('id,riconsegna_il'),
       db.from<any>('mezzi').select('targa,tipo,revisione,assicurazione,tagliando_km,stato'),
       db.from<any>('resoconti').select('testo,giorno').eq('azienda', 'trasporti').order('giorno', { ascending: false }).limit(1),
+      db.from<any>('bolle').select('id').eq('stato', 'Non consegnata'),
     ]);
-    return { bolleOggi, nuove, inc: inc[0] ?? {}, pagate, fermate, an, giac, mezzi, res: res[0] ?? null };
+    return { bolleOggi, nuove, inc: inc[0] ?? {}, pagate, fermate, an, giac, mezzi, res: res[0] ?? null, ferme };
   }, []);
   if (!dati) return null;
   const consegnate = dati.bolleOggi.filter((b) => ['Consegnata', 'Fatturata'].includes(b.stato)).length;
@@ -31,7 +32,8 @@ export function Home() {
   const primo = chiuse.length ? Math.round(chiuse.filter((f) => f.esito === 'Consegnata').length / chiuse.length * 100) : null;
   const mancanti = dati.nuove.filter((b) => b.dati_mancanti?.length).length;
   const nPag = dati.pagate.length;
-  const daRimettere = dati.fermate.filter((f) => f.esito === 'Non consegnata' && f.dopo !== 'Giacenza').length;
+  // spedizioni non consegnate e ferme: né giacenza né nuova data (quelle tornano nei giri da sole)
+  const daRimettere = dati.ferme.length;
   const daPren = dati.giac.filter((g) => !g.riconsegna_il).length;
   const tra30 = new Date(); tra30.setDate(tra30.getDate() + 30);
   const scad = dati.mezzi.flatMap((m) => [['revisione', m.revisione], ['assicurazione', m.assicurazione]].filter(([, d]) => d && new Date(d) <= tra30)
@@ -43,7 +45,7 @@ export function Home() {
     if (l.length === 1) voci.push([l[0].cosa, l[0].dove, s, PILL[s]]);
     else if (l.length > 1) voci.push([`${l.length} anomalie in ${s}`, 'anomalie/' + s, s, PILL[s]]);
   }
-  if (daRimettere) voci.push([`${daRimettere} mancate consegne da rimettere in giro`, 'traffico', 'Traffico', undefined]);
+  if (daRimettere) voci.push([daRimettere === 1 ? '1 spedizione non consegnata da rimettere in giro' : `${daRimettere} spedizioni non consegnate da rimettere in giro`, 'bolle', 'Bolle', undefined]);
   if (daPren) voci.push([`${daPren === 1 ? '1 giacenza' : daPren + ' giacenze'} con riconsegna da prenotare`, 'giacenze', 'Giacenze', 'red']);
   scad.forEach((x) => voci.push([x, 'mezzi', 'Mezzi', undefined]));
   return (<>

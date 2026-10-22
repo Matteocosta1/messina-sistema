@@ -38,14 +38,14 @@ export function Mezzi() {
     <div className="row">{TIPI.map(([k, l]) => <Chip key={k} on={f === k} onClick={() => setF(k)}>{l}</Chip>)}</div>
     {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
-    <div className="glass tbox"><table className="t"><thead><tr><th>Targa</th><th>Tipo</th><th>Sponda</th><th>Autista</th><th>Telepass</th><th>Satellitare</th><th>Scadenza</th><th>Oggi</th></tr></thead><tbody>
+    <div className="glass tbox"><table className="t"><thead><tr><th>Targa</th><th>Tipo</th><th>Sponda</th><th>Portata</th><th>Autista</th><th>Telepass</th><th>Satellitare</th><th>Scadenza</th><th>Oggi</th></tr></thead><tbody>
       {list.length ? list.map((m) => { const o = oggi(m); const sc = scad(m);
-        return <tr key={m.id}><td><b>{m.targa}</b></td><td>{m.tipo}</td><td>{m.sponda ? 'Sì' : 'No'}</td>
+        return <tr key={m.id}><td><b>{m.targa}</b></td><td>{m.tipo}</td><td>{m.sponda ? 'Sì' : 'No'}</td><td>{m.portata_kg != null ? `${Number(m.portata_kg).toLocaleString('it-IT')} kg · ${m.bancali ?? '—'} bancali` : '—'}</td>
           <td><select className="input" aria-label={'Autista fisso del mezzo ' + m.targa} value={m.autista_id ?? ''} disabled={az.inCorso} onChange={(e) => fisso(m, e.target.value)} style={{ padding: '6px 8px', minWidth: 130 }}>
             <option value="">—</option>{dati.autisti.map((a: any) => <option key={a.id} value={a.id}>{a.nome}</option>)}</select></td>
           <td>{m.telepass ?? '—'}</td><td>{m.satellitare ? <Pill tone="ok">Collegato</Pill> : <span className="lbl">—</span>}</td>
           <td>{vicino(m.revisione, 30) || vicino(m.assicurazione, 30) ? <span className="miss">{sc}</span> : sc}</td><td>{o === 'Fermo' ? <Pill tone="red">Fermo</Pill> : <Pill tone="dark">{o}</Pill>}</td></tr>; })
-        : <tr><td colSpan={8} className="lbl">Nessun mezzo di questo tipo.</td></tr>}
+        : <tr><td colSpan={9} className="lbl">Nessun mezzo di questo tipo.</td></tr>}
     </tbody></table></div>
   </>);
 }

@@ -92,6 +92,8 @@ insert into public.bolle (id, cliente_id, tipo, data_consegna, fascia, destinata
 update public.bolle set stato = 'Confermata'
  where id in ('40000000-0000-0000-0000-000000000004', '40000000-0000-0000-0000-000000000005', '40000000-0000-0000-0000-000000000006');
 
+-- alla conferma il database crea i colli con il numero della bolla; qui i dati di prova usano codici fissi (C-4-001…) per i test
+delete from public.colli;
 insert into public.colli (bolla_id, codice)
 select b.id, 'C-' || substr(b.id::text, 36, 1) || '-' || lpad(g::text, 3, '0')
 from public.bolle b, generate_series(1, b.colli_previsti) g;

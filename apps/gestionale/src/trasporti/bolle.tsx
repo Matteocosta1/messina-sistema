@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Btn, Msg, Pill, Warn } from '@messina/ui';
+import { Btn, Chip, Msg, Pill, Warn } from '@messina/ui';
 import { MailView, useApp, useAzione, useDati, useStato, giornoLungo, giornoCorto, hm, eur, eur0, domaniISO, oggiISO, Mese, Errore, type Mail } from '../core';
 
 // ------------------------------------------------------------------ Mail
@@ -53,7 +53,8 @@ export function Bolle({ scelta }: { scelta?: string }) {
   const ok = cur?.stato === 'Confermata';
   const manca: string[] = cur?.dati_mancanti ?? [];
   const conferma = () => az.esegui(() => db.from('bolle').update({ stato: 'Confermata' }).eq('id', cur!.id)).then((x) => x && set({ msg: 'ok' }));
-  return (
+  return (<>
+    <NonConsegnate />
     <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
       <div className="glass" style={{ flex: '1 1 280px', padding: 8, minWidth: 0 }}>
         <div className="row between" style={{ padding: '8px 10px' }}><b>Da confermare</b><span className="lbl">{dati.nuove.length} {dati.nuove.length === 1 ? 'bolla' : 'bolle'}</span></div>
@@ -88,7 +89,30 @@ export function Bolle({ scelta }: { scelta?: string }) {
         <div className="row">{!ok && <Btn disabled={manca.length > 0 || az.inCorso} onClick={conferma}>Conferma</Btn>}{manca.length > 0 && !ok && <Btn ghost onClick={() => set({ msg: 'chiesto' })}>Chiedi</Btn>}</div>
       </div>}
     </div>
-  );
+  </>);
+}
+
+/** spedizioni non consegnate e rimaste ferme (né giacenza né nuova data): l'ufficio sceglie il giorno e le rimette nei giri */
+function NonConsegnate() {
+  const { db } = useApp();
+  const az = useAzione();
+  const [data, setData] = useState<Record<string, string>>({});
+  const [fatto, setFatto] = useState('');
+  const { dati } = useDati((d) => d.from<any>('bolle').select('id,numero,citta,colli_previsti,data_consegna,clienti(nome)').eq('stato', 'Non consegnata').order('data_consegna'), []);
+  if (!dati || (!dati.length && !fatto)) return null;
+  const rimetti = (b: any) => az.esegui(() => db.rpc('rimetti_in_giro', { p_bolla: b.id, p_data: data[b.id] }))
+    .then((x) => x !== undefined && setFatto(`${b.clienti?.nome ?? 'Spedizione'}: rimessa nei giri di ${giornoLungo(data[b.id]).toLowerCase()}.`));
+  return <div className="glass card stack">
+    <div className="row between"><b>Non consegnate</b>{dati.length > 0 && <span className="lbl">{dati.length} {dati.length === 1 ? 'spedizione' : 'spedizioni'}</span>}</div>
+    {fatto && <Msg>{fatto}</Msg>}
+    <Errore testo={az.errore} />
+    {dati.map((b) => <div key={b.id} className="row between" style={{ gap: 10, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+      <div style={{ minWidth: 0 }}><b>{b.clienti?.nome ?? '—'}</b><div className="lbl">{[b.numero, b.citta, b.colli_previsti != null ? `${b.colli_previsti} colli` : null, 'era per il ' + new Date(b.data_consegna + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })].filter(Boolean).join(' · ')}</div></div>
+      <div className="row" style={{ gap: 8 }}>
+        <input className="input" type="date" aria-label="Giorno della nuova consegna" min={oggiISO()} value={data[b.id] ?? ''} onChange={(e) => setData({ ...data, [b.id]: e.target.value })} />
+        <Btn sm disabled={!data[b.id] || az.inCorso} onClick={() => rimetti(b)}>Rimetti</Btn></div>
+    </div>)}
+  </div>;
 }
 
 /** il dato mancante si scrive qui quando il cliente risponde; poi la bolla si può confermare */
@@ -125,9 +149,20 @@ const orari = (n: number) => { let m = 7 * 60 + 30; return Array.from({ length: 
 const kmGiro = (g: any) => g.km_previsti != null ? `${Math.round(g.km_previsti)} km` : null;
 const nomeMezzo = (g: any) => `${g.mezzi?.tipo ?? '—'}${g.mezzi?.sponda ? ' con sponda' : ''}${g.mezzi?.targa ? ' ' + g.mezzi.targa : ''}`;
 
+const isoLocale = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+/** il prossimo giorno lavorativo: di venerdì e sabato è lunedì */
+const prossimoLavorativo = () => { const d = new Date(); do d.setDate(d.getDate() + 1); while (d.getDay() === 0 || d.getDay() === 6); return isoLocale(d); };
+const nomeGiorno = (iso: string) => iso === oggiISO() ? 'Oggi' : iso === domaniISO() ? 'Domani' : new Date(iso + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long' }).replace(/^./, (c) => c.toUpperCase());
+let giornoTraffico = '';
+const dataBreve = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
+
 export function Traffico({ scelto }: { scelto?: string }) {
   const { db, vai } = useApp();
-  const domani = domaniISO();
+  const [giorno, setGiornoS] = useState(() => giornoTraffico || prossimoLavorativo());
+  const setGiorno = (x: string) => { giornoTraffico = x; setGiornoS(x); setOk(''); };
+  const giorni = [...new Set([oggiISO(), domaniISO(), prossimoLavorativo()])];
+  const domani = giorno;
+  const nome = nomeGiorno(giorno);
   const az = useAzione();
   const [ok, setOk] = useState('');
   const { dati } = useDati(async (d) => {
@@ -137,8 +172,10 @@ export function Traffico({ scelto }: { scelto?: string }) {
       d.from<any>('giri_preparazioni').select('*').eq('data', domani).order('eseguita_il', { ascending: false }).limit(1),
       d.from<any>('impostazioni').select('valore').eq('chiave', 'ora_giri'),
     ]);
+    const vincoli = await Promise.all(giri.map((g) => d.rpc<string[] | null>('giro_vincoli', { p_giro: g.id })));
+    giri.forEach((g, i) => { g.vincoli = vincoli[i] ?? []; });
     return { bolle, giri: giri.sort((a, b) => String(a.dipendenti?.nome).localeCompare(String(b.dipendenti?.nome))), prep: prep[0] ?? null, ora: Number(imp[0]?.valore ?? 15) };
-  }, []);
+  }, [giorno]);
   if (!dati) return null;
   const assegnate = new Set(dati.giri.flatMap((g) => g.fermate.filter((f: any) => f.esito === 'Da fare').map((f: any) => f.bolla_id)));
   const libere = dati.bolle.filter((b) => !assegnate.has(b.id));
@@ -149,14 +186,19 @@ export function Traffico({ scelto }: { scelto?: string }) {
   const nuove = daConfermare.filter((g) => g.da_confermare?.length);
   const tot = dati.giri.reduce((n, g) => n + g.fermate.length, 0);
   const km = dati.giri.every((g) => g.km_previsti != null) && dati.giri.length ? dati.giri.reduce((n, g) => n + Number(g.km_previsti), 0) : null;
-  const conferma = () => az.esegui(() => db.rpc<number>('conferma_giri', { p_data: domani }).then(() => setOk('Giri confermati: domattina ogni autista li trova già in ordine nella sua app.')));
+  const bloccati = dati.giri.filter((g) => !g.confermato_il && g.vincoli.length);
+  const conferma = () => az.esegui(() => db.rpc<number>('conferma_giri', { p_data: domani }).then(() => setOk(giorno === oggiISO()
+    ? 'Giri di oggi confermati: ogni autista li trova già in ordine nella sua app.'
+    : `Giri di ${nome === 'Domani' ? 'domani' : nome.toLowerCase()} ${dataBreve(giorno)} confermati: quel mattino ogni autista li trova già in ordine nella sua app.`)));
   return (<>
-    <div className="glass card row between"><span><b>Domani</b> <span className="lbl">{tot} fermate · {dati.giri.length} mezzi</span></span>
-      <div className="row">{!dati.giri.length ? null : daConfermare.length ? <Btn onClick={conferma} disabled={az.inCorso}>Conferma</Btn> : <Pill tone="ok">Confermati</Pill>}</div></div>
+    <div className="row">{giorni.map((x) => <Chip key={x} on={giorno === x} onClick={() => setGiorno(x)}>{nomeGiorno(x)}</Chip>)}</div>
+    <div className="glass card row between"><span><b>{nome}</b> <span className="lbl">{dataBreve(giorno)} · {tot} fermate · {dati.giri.length} mezzi</span></span>
+      <div className="row">{!dati.giri.length ? null : daConfermare.length ? <Btn onClick={conferma} disabled={az.inCorso || bloccati.length > 0}>Conferma</Btn> : <Pill tone="ok">Confermati</Pill>}</div></div>
     {ok && !daConfermare.length && <Msg>{ok}</Msg>}
-    {!dati.giri.length && <Msg>I giri di domani li prepara il programma da solo alle {String(dati.ora).padStart(2, '0')}:00 con le spedizioni confermate. Li trovate qui, pronti da controllare.</Msg>}
+    {bloccati.length > 0 && <Warn>{bloccati.map((g) => `Giro di ${g.dipendenti?.nome ?? '—'}: ${g.vincoli.join('; ')}`).join(' · ')}. Spostate le fermate su un altro mezzo, poi confermate.</Warn>}
+    {!dati.giri.length && <Msg>{giorno === oggiISO() ? 'Oggi non ci sono giri.' : <>I giri li prepara il programma da solo alle {String(dati.ora).padStart(2, '0')}:00 del giorno lavorativo prima, con le spedizioni confermate. Li trovate qui, pronti da controllare.</>}</Msg>}
     {daConfermare.length > 0 && !nuove.length && dati.giri.length > 0 && <Msg>
-      Il programma ha preparato i giri di domani{dati.prep ? ` alle ${hm(dati.prep.eseguita_il)}` : ''}: ha diviso le spedizioni tra i mezzi per zona e ha messo le fermate di ogni mezzo in ordine di fascia oraria{km != null ? ` (${Math.round(km)} km)` : ''}. Controllate, aprite un giro se volete cambiarlo, poi premete «Conferma».</Msg>}
+      Il programma ha preparato i giri{dati.prep ? ` alle ${hm(dati.prep.eseguita_il)}` : ''}: ha diviso le spedizioni tra i mezzi per zona e ha messo le fermate di ogni mezzo in ordine di fascia oraria{km != null ? ` (${Math.round(km)} km)` : ''}. Controllate, aprite un giro se volete cambiarlo, poi premete «Conferma».</Msg>}
     {nuove.length > 0 && <Msg>
       {nuove.reduce((n, g) => n + g.da_confermare.length, 0) === 1 ? 'È arrivata una spedizione nuova' : 'Sono arrivate spedizioni nuove'} e il programma l’ha messa nel giro di {nuove.map((g) => g.dipendenti?.nome).join(', ')}: {nuove.flatMap((g) => g.da_confermare).join('; ')}. Controllate e premete «Conferma».</Msg>}
     <Errore testo={az.errore} />
@@ -165,6 +207,7 @@ export function Traffico({ scelto }: { scelto?: string }) {
         const fer = ordinate(g);
         return <button key={g.id} type="button" className="glass card giro" onClick={() => vai('traffico/' + g.id)}>
           <span className="row between" style={{ width: '100%' }}><b>{nomeMezzo(g)} · {g.dipendenti?.nome}</b><Pill>{g.zona ?? '—'}</Pill></span>
+          {g.vincoli.length > 0 && <span className="miss" style={{ marginTop: 6 }}>{g.vincoli.join('; ')}</span>}
           <ol style={{ margin: '12px 0 0', paddingLeft: 20, lineHeight: 1.9, textAlign: 'left' }}>
             {fer.map((f: any) => <li key={f.id}>{f.bolle?.clienti?.nome} · {f.bolle?.citta ?? '—'}</li>)}
           </ol>
@@ -193,9 +236,14 @@ function MappaGiro({ n, chi }: { n: number; chi: string }) {
   </svg>;
 }
 
+const STATO_GIRO: Record<string, string> = { Preparato: 'In sede', Partito: 'Partito', Rientrato: 'Rientrato', Chiuso: 'Chiuso' };
 function GiroPagina({ giro: g, giri, libere }: { giro: any; giri: any[]; libere: any[] }) {
   const { db, vai } = useApp();
   const az = useAzione();
+  // chiusura d'ufficio: l'autista non ha potuto chiudere la fermata (telefono rotto, cliente che chiama dopo)
+  const [uff, setUff] = useState<{ id: string; ok: boolean | null; motivo: string; dopo: 'Giacenza' | 'Nuova data'; data: string } | null>(null);
+  const partito = g.stato === 'Partito' || g.stato === 'Rientrato';
+  const cambia = (x: Partial<NonNullable<typeof uff>>) => setUff((u) => u && { ...u, ...x });
   const [edit, setEdit] = useState<{ id: string; fascia: string; acc: string[] } | null>(null);
   const [aggiungi, setAggiungi] = useState(false);
   const [dest, setDest] = useState<Record<string, string>>({});
@@ -207,7 +255,7 @@ function GiroPagina({ giro: g, giri, libere }: { giro: any; giri: any[]; libere:
     <div className="row"><Btn ghost sm onClick={() => vai('traffico')}>← Tutti i giri</Btn></div>
     <div className="glass card row between" style={{ gap: 12 }}><div><b style={{ fontSize: 22 }}>{chi} · {nomeMezzo(g)}</b>
       <div className="lbl">{[g.zona ?? '—', `${fer.length} ${fer.length === 1 ? 'fermata' : 'fermate'}`, kmGiro(g), 'partenza 07:30'].filter(Boolean).join(' · ')}</div></div>
-      {g.stato === 'Partito' ? <Pill tone="dark">Partito</Pill> : <Pill>{g.stato === 'Preparato' ? 'In magazzino' : g.stato}</Pill>}</div>
+      {g.stato === 'Partito' ? <Pill tone="dark">Partito</Pill> : <Pill>{STATO_GIRO[g.stato] ?? g.stato}</Pill>}</div>
     {g.confermato_il && g.stato === 'Partito' && <Msg>Questo giro è confermato e l’autista è già partito: ogni modifica gli arriva subito nell’app con un avviso.</Msg>}
     <Errore testo={az.errore} />
     <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
@@ -232,6 +280,17 @@ function GiroPagina({ giro: g, giri, libere }: { giro: any; giri: any[]; libere:
                 })}</div>
                 <div className="row"><Btn sm disabled={az.inCorso} onClick={() => fai('giro_modifica', { p_fermata: f.id, p_fascia: ed.fascia, p_accessori: ed.acc }).then((x) => x && setEdit(null))}>Salva</Btn>
                   <Btn ghost sm onClick={() => setEdit(null)}>Annulla</Btn></div>
+              </div>}
+              {partito && f.esito === 'Da fare' && uff?.id !== f.id && <div className="row" style={{ gap: 6, marginTop: 10 }}>
+                <Btn ghost sm onClick={() => setUff({ id: f.id, ok: null, motivo: '', dopo: 'Giacenza', data: '' })}>Chiudi</Btn></div>}
+              {uff && uff.id === f.id && <div className="stack" style={{ gap: 8, marginTop: 10, padding: 12, borderRadius: 14, background: 'var(--soft)' }}>
+                <div className="row" style={{ gap: 6 }}><Chip on={uff.ok === true} onClick={() => cambia({ ok: true })}>Consegnata</Chip><Chip on={uff.ok === false} onClick={() => cambia({ ok: false })}>Mancata</Chip></div>
+                {uff.ok === false && <div className="row" style={{ gap: 6 }}><Chip on={uff.dopo === 'Giacenza'} onClick={() => cambia({ dopo: 'Giacenza' })}>Giacenza</Chip><Chip on={uff.dopo === 'Nuova data'} onClick={() => cambia({ dopo: 'Nuova data' })}>Nuova data</Chip>
+                  {uff.dopo === 'Nuova data' && <input className="input" type="date" aria-label="Giorno della nuova consegna" min={domaniISO()} value={uff.data} onChange={(e) => cambia({ data: e.target.value })} />}</div>}
+                <input className="input" aria-label="Motivo" placeholder="Motivo (finisce nello Storico)" value={uff.motivo} onChange={(e) => cambia({ motivo: e.target.value })} />
+                <div className="row"><Btn sm disabled={uff.ok === null || !uff.motivo.trim() || (uff.ok === false && uff.dopo === 'Nuova data' && !uff.data) || az.inCorso}
+                  onClick={() => fai('chiudi_ufficio', { p_fermata: f.id, p_consegnata: uff.ok, p_motivo: uff.motivo.trim(), p_dopo: uff.ok ? null : uff.dopo, p_nuova_data: uff.ok || uff.dopo !== 'Nuova data' ? null : uff.data }).then((x) => x !== undefined && setUff(null))}>Conferma</Btn>
+                  <Btn ghost sm onClick={() => setUff(null)}>Annulla</Btn></div>
               </div>}
               {libera && <div className="row" style={{ gap: 6, marginTop: 10 }}>
                 <Btn ghost sm disabled={az.inCorso} onClick={() => fai('giro_ordine', { p_fermata: f.id, p_su: true })}>Su</Btn>

@@ -25,7 +25,7 @@ select public.firma_fermata('51000000-0000-0000-0000-000000000951');
 select pg_temp.deve_fallire($$select public.chiudi_fermata('51000000-0000-0000-0000-000000000951', false, 'Assente', 'Giacenza')$$, 'firmata e poi «Non consegnata»');
 select pg_temp.deve_fallire($$select public.riprova_dopo('51000000-0000-0000-0000-000000000951', 'Chiuso')$$, 'firmata e poi «Riprovo dopo»');
 -- senza firma la mancata consegna resta possibile
-select public.chiudi_fermata('51000000-0000-0000-0000-000000000952', false, 'Assente', 'Nuova data');
+select public.chiudi_fermata('51000000-0000-0000-0000-000000000952', false, 'Assente', 'Nuova data', p_nuova_data => current_date + 2);
 reset role;
 select pg_temp.verifica((select esito = 'Da fare' and firmata from public.fermate where id = '51000000-0000-0000-0000-000000000951'), 'la fermata firmata è rimasta aperta');
 select pg_temp.verifica((select esito = 'Non consegnata' from public.fermate where id = '51000000-0000-0000-0000-000000000952'), 'senza firma si chiude come mancata');
@@ -81,7 +81,7 @@ select pg_temp.deve_fallire($$select public.giro_togli((select id from public.fe
 reset role;
 select pg_temp.come('00000000-0000-0000-0000-000000000006');
 select pg_temp.deve_fallire($$select public.giro_ordine((select id from public.fermate where bolla_id = '40000000-0000-0000-0000-000000000961'), false)$$, 'l''autista cambia l''ordine');
-delete from public.fermate where bolla_id = '40000000-0000-0000-0000-000000000961';
+select pg_temp.deve_fallire($$delete from public.fermate where bolla_id = '40000000-0000-0000-0000-000000000961'$$, 'l''autista cancella una fermata');
 reset role;
 select pg_temp.verifica((select count(*) from public.fermate where bolla_id = '40000000-0000-0000-0000-000000000961') = 1, 'l''autista ha cancellato una fermata');
 
@@ -131,7 +131,7 @@ select pg_temp.verifica((select count(*) from public.avvisi_autista) = 0, 'avvis
 -- ------------------------------------------------------------------ Avviso «Il tuo giro è cambiato»
 insert into public.bolle (id, cliente_id, tipo, data_consegna, destinatario, indirizzo, citta, colli_previsti, accessori, stato, operatore_id) values
   ('40000000-0000-0000-0000-000000000953', '10000000-0000-0000-0000-000000000003', 'Consegna', current_date, 'Luxiona', 'Via [indirizzo]', 'Assago', 1, '{}', 'Nuova', '00000000-0000-0000-0000-000000000003');
-update public.bolle set stato = 'Confermata' where id = '40000000-0000-0000-0000-000000000953';
+update public.bolle set stato = 'Confermata', fuori_dai_giri = true where id = '40000000-0000-0000-0000-000000000953';   -- la fermata la mette il test
 insert into public.fermate (id, giro_id, bolla_id, ordine) values ('51000000-0000-0000-0000-000000000953', '50000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000953', 953);
 update public.giri set confermato_il = now() where id = '50000000-0000-0000-0000-000000000001';
 select pg_temp.come('00000000-0000-0000-0000-000000000004');

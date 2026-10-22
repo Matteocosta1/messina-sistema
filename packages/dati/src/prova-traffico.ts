@@ -22,23 +22,30 @@ estendiProva(({ t, rpc, rel, viste }) => {
   // -------------------------------------------------- preparazione del sistema (prepara_giri_sistema)
   const aperta = (bid: string) => t.fermate.some((f) => f.bolla_id === bid && f.esito === 'Da fare');
   const prepara = (data: string) => {
-    const mezzi = t.mezzi.filter((m) => m.stato === 'Attivo' && m.autista_id).sort((a, b) => (a.tipo + a.targa).localeCompare(b.tipo + b.targa));
-    if (!mezzi.length) return 0;
-    let i = t.giri.filter((g) => g.data === data).length, n = 0;
+    if (!t.mezzi.some((m) => m.stato === 'Attivo' && m.autista_id)) return 0;
+    let n = 0;
     const da = t.bolle.filter((b) => b.stato === 'Confermata' && b.data_consegna === data && b.tipo !== 'Magazzino' && !b.fuori_dai_giri && !aperta(b.id))
       .sort((a, b) => (a.citta ?? '~').localeCompare(b.citta ?? '~') || (a.fascia ?? '~').localeCompare(b.fascia ?? '~'));
+    const mezzo = (g: Record<string, any>) => t.mezzi.find((m) => m.id === g.mezzo_id);
+    const inStrada = (g: Record<string, any>) => g.data === data && ['Preparato', 'Partito'].includes(g.stato);
     for (const b of da) {
-      let g = t.giri.find((x) => x.data === data && t.fermate.some((f) => f.giro_id === x.id && t.bolle.find((y) => y.id === f.bolla_id)?.citta === b.citta));
+      const sponda = (b.accessori ?? []).includes('Sponda');
+      // un giro dello stesso giorno nella stessa città, non ancora rientrato, con la sponda se serve
+      let g = t.giri.find((x) => inStrada(x) && (!sponda || mezzo(x)?.sponda) && t.fermate.some((f) => f.giro_id === x.id && t.bolle.find((y) => y.id === f.bolla_id)?.citta === b.citta));
       if (!g) {
-        const m = mezzi[i % mezzi.length]; i++;
-        g = t.giri.find((x) => x.data === data && x.mezzo_id === m.id);
-        if (!g) { g = { id: crypto.randomUUID(), data, mezzo_id: m.id, autista_id: m.autista_id, zona: b.citta ?? null, stato: 'Preparato', confermato_il: null, confermato_da: null, da_confermare: [], km_previsti: null }; t.giri.push(g); }
+        // un mezzo libero quel giorno: prima quelli adatti alla sponda, poi i più piccoli
+        const m = t.mezzi.filter((x) => x.stato === 'Attivo' && x.autista_id && (!sponda || x.sponda) && !t.giri.some((y) => y.data === data && y.mezzo_id === x.id))
+          .sort((x, y) => Number(y.sponda === sponda) - Number(x.sponda === sponda) || (x.portata_kg ?? 1e9) - (y.portata_kg ?? 1e9) || x.targa.localeCompare(y.targa))[0];
+        if (m) { g = { id: crypto.randomUUID(), data, mezzo_id: m.id, autista_id: m.autista_id, zona: b.citta ?? null, stato: 'Preparato', confermato_il: null, confermato_da: null, da_confermare: [], km_previsti: null }; t.giri.push(g); }
+        else g = t.giri.filter((x) => inStrada(x) && (!sponda || mezzo(x)?.sponda)).sort((x, y) => t.fermate.filter((f) => f.giro_id === x.id).length - t.fermate.filter((f) => f.giro_id === y.id).length)[0];
+        if (!g) continue;   // nessun mezzo adatto: resta «Da assegnare»
       }
       t.fermate.push({ id: crypto.randomUUID(), giro_id: g.id, bolla_id: b.id, ordine: Math.max(0, ...t.fermate.filter((f) => f.giro_id === g!.id).map((f) => f.ordine)) + 1,
         esito: 'Da fare', motivo: null, dopo: null, firmata: false, foto_bolla: null, nitidezza: null, chiusa_il: null });
       const cosa = 'Aggiunta ' + cliente(b.id);
       if (g.confermato_il) { g.confermato_il = null; g.confermato_da = null; g.da_confermare = [...(g.da_confermare ?? []), cosa]; }
       else if (g.da_confermare?.length && !g.da_confermare.includes(cosa)) g.da_confermare = [...g.da_confermare, cosa];
+      if (g.stato === 'Partito') t.avvisi_autista.push({ id: crypto.randomUUID(), dipendente_id: g.autista_id, giro_id: g.id, testo: 'Il tuo giro è cambiato: ' + cosa, creato_il: ora(), letto_il: null });
       n++;
     }
     if (n) {
@@ -52,7 +59,7 @@ estendiProva(({ t, rpc, rel, viste }) => {
   t.giri_preparazioni.forEach((p) => { const d = new Date(); if (d.getHours() >= 15) d.setHours(15, 0, 0, 0); p.eseguita_il = d.toISOString(); });
   // trigger bolle_nei_giri: spedizione confermata per un giorno che ha già i giri
   viste.push(() => {
-    const giorni = [...new Set(t.bolle.filter((b) => b.stato === 'Confermata' && b.tipo !== 'Magazzino' && b.data_consegna > giorno(0) && !b.fuori_dai_giri && !aperta(b.id)
+    const giorni = [...new Set(t.bolle.filter((b) => b.stato === 'Confermata' && b.tipo !== 'Magazzino' && b.data_consegna >= giorno(0) && !b.fuori_dai_giri && !aperta(b.id)
       && t.giri.some((g) => g.data === b.data_consegna)).map((b) => b.data_consegna as string))];
     giorni.forEach(prepara);
   });

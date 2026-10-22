@@ -5,12 +5,14 @@ import { useApp, useDati, useAzione, dataApp, posizione, off, Num, ErroreApp, vi
 import { useScan, usePistola, useCodiciProva } from './scanner';
 import { analizzaFoto, Firma, type InfoFoto } from './foto';
 
-interface Fermata { id: string; ordine: number; esito: 'Da fare' | 'Consegnata' | 'Non consegnata'; motivo: string | null; dopo: string | null; firmata: boolean; foto: boolean;
+interface Fermata { id: string; ordine: number; esito: 'Da fare' | 'Consegnata' | 'Non consegnata'; motivo: string | null; dopo: string | null; firmata: boolean; foto: boolean; riserva: string | null;
   numero: string | null; tipo: string; destinatario: string | null; indirizzo: string | null; citta: string | null; fascia: string | null; note: string | null;
   colli: number; letti: number; accessori: string[]; extra: string[] }
 interface Giro { giro: { id: string; data: string; zona: string | null; stato: string }; mezzo: { tipo: string; sponda: boolean; targa: string } | null; fermate: Fermata[] }
 
 type Scr = 'lista' | 'dett' | 'firma' | 'mancata' | 'nota' | 'merce' | 'esito';
+type Conf = { colli?: boolean; acc?: boolean; riserva?: string; ritirati?: number };
+const RISERVE = ['Collo mancante', 'Collo danneggiato', 'Collo in più'];
 const MOTIVI = ['Destinatario assente', 'Indirizzo sbagliato', 'Merce rifiutata', 'Chiuso o fuori orario', 'Altro, lascio una nota vocale'];
 
 const ind = (f: Fermata) => [f.indirizzo, f.citta].filter(Boolean).join(', ');
@@ -48,7 +50,7 @@ export function Autisti() {
   const [cur, setCur] = useState<string | null>(null);
   const [why, setWhy] = useState('');
   const [esito, setEsito] = useState<'rico' | 'dopo' | 'giac'>('giac');
-  const [conf, setConf] = useState<Record<string, { colli?: boolean; acc?: boolean }>>({});
+  const [conf, setConf] = useState<Record<string, Conf>>({});
   const [mancDa, setMancDa] = useState<'dett' | 'firma'>('dett');   // «Indietro» dal motivo torna alla pagina da cui si è venuti
   const vai = (s: Scr) => { setScr(s); window.scrollTo(0, 0); };
   const avvisi = useAvvisi();
@@ -79,9 +81,9 @@ export function Autisti() {
   const idx = g.fermate.findIndex((x) => x.id === f.id);
   const c = conf[f.id] ?? {};
   const pronto = !!c.colli && !!c.acc && f.firmata;
-  if (scr === 'dett') return <Dettaglio f={f} idx={idx} conf={c} conferma={(k) => setConf((x) => ({ ...x, [f.id]: { ...x[f.id], [k]: true } }))}
+  if (scr === 'dett') return <Dettaglio f={f} idx={idx} conf={c} conferma={(k, extra) => setConf((x) => ({ ...x, [f.id]: { ...x[f.id], [k]: true, ...extra } }))}
     onBack={() => vai('lista')} onAvanti={() => vai('firma')} onMancata={() => { setMancDa('dett'); vai('mancata'); }} />;
-  if (scr === 'firma') return <FotoBolla f={f} soglia={soglia ?? 35} pronto={pronto} onBack={() => vai('dett')} onFatto={() => vai('lista')} onMancata={() => { setMancDa('firma'); vai('mancata'); }} />;
+  if (scr === 'firma') return <FotoBolla f={f} soglia={soglia ?? 35} pronto={pronto} conf={c} onBack={() => vai('dett')} onFatto={() => vai('lista')} onMancata={() => { setMancDa('firma'); vai('mancata'); }} />;
   if (scr === 'mancata') return (
     <div className="pscr">
       <button type="button" className="back" onClick={() => vai(mancDa)}>Indietro</button>
@@ -102,19 +104,22 @@ export function Autisti() {
   return <Esito f={f} why={why} esito={esito} onBack={() => vai('mancata')} onFatto={() => vai('lista')} db={db} />;
 }
 
-function Dettaglio({ f, idx, conf, conferma, onBack, onAvanti, onMancata }: { f: Fermata; idx: number; conf: { colli?: boolean; acc?: boolean }; conferma: (k: 'colli' | 'acc') => void; onBack: () => void; onAvanti: () => void; onMancata: () => void }) {
+function Dettaglio({ f, idx, conf, conferma, onBack, onAvanti, onMancata }: { f: Fermata; idx: number; conf: Conf; conferma: (k: 'colli' | 'acc', extra?: Partial<Conf>) => void; onBack: () => void; onAvanti: () => void; onMancata: () => void }) {
   const { db } = useApp();
   const scan = useScan();
   const az = useAzione();
   const [accOpen, setAccOpen] = useState(false);
   const [firma, setFirma] = useState(false);
+  const [ris, setRis] = useState<{ aperta: boolean; cosa: string; nota: string }>({ aperta: false, cosa: '', nota: '' });
+  const [ritirati, setRitirati] = useState(String(f.colli ?? ''));
+  const ritiro = f.tipo === 'Ritiro';
   const { dati: possibili } = useDati((d) => d.rpc<string[]>('accessori_possibili', { p_fermata: f.id }), [f.id]);
   const codici = useCodiciProva('fermata', f.id, f.letti);
   const accs = [...f.accessori, ...f.extra.filter((x) => !f.accessori.includes(x))];
   const letti = f.colli > 0 && f.letti >= f.colli;
-  const d1 = letti && !!conf.colli, d2 = d1 && !!conf.acc, d3 = d2 && f.firmata;
+  const d1 = (ritiro || letti || !!conf.riserva) && !!conf.colli, d2 = d1 && !!conf.acc, d3 = d2 && f.firmata;
   const leggi = async (c: string) => { const r = await az.esegui(() => db.rpc<{ letti: number; totale: number }>('scansiona_consegna', { p_fermata: f.id, p_codice: c })); if (r) vibra(); return r; };
-  usePistola(letti ? null : (c) => { leggi(c); });
+  usePistola(letti || ritiro ? null : (c) => { leggi(c); });
   const scansiona = async () => {
     let n = f.letti;
     while (n < f.colli) {
@@ -144,11 +149,32 @@ function Dettaglio({ f, idx, conf, conferma, onBack, onAvanti, onMancata }: { f:
           <a className="round" href={mappa} target="_blank" rel="noopener" aria-label="Navigatore per camion" style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'inherit' }}>{KI.pin()}</a></div>
         {f.note && <div style={{ marginTop: 6 }}><Pill tone="dark">{f.note}</Pill></div>}</div>
       <ErroreApp testo={az.errore} />
-      {blk(1, 'Colli', d1, true, d1 || letti ? <><div style={{ fontSize: 17 }}>{f.colli} colli · tutti scansionati</div>{!d1 && <Conferma ok onClick={() => conferma('colli')} />}</> : <>
+      {blk(1, 'Colli', d1, true, ritiro ? (d1 ? <div style={{ fontSize: 17 }}>{conf.ritirati} colli ritirati{conf.riserva ? ' · ' + conf.riserva : ''}</div> : <>
+        {/* al ritiro i colli non hanno ancora l'etichetta: si contano, si leggono all'entrata in magazzino */}
+        <div style={{ fontSize: 17 }}>Conta i colli che prendi{f.colli ? ` (in bolla: ${f.colli})` : ''}.</div>
+        <input className="input" type="number" inputMode="numeric" min={1} aria-label="Colli ritirati" value={ritirati} onChange={(e) => setRitirati(e.target.value)}
+          style={{ fontSize: 22, fontWeight: 800, padding: 12, borderRadius: 14, border: '1px solid var(--line)', textAlign: 'center' }} />
+        {Number(ritirati) > 0 && Number(ritirati) !== f.colli && <input className="input" aria-label="Cosa non torna" placeholder="Cosa non torna" value={ris.nota} onChange={(e) => setRis({ ...ris, nota: e.target.value })}
+          style={{ font: 'inherit', padding: 12, borderRadius: 14, border: '1px solid var(--line)' }} />}
+        <Conferma ok={Number(ritirati) > 0 && (Number(ritirati) === f.colli || !!ris.nota.trim())} onClick={() => conferma('colli', { ritirati: Number(ritirati), riserva: Number(ritirati) === f.colli ? undefined : ris.nota.trim() })} /></>)
+        : d1 || (letti && !ris.aperta) ? <><div style={{ fontSize: 17 }}>{conf.riserva ? `${f.letti} di ${f.colli} colli · ${conf.riserva}` : `${f.colli} colli · tutti scansionati`}</div>
+          {!d1 && <Conferma ok onClick={() => conferma('colli')} />}
+          {!d1 && <button type="button" className="chipbtn" style={{ alignSelf: 'flex-start' }} onClick={() => setRis({ ...ris, aperta: true })}>Riserva</button>}</> : <>
         <div style={{ fontSize: 17 }}>{f.colli} colli da scaricare. Scansiona ogni collo.</div>
         {f.letti > 0 && <div className="lbl">{f.letti} di {f.colli} scansionati</div>}
-        <button type="button" className="bigbtn ghost" onClick={scansiona} aria-label="Scansiona i colli" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{big30(KI.cam(30))}</button>
-        <Conferma ok={false} onClick={() => {}} /></>)}
+        {!ris.aperta && <button type="button" className="bigbtn ghost" onClick={scansiona} aria-label="Scansiona i colli" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{big30(KI.cam(30))}</button>}
+        {/* consegna con riserva: qualcosa non torna (collo mancante, danneggiato o in più) e il cliente firma con riserva */}
+        {f.letti > 0 && !ris.aperta && <button type="button" className="chipbtn" style={{ alignSelf: 'flex-start' }} onClick={() => setRis({ ...ris, aperta: true })}>Riserva</button>}
+        {ris.aperta && <div className="stack" style={{ gap: 8 }}>
+          <div className="lbl">Cosa non torna? Il cliente firma con riserva.</div>
+          <div className="row" style={{ gap: 6 }}>{RISERVE.map((x) => <button key={x} type="button" className={'chipbtn' + (ris.cosa === x ? ' on' : '')} onClick={() => setRis({ ...ris, cosa: x })}>{x}</button>)}</div>
+          <input className="input" aria-label="Nota" placeholder="Nota (facoltativa)" value={ris.nota} onChange={(e) => setRis({ ...ris, nota: e.target.value })}
+            style={{ font: 'inherit', padding: 12, borderRadius: 14, border: '1px solid var(--line)' }} />
+          <div className="row" style={{ gap: 8 }}>
+            <button type="button" className="bigbtn" style={{ flex: 1 }} onClick={() => { conferma('colli', { riserva: [ris.cosa, ris.nota.trim()].filter(Boolean).join(': ') }); setRis({ ...ris, aperta: false }); }} {...(ris.cosa ? {} : off)}>Conferma</button>
+            <button type="button" className="bigbtn ghost" style={{ flex: 1 }} onClick={() => setRis({ aperta: false, cosa: '', nota: '' })}>Annulla</button></div>
+        </div>}
+        {!ris.aperta && <Conferma ok={false} onClick={() => {}} />}</>)}
       {blk(2, 'Accessori', d2, d1, d2 ? righeAcc : <>
         {righeAcc}
         <button type="button" className="chipbtn" style={{ alignSelf: 'flex-start', borderStyle: 'dashed' }} onClick={() => setAccOpen(!accOpen)}>+ Aggiungi</button>
@@ -169,7 +195,7 @@ function Dettaglio({ f, idx, conf, conferma, onBack, onAvanti, onMancata }: { f:
   );
 }
 
-function FotoBolla({ f, soglia, pronto, onBack, onFatto, onMancata }: { f: Fermata; soglia: number; pronto: boolean; onBack: () => void; onFatto: () => void; onMancata: () => void }) {
+function FotoBolla({ f, soglia, pronto, conf, onBack, onFatto, onMancata }: { f: Fermata; soglia: number; pronto: boolean; conf: Conf; onBack: () => void; onFatto: () => void; onMancata: () => void }) {
   const { db } = useApp();
   const az = useAzione();
   const [stato, setStato] = useState<0 | 1 | 2>(f.foto ? 2 : 0);
@@ -188,7 +214,8 @@ function FotoBolla({ f, soglia, pronto, onBack, onFatto, onMancata }: { f: Ferma
     } catch { setInf({ titolo: 'Foto non leggibile', consiglio: 'Riprova con la fotocamera del telefono.' }); setStato(1); }
     finally { setAnalisi(false); }
   };
-  const conferma = async () => { const p = await posizione(); const r = await az.esegui(() => db.rpc('chiudi_fermata', { p_fermata: f.id, p_consegnata: true, p_lat: p?.lat ?? null, p_lng: p?.lng ?? null })); if (r !== undefined) { vibra(); onFatto(); } };
+  const conferma = async () => { const p = await posizione(); const r = await az.esegui(() => db.rpc('chiudi_fermata', { p_fermata: f.id, p_consegnata: true, p_lat: p?.lat ?? null, p_lng: p?.lng ?? null,
+    p_riserva: conf.riserva ?? null, p_colli_ritirati: conf.ritirati ?? null })); if (r !== undefined) { vibra(); onFatto(); } };
   const scatta = <label className="bigbtn" aria-label="Fotografa la bolla" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', position: 'relative', boxSizing: 'border-box' }}>
     {big30(KI.cam(30))}<input id="fotoBolla" type="file" accept="image/*" capture="environment" style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
       onChange={(e) => { const x = e.target.files?.[0]; e.target.value = ''; if (x) scelta(x); }} /></label>;
@@ -260,13 +287,16 @@ function NotaVocale({ f, onBack, onFatto }: { f: Fermata; onBack: () => void; on
 
 function Esito({ f, why, esito, onBack, onFatto, db }: { f: Fermata; why: string; esito: 'rico' | 'dopo' | 'giac'; onBack: () => void; onFatto: () => void; db: ReturnType<typeof useApp>['db'] }) {
   const az = useAzione();
-  const txt = { rico: ['Nuova consegna fissata', 'La spedizione torna al traffico con la nuova data. In fattura va anche la riconsegna.'],
+  const domani = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); })();
+  const [data, setData] = useState('');
+  const txt = { rico: ['Nuova consegna fissata', 'Scegli il giorno: la spedizione torna da sola nei giri di quel giorno. In fattura va anche la riconsegna.'],
     dopo: ['Riprovi più tardi', 'La fermata resta nel tuo giro, spostata in fondo.'],
     giac: ['Merce in giacenza', 'Riporta la merce a Lacchiarella e scansiona i colli all’entrata. In ufficio la trovano in Giacenze: il cliente paga la giacenza e la riconsegna quando la prenota.'] }[esito];
   const conferma = async () => {
     const p = await posizione();
     const r = await az.esegui(() => esito === 'dopo' ? db.rpc('riprova_dopo', { p_fermata: f.id, p_motivo: why })
-      : db.rpc('chiudi_fermata', { p_fermata: f.id, p_consegnata: false, p_motivo: why, p_dopo: esito === 'rico' ? 'Nuova data' : 'Giacenza', p_lat: p?.lat ?? null, p_lng: p?.lng ?? null }));
+      : db.rpc('chiudi_fermata', { p_fermata: f.id, p_consegnata: false, p_motivo: why, p_dopo: esito === 'rico' ? 'Nuova data' : 'Giacenza', p_lat: p?.lat ?? null, p_lng: p?.lng ?? null,
+        p_nuova_data: esito === 'rico' ? data : null }));
     if (r !== undefined) onFatto();
   };
   const breve = why.startsWith('Altro') ? 'Altro' : why;
@@ -276,10 +306,13 @@ function Esito({ f, why, esito, onBack, onFatto, db }: { f: Fermata; why: string
       <div className="ptitle">{txt[0]}</div>
       <div className="pcard" style={{ padding: 14 }}><b>{cli(f)}</b><div className="lbl">{ind(f)}</div><div style={{ marginTop: 8 }}><Pill tone="red">{breve}</Pill></div></div>
       <p style={{ margin: 0, lineHeight: 1.5 }}>{txt[1]}</p>
+      {esito === 'rico' && <label className="stack" style={{ gap: 6 }}><span className="lbl">Giorno della nuova consegna</span>
+        <input className="input" type="date" min={domani} value={data} onChange={(e) => setData(e.target.value)}
+          style={{ font: 'inherit', fontSize: 18, padding: 12, borderRadius: 14, border: '1px solid var(--line)' }} /></label>}
       <div className="lbl">Ora e posizione si salvano da sole.</div>
       <ErroreApp testo={az.errore} />
       <div style={{ flex: 1 }} />
-      <button type="button" className="bigbtn" onClick={conferma} {...(az.inCorso ? off : {})}>Conferma</button>
+      <button type="button" className="bigbtn" onClick={conferma} {...(az.inCorso || (esito === 'rico' && !data) ? off : {})}>Conferma</button>
     </div>
   );
 }

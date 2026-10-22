@@ -3,7 +3,7 @@
 import { estendiProva } from './prova';
 import type { Tabelle } from './index';
 
-const oggi = () => new Date().toISOString().slice(0, 10);
+const oggi = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };   // giorno in Italia
 const ora = () => new Date().toISOString();
 
 estendiProva(({ t, rpc, funzioni }) => {
@@ -11,7 +11,7 @@ estendiProva(({ t, rpc, funzioni }) => {
   t.impostazioni ??= [{ chiave: 'soglia_nitidezza', valore: 35 }];
   t.badge_usati ??= [];
   // una spedizione da caricare (Uscita) e una bolla da mettere a posto (Entrata)
-  t.giri.push({ id: 'giro2', data: oggi(), mezzo_id: 'm2', autista_id: 'd-a2', zona: 'Milano Nord', stato: 'Preparato' });
+  t.giri.push({ id: 'giro2', data: oggi(), mezzo_id: 'm2', autista_id: 'd-a2', zona: 'Milano Nord', stato: 'Preparato', confermato_il: t.giri[0]?.confermato_il ?? null, confermato_da: 'u-tra', da_confermare: [] });
   t.bolle.push({ id: 'b-0050', numero: '26-000047', cliente_id: 'c-snam', tipo: 'Consegna', data_consegna: oggi(), fascia: 'Entro le 12', destinatario: 'Snam', indirizzo: 'Via [indirizzo]', citta: 'Sesto',
     colli_previsti: 4, accessori: ['Sponda'], dati_mancanti: [], stato: 'Confermata', operatore_id: 'u-bol', creata_il: ora(), note: null, mail_id: null });
   t.bolle.push({ id: 'b-0051', numero: '26-000048', cliente_id: 'c-snam', tipo: 'Magazzino', data_consegna: oggi(), fascia: null, destinatario: 'Messina', indirizzo: 'Lacchiarella', citta: 'Lacchiarella',
@@ -54,7 +54,7 @@ estendiProva(({ t, rpc, funzioni }) => {
     const m = t.mezzi.find((x) => x.id === g.mezzo_id);
     return { giro: { id: g.id, data: g.data, zona: g.zona, stato: g.stato }, mezzo: m ? { tipo: m.tipo, sponda: m.sponda, targa: m.targa } : null,
       fermate: t.fermate.filter((f) => f.giro_id === g.id).sort((x, y) => x.ordine - y.ordine).map((f) => { const b = t.bolle.find((x) => x.id === f.bolla_id)!;
-        return { id: f.id, ordine: f.ordine, esito: f.esito, motivo: f.motivo ?? null, dopo: f.dopo ?? null, firmata: !!f.firmata, foto: !!f.foto_bolla,
+        return { id: f.id, ordine: f.ordine, esito: f.esito, motivo: f.motivo ?? null, dopo: f.dopo ?? null, firmata: !!f.firmata, foto: !!f.foto_bolla, riserva: f.riserva ?? null,
           numero: b.numero, tipo: b.tipo, destinatario: b.destinatario, indirizzo: b.indirizzo, citta: b.citta, fascia: b.fascia, note: b.note ?? null, colli: b.colli_previsti,
           letti: t.colli.filter((k) => k.bolla_id === b.id && k.letto_consegna).length, accessori: b.accessori,
           extra: t.accessori_extra.filter((x) => x.fermata_id === f.id).map((x) => x.voce) }; }) };

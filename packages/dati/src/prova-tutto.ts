@@ -5,6 +5,7 @@
 import './prova-recap';
 import './prova-app';
 import './prova-traffico';
+import './prova-consegne';
 import './prova-portale';
 import './prova-negozio';
 import './prova-corporation';

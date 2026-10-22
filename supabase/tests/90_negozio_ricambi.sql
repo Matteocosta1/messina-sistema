@@ -14,7 +14,9 @@ grant execute on function pg_temp.come(uuid, text), pg_temp.verifica(boolean, te
 -- ------------------------------------------------------------ Non Consegnato senza scansionare niente
 insert into public.bolle (id, cliente_id, tipo, data_consegna, destinatario, indirizzo, citta, colli_previsti, accessori, stato, operatore_id) values
   ('40000000-0000-0000-0000-000000000901', '10000000-0000-0000-0000-000000000001', 'Consegna', current_date, 'Snam', 'Via [indirizzo]', 'Milano', 3, '{}', 'Nuova', '00000000-0000-0000-0000-000000000003');
-update public.bolle set stato = 'Confermata' where id = '40000000-0000-0000-0000-000000000901';
+update public.bolle set stato = 'Confermata', fuori_dai_giri = true where id = '40000000-0000-0000-0000-000000000901';
+-- giro e colli li crea il test: via quelli creati in automatico alla conferma
+delete from public.colli where bolla_id in ('40000000-0000-0000-0000-000000000901');
 insert into public.colli (bolla_id, codice) values ('40000000-0000-0000-0000-000000000901', 'C-901-1'), ('40000000-0000-0000-0000-000000000901', 'C-901-2'), ('40000000-0000-0000-0000-000000000901', 'C-901-3');
 insert into public.fermate (id, giro_id, bolla_id, ordine) values
   ('51000000-0000-0000-0000-000000000901', '50000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000901', 9);
