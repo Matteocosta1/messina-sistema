@@ -11,3 +11,4 @@ import './prova-negozio';
 import './prova-corporation';
 import './prova-fatture';
 import './prova-accessi';
+import './prova-magazzino';

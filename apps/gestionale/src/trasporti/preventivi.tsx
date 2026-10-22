@@ -14,7 +14,7 @@ const PROPOSTE: Record<string, any[]> = {
   'Spedizioni a peso': [{ voce: 'Base', unita: 'spedizione', scaglione_su: 'peso', scaglione_da: 0, scaglione_a: 100 }, { voce: 'Base', unita: 'spedizione', scaglione_su: 'peso', scaglione_da: 100, scaglione_a: 500 },
     { voce: 'Base', unita: 'kg', scaglione_su: 'peso', scaglione_da: 500 }, { voce: 'Contrassegno', unita: 'percentuale' }, { voce: 'Giacenza', unita: 'giorno' }],
   'Mezzo dedicato a km': [{ voce: 'Base', unita: 'km' }, { voce: 'Attesa', unita: 'ora' }, { voce: 'Sponda', unita: 'spedizione' }],
-  'Logistica': [{ voce: 'Deposito', unita: 'bancale', quando: 'Al giorno, per bancale in magazzino' }, { voce: 'Entrata merce', unita: 'pezzo' }, { voce: 'Uscita merce', unita: 'pezzo' }, { voce: 'Base', unita: 'spedizione' }],
+  'Logistica': [{ voce: 'Deposito', unita: 'giorno', quando: 'Per bancale, ogni giorno in magazzino' }, { voce: 'Entrata merce', unita: 'pezzo' }, { voce: 'Uscita merce', unita: 'pezzo' }, { voce: 'Base', unita: 'spedizione' }],
 };
 const scaglione = (r: any) => !r.scaglione_su ? '' : ` · da ${r.scaglione_da ?? 0}${r.scaglione_a != null && r.scaglione_a !== '' ? ' a ' + r.scaglione_a : ' in su'} ${r.scaglione_su === 'peso' ? 'kg' : r.scaglione_su}`;
 const fmt = (d: string | null) => d ? new Date(d.slice(0, 10) + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long' }) : '—';

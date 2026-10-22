@@ -7,8 +7,8 @@ import { useScan, usePistola, useCodiciProva } from './scanner';
 
 type Scr = 'home' | 'entrata' | 'uscita' | 'sposta' | 'conta';
 interface Info { tipo: 'collo' | 'bancale'; codice: string; cliente: string; posto: string | null; proposto: string | null; bolla_id?: string; numero?: string | null; totale?: number; messi?: number }
-interface Uscita { bolla_id: string; numero: string | null; cliente: string; mezzo: string; autista: string; totale: number; caricati: number; colli: { codice: string; posto: string | null; caricato: boolean }[] }
-interface PostoMissione { id: string; missione_id: string; posto: string; stato: 'Da fare' | 'Fatto' | 'Bloccato' | 'Sbloccato'; elenco: { articolo: string; pezzi: number; letti: number }[]; pezzi: number; letti: number; extra: number }
+interface Uscita { bolla_id: string; numero: string | null; cliente: string; mezzo: string; autista: string; totale: number; caricati: number; in_deposito?: number; usciti?: string[]; colli: { codice: string; posto: string | null; caricato: boolean }[] }
+interface PostoMissione { id: string; missione_id: string; posto: string; stato: 'Da fare' | 'Fatto' | 'Bloccato' | 'Sbloccato'; elenco: { articolo: string; pezzi: number; letti: number; conta?: boolean }[]; pezzi: number; letti: number; extra: number }
 
 type Tipo = 'Bancale' | 'Collo';
 /** scelta Bancale / Collo in Entrata e Trasferisci */
@@ -22,8 +22,10 @@ const Big = ({ label, sub, dark, onClick }: { label: string; sub?: string; dark?
 export function Magazzino() {
   const { io } = useApp();
   const [scr, setScr] = useState<Scr>('home');
-  const { dati: posti } = useDati((d) => d.from<PostoMissione>('missioni_posti_app').select('*').order('posto'), [scr]);
+  const { dati: tutti } = useDati((d) => d.from<PostoMissione>('missioni_posti_app').select('*').order('posto'), [scr]);
   const { dati: missione } = useDati((d) => d.from<any>('missioni').select('id,ambito,filtro').eq('stato', 'Aperta').order('creata_il', { ascending: false }).limit(1).then((r) => r[0] ?? null), [scr]);
+  // solo la missione più recente: i posti bloccati di quelle vecchie li sistema l'ufficio
+  const posti = tutti && missione ? tutti.filter((p) => p.missione_id === missione.id) : tutti;
   const vai = (s: Scr) => { setScr(s); window.scrollTo(0, 0); };
   const back = <button type="button" className="back" onClick={() => vai('home')}>Magazzino</button>;
   const nomeMissione = missione ? (missione.ambito === 'Tutto' ? 'Tutto il magazzino' : missione.ambito === 'Cliente' ? missione.filtro : (missione.ambito === 'Scaffale' ? 'Scaffale ' : 'Zona ') + missione.filtro) : '';
@@ -97,14 +99,21 @@ function UscitaScr({ back }: { back: React.ReactNode }) {
   const [sel, setSel] = useState<string | null>(null);
   const [sbagliato, setSbagliato] = useState<string | null>(null);
   const [via, setVia] = useState(false);
+  const [uscito, setUscito] = useState<string[]>([]);
   const u = uscite?.find((x) => x.bolla_id === sel) ?? (uscite?.length === 1 ? uscite[0] : null);
   const codici = useCodiciProva('uscita', u?.bolla_id ?? null, u?.caricati);
   const leggi = async (c: string) => {
     if (!u) return;
     const k = u.colli.find((x) => x.codice === c);
     if (!k) {
-      vibra([120, 80, 120]);
       const i = await db.rpc<Info>('info_codice', { p_codice: c }).catch(() => null);
+      // merce in deposito: il bancale del cliente esce con questa bolla, il posto si libera
+      if (i?.tipo === 'bancale' && i.cliente === u.cliente) {
+        const r = await az.esegui(() => db.rpc('esci_bancale', { p_bancale: c, p_bolla: u.bolla_id }));
+        if (r) { vibra(); setSbagliato(null); setUscito((x) => [...x, `${c}${i.posto ? ' da ' + i.posto : ''}`]); }
+        return;
+      }
+      vibra([120, 80, 120]);
       const giusto = u.colli.find((x) => !x.caricato);
       setSbagliato(i ? `Questo è della spedizione ${i.cliente}. Rimettilo${i.posto ? ' in ' + i.posto : ' al suo posto'} e prendi quello giusto${giusto?.posto ? ' da ' + giusto.posto : ''}.`
         : 'Questo codice non è di nessuna spedizione: chiedi all’ufficio.');
@@ -119,22 +128,27 @@ function UscitaScr({ back }: { back: React.ReactNode }) {
   if (!u) return (
     <div className="pscr">{back}
       <div><div className="lbl">{dataApp()}</div><div className="ptitle">Uscita</div></div>
+      <div className="lbl">Merce in deposito: apri la spedizione e scansiona l’etichetta del bancale.</div>
       {uscite.length ? uscite.map((x, i) => <button key={x.bolla_id} type="button" className={'stop' + (x.caricati >= x.totale ? ' done' : '')} onClick={() => setSel(x.bolla_id)}>
         <span className="n">{i + 1}</span><span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}><b style={{ fontSize: 16 }}>{x.cliente}</b><span className="lbl">{x.mezzo} · {x.autista}</span></span>
         <b style={{ fontSize: 12 }}>{x.caricati} di {x.totale}</b></button>) : <div className="lbl">Nessuna spedizione da caricare oggi.</div>}
     </div>);
   const n = u.colli.filter((x) => x.caricato).length, tot = u.colli.length, adesso = u.colli.findIndex((x) => !x.caricato);
   return (
-    <div className="pscr">{uscite.length > 1 ? <button type="button" className="back" onClick={() => { setSel(null); setVia(false); setSbagliato(null); }}>Uscita</button> : back}
+    <div className="pscr">{uscite.length > 1 ? <button type="button" className="back" onClick={() => { setSel(null); setVia(false); setSbagliato(null); setUscito([]); }}>Uscita</button> : back}
       <div><div className="lbl">Spedizione {u.cliente} · {u.mezzo} · {u.autista}</div><div className="ptitle">Uscita</div></div>
       {u.colli.map((k, i) => <div key={k.codice} className="pcard row between" style={{ padding: '12px 14px' }}>
         <span><b>Collo {i + 1} di {tot}</b><span className="lbl" style={{ display: 'block' }}>{k.posto ? 'prendi da ' + k.posto : k.codice}</span></span>
         {k.caricato ? <Pill tone="ok">Caricato</Pill> : i === adesso ? <Pill>Adesso</Pill> : null}</div>)}
+      {uscito.length > 0 && <Esito ok titolo={uscito.length === 1 ? 'Bancale uscito' : uscito.length + ' bancali usciti'}>{uscito.join(', ')}: il posto si è liberato.</Esito>}
       {sbagliato && <Esito ok={false} titolo="Collo sbagliato">{sbagliato}</Esito>}
       <ErroreApp testo={az.errore} />
       <div style={{ flex: 1 }} />
       {via ? <Esito ok titolo="Mezzo pronto a partire">{tot} colli su {tot} scansionati sul mezzo giusto.</Esito>
         : n < tot ? <button type="button" className="bigbtn" onClick={async () => { const c = await scan(`Collo ${n + 1} di ${tot}`, codici); if (c) leggi(c); }}>Scansiona il collo</button> : null}
+      {/* merce in deposito del cliente: il bancale esce con questa bolla */}
+      {!via && (u.in_deposito ?? 0) > 0 && <button type="button" className="bigbtn ghost" onClick={async () => { const c = await scan('Bancale in deposito', codici); if (c) leggi(c); }}>Bancale</button>}
+      {(u.usciti?.length ?? 0) > 0 && !uscito.length && <div className="lbl">Bancali già usciti con questa spedizione: {u.usciti!.join(', ')}</div>}
       {!via && <button type="button" className={'bigbtn' + (n === tot ? '' : ' ghost')} onClick={() => { if (n === tot) { setVia(true); vibra(); } }}
         {...(n === tot ? {} : { disabled: true, style: { opacity: .4, cursor: 'not-allowed' } })}>{n === tot ? 'Spedizione completa: può partire' : 'Non parte finché mancano colli'}</button>}
     </div>
@@ -185,6 +199,8 @@ function Missione({ back, posti, nome, breve }: { back: React.ReactNode; posti: 
   const [cur, setCur] = useState<string | null>(null);
   const [extra, setExtra] = useState<Record<string, string[]>>({});
   const [msg, setMsg] = useState('');
+  const [contati, setContati] = useState<Record<string, string>>({});
+  const [fatti, setFatti] = useState<Record<string, number>>({});
   const p = posti.find((x) => x.id === cur) ?? null;
   const codici = useCodiciProva('missione', p?.id ?? null, p?.letti);
   const leggi = async (c: string) => {
@@ -212,7 +228,15 @@ function Missione({ back, posti, nome, breve }: { back: React.ReactNode; posti: 
         ? <div className="pcard" style={{ padding: 14, textAlign: 'center' }}><b>Missione finita</b><div className="lbl" style={{ marginTop: 4 }}>{posti.some((x) => x.stato === 'Bloccato') ? 'I posti bloccati li sblocca l’ufficio.' : 'Tutto torna.'}</div></div>
         : <div className="lbl">Se arriva un camion puoi uscire: quando torni riparti da qui.</div>)}
     </div>);
-  const righe = p.elenco.flatMap((e) => Array.from({ length: e.pezzi }, (_, j) => ({ articolo: e.articolo, ok: j < e.letti })));
+  const righe = p.elenco.filter((e) => !e.conta).flatMap((e) => Array.from({ length: e.pezzi }, (_, j) => ({ articolo: e.articolo, ok: j < e.letti })));
+  const daContare = p.elenco.filter((e) => e.conta);
+  const conta = async (articolo: string) => {
+    const n = Number(contati[p.id + articolo]); if (!(n >= 0)) return;
+    const r = await az.esegui(() => db.rpc<{ chiuso: boolean }>('conta_missione', { p_posto: p.id, p_articolo: articolo, p_quantita: n }));
+    if (!r) return; vibra();
+    setFatti((x) => ({ ...x, [p.id + articolo]: n }));
+    if (r.chiuso) { setMsg(`${p.posto}: tutto torna, posto chiuso.`); setCur(null); }
+  };
   const ex = extra[p.id] ?? [], nEx = Math.max(p.extra, ex.length), letti = p.letti - nEx;
   const manca = righe.filter((r) => !r.ok).map((r) => r.articolo);
   const nonTorna = nEx > 0;
@@ -221,6 +245,14 @@ function Missione({ back, posti, nome, breve }: { back: React.ReactNode; posti: 
       <div><div className="lbl">Scansiona i pezzi nell’ordine che vuoi</div><div className="ptitle">{p.posto}</div></div>
       <div className="lbl">{letti} di {p.pezzi}</div>
       {righe.map((r, j) => <div key={j} className="pcard row between" style={{ padding: '12px 14px', ...(r.ok ? { opacity: .5 } : {}) }}><span>{r.articolo}</span><b style={{ fontSize: 13 }}>{r.ok ? '✓' : ''}</b></div>)}
+      {/* senza seriale: si contano e si scrive il numero (quanti dovrebbero essere non si mostra, così il conto è vero) */}
+      {daContare.map((e) => { const k = p.id + e.articolo, fatto = fatti[k]; const male = fatto !== undefined && fatto !== e.pezzi;
+        return <div key={k} className="pcard stack" style={{ padding: '12px 14px', gap: 8, ...(male ? { border: '2px solid var(--alert)', background: 'var(--alert-soft)' } : {}) }}>
+          <div className="row between"><span>{e.articolo}</span>{fatto !== undefined && <b style={{ fontSize: 13, ...(male ? { color: 'var(--alert)' } : {}) }}>{male ? 'Non torna' : '✓'}</b>}</div>
+          <div className="row" style={{ gap: 8 }}><input className="input" type="number" inputMode="numeric" min={0} aria-label={'Quanti ' + e.articolo} placeholder="Quanti ne conti"
+            value={contati[k] ?? ''} onChange={(ev) => setContati({ ...contati, [k]: ev.target.value })} style={{ flex: 1, fontSize: 18, padding: 10, borderRadius: 12, border: '1px solid var(--line)' }} />
+            <button type="button" className="chipbtn" onClick={() => conta(e.articolo)} {...(contati[k] === undefined || contati[k] === '' ? { disabled: true, style: { opacity: .4 } } : {})}>Conferma</button></div>
+        </div>; })}
       {Array.from({ length: nEx }, (_, j) => <div key={'x' + j} className="pcard row between" style={{ padding: '12px 14px', border: '2px solid var(--alert)', background: 'var(--alert-soft)' }}>
         <span>{ex[j] ?? 'Pezzo in più'}</span><b style={{ fontSize: 13, color: 'var(--alert)' }}>Extra</b></div>)}
       {p.pezzi === 0 && nEx === 0 && <div className="lbl">Qui non dovrebbe esserci niente.</div>}

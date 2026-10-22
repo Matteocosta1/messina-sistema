@@ -179,7 +179,17 @@ estendiProva(({ t, rpc, rel, funzioni, viste, regole }) => {
     const fine = new Date(Number(mese.slice(0, 4)), Number(mese.slice(5, 7)), 0); const fineIso = `${mese}-${String(fine.getDate()).padStart(2, '0')}`;
     const nuove = t.bolle.filter((b) => b.stato === 'Consegnata' && b.tipo !== 'Magazzino' && (b.data_consegna ?? '9') <= fineIso && !inFattura(b.id)
       && !t.giacenze.some((g) => g.bolla_id === b.id && !g.chiusa_il) && t.clienti.find((c) => c.id === b.cliente_id)?.azienda !== 'corporation');
-    const clienti = new Set([...nuove.map((b) => b.cliente_id),
+    // deposito: bancali per giorni (italiani) dentro il mese, una volta per mese e cliente
+    const inizio = new Date(`${mese}-01T00:00:00`); const dopo = new Date(inizio); dopo.setMonth(dopo.getMonth() + 1);
+    const giorniDeposito = (cid: string) => t.bancali.filter((b) => b.cliente_id === cid).reduce((s, b) => {
+      const da = new Date(Math.max(new Date(b.creato_il).setHours(0, 0, 0, 0), inizio.getTime()));
+      const al = new Date(Math.min(b.uscito_il ? new Date(b.uscito_il).setHours(0, 0, 0, 0) : new Date().setHours(24, 0, 0, 0), dopo.getTime()));
+      return s + Math.max(0, Math.round((al.getTime() - da.getTime()) / 86400000)); }, 0);
+    const depositoFatturato = (cid: string, escludi?: string) => t.righe_fattura.some((r) => String(r.voce).startsWith('Deposito · ')
+      && t.fatture.some((f) => f.id === r.fattura_id && f.id !== escludi && f.cliente_id === cid && f.periodo === mese && f.tipo === 'Fattura' && !['Annullata', 'Stornata'].includes(f.stato)));
+    const conDeposito = t.clienti.filter((c) => c.azienda !== 'corporation' && giorniDeposito(c.id) > 0
+      && !t.fatture.some((f) => f.cliente_id === c.id && f.periodo === mese && ['Inviata', 'Pagata'].includes(f.stato) && t.righe_fattura.some((r) => r.fattura_id === f.id && String(r.voce).startsWith('Deposito · ')))).map((c) => c.id);
+    const clienti = new Set([...nuove.map((b) => b.cliente_id), ...conDeposito,
       ...t.fatture.filter((f) => f.azienda === 'trasporti' && f.periodo === mese && f.tipo === 'Fattura' && APERTE.includes(f.stato) && t.fatture_bolle.some((x) => x.fattura_id === f.id && x.valida)).map((f) => f.cliente_id)]);
     let n = 0;
     for (const cid of clienti) {
@@ -198,8 +208,16 @@ estendiProva(({ t, rpc, rel, funzioni, viste, regole }) => {
         }
       }
       for (const g of Object.values(gruppi)) t.righe_fattura.push({ id: crypto.randomUUID(), fattura_id: f.id, ...g, quantita: r2(g.quantita), iva_aliquota: c.iva_aliquota ?? 22, iva_natura: c.iva_natura ?? null, margine: false });
+      t.righe_fattura = t.righe_fattura.filter((r) => !(r.fattura_id === f!.id && String(r.voce).startsWith('Deposito · ')));
+      const gg = giorniDeposito(cid);
+      if (gg > 0 && !depositoFatturato(cid, f.id)) {
+        const td = valida(cid, 'Deposito', fineIso, [], null, 0, null);
+        if (td) t.righe_fattura.push({ id: crypto.randomUUID(), fattura_id: f.id, voce: `Deposito · bancali al giorno ${mese}`, quantita: gg, prezzo: Number(td.prezzo), iva_aliquota: c.iva_aliquota ?? 22, iva_natura: c.iva_natura ?? null, margine: false });
+        else problemi.push(`deposito: ${gg} giorni di bancali senza tariffa Deposito`);
+      }
       ricalcola(f);
       const tutti = [...new Set(problemi), ...manca(cid).map((m) => 'scheda cliente: manca ' + m)];
+      if (!t.righe_fattura.some((r) => r.fattura_id === f!.id) && !tutti.length) { f.stato = 'Annullata'; f.motivo = 'Niente da fatturare'; continue; }
       f.problema = tutti.length ? tutti.slice(0, 5).join('; ') + (tutti.length > 5 ? ` e altri ${tutti.length - 5}` : '') : null;
       f.stato = tutti.length ? 'Da controllare' : 'Pronta';
       n++;

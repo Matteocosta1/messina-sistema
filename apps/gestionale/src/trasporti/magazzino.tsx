@@ -175,8 +175,9 @@ function Missioni() {
   const bloccati = mp.filter((x) => x.stato === 'Bloccato');
   const conBlocco = mp.filter((x) => x.stato === 'Bloccato' || x.stato === 'Sbloccato');
   const lancia = () => az.esegui(() => db.rpc('lancia_missione', { p_ambito: ambito, p_filtro: ambito === 'Tutto' ? null : filtro.trim() || null }));
-  const sblocca = (x: any) => { const v = (motivi[x.id] ?? '').trim(); if (!v) { setErrSbl(x.id); return; } setErrSbl('');
-    az.esegui(() => db.rpc('sblocca_posto', { p_posto: x.id, p_motivo: v })); };
+  // Sblocca: il magazzino resta com'era (errore di lettura, pezzo ritrovato). Rettifica: il magazzino diventa quello trovato.
+  const sblocca = (x: any, fn: 'sblocca_posto' | 'rettifica_posto') => { const v = (motivi[x.id] ?? '').trim(); if (!v) { setErrSbl(x.id); return; } setErrSbl('');
+    az.esegui(() => db.rpc(fn, { p_posto: x.id, p_motivo: v })); };
   const appUrl = (window as any).MESSINA?.appUrl as string | undefined;
   const ph: Record<string, string> = { Zona: 'Ricevimento, Resi…', Scaffale: 'S07', Cliente: 'Econocom' };
   return (<>
@@ -194,16 +195,18 @@ function Missioni() {
         <div className="row"><Btn onClick={lancia} disabled={az.inCorso || (ambito !== 'Tutto' && !filtro.trim())}>Lancia</Btn></div></div>
     </div>
     {conBlocco.map((x) => { const ok = x.stato === 'Sbloccato';
-      const manca = (x.mancanti ?? []).map((a: any) => a.articolo + (a.codice ? ' ' + a.codice : ''));
+      const manca = (x.mancanti ?? []).map((a: any) => a.articolo + (a.codice ? ' ' + a.codice : a.quantita ? ' × ' + a.quantita : ''));
+      const extra = (x.extra ?? []).map((a: any) => typeof a === 'string' ? a : a.articolo + ' × ' + a.quantita);
       return <div key={x.id} className="glass card stack" style={ok ? undefined : { border: '2px solid var(--alert)' }}>
         <div className="row between"><b>{x.posti?.codice}{m?.ambito === 'Cliente' ? ' · ' + m.filtro : ''}</b>{ok ? <Pill tone="ok">Sbloccato</Pill> : <Pill tone="red">Bloccato</Pill>}</div>
         {manca.length > 0 && <div><span className="lbl">Manca</span> <b className="miss">{manca.join(', ')}</b></div>}
-        {x.extra?.length > 0 && <div><span className="lbl">In più</span> <b className="miss">{x.extra.join(', ')}</b></div>}
+        {extra.length > 0 && <div><span className="lbl">In più</span> <b className="miss">{extra.join(', ')}</b></div>}
         {ok ? <div className="lbl">Motivo: {x.motivo}</div> : <>
           <textarea rows={2} placeholder="Cosa è successo" aria-label="Cosa è successo" value={motivi[x.id] ?? ''} onChange={(e) => setMotivi({ ...motivi, [x.id]: e.target.value })}
             style={{ font: 'inherit', padding: 10, borderRadius: 12, border: '1px solid var(--line)', width: '100%', boxSizing: 'border-box' }} />
           {errSbl === x.id && <div className="miss">Scrivi cosa è successo prima di sbloccare.</div>}
-          <div className="row"><Btn onClick={() => sblocca(x)} disabled={az.inCorso}>Sblocca</Btn></div></>}
+          <div className="row"><Btn onClick={() => sblocca(x, 'sblocca_posto')} disabled={az.inCorso}>Sblocca</Btn><Btn ghost onClick={() => sblocca(x, 'rettifica_posto')} disabled={az.inCorso}>Rettifica</Btn>
+            <span className="lbl">Sblocca: era un errore di lettura, il magazzino resta com’è. Rettifica: il magazzino diventa quello trovato.</span></div></>}
       </div>; })}
     <p className="lbl" style={{ margin: 0 }}>Il magazziniere vede l’elenco di quello che dovrebbe esserci e lo scansiona nell’ordine che vuole. Se qualcosa manca o è in più il posto non si chiude: resta bloccato finché l’ufficio non scrive cosa è successo. Tutto resta nello Storico.</p>
   </>);

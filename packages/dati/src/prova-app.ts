@@ -211,10 +211,11 @@ function codiciProva(t: Tabelle, cosa: string, id: string | null): string[] {
     case 'su-bancale': { const k = t.colli.find((x) => x.codice === id); const c = t.bolle.find((b) => b.id === k?.bolla_id)?.cliente_id;
       return t.bancali.filter((b) => b.cliente_id === c && !b.uscito_il).slice(0, 3).map((b) => b.codice); }
     case 'posto': return [...new Set([id, ...liberi.slice(0, 3)].filter(Boolean) as string[])];
-    case 'uscita': return [...t.colli.filter((k) => k.bolla_id === id && !k.letto_carico).map((k) => k.codice), 'C07-001'];
+    case 'uscita': { const c = t.bolle.find((b) => b.id === id)?.cliente_id;   // colli della spedizione, un bancale in deposito del cliente, un collo sbagliato
+      return [...t.colli.filter((k) => k.bolla_id === id && !k.letto_carico).map((k) => k.codice), ...t.bancali.filter((b) => b.cliente_id === c && !b.uscito_il).slice(0, 1).map((b) => b.codice), 'C07-001']; }
     case 'trasferisci': return id === 'Collo' ? ['C50-001'] : [t.bancali.find((b) => b.cliente_id === 'c-lux')?.codice].filter(Boolean) as string[];
     case 'bancale': return t.bancali.filter((b) => b.cliente_id === 'c-corp' && !b.uscito_il).slice(0, 3).map((b) => b.codice);
-    case 'missione': { const m = t.missioni_posti.find((x) => x.id === id); return [...(m?.attesi ?? []).filter((x: any) => !m!.letti.includes(x.codice)).map((x: any) => x.codice), 'HP9X099']; }
+    case 'missione': { const m = t.missioni_posti.find((x) => x.id === id); return [...(m?.attesi ?? []).filter((x: any) => x.codice && !m!.letti.includes(x.codice)).map((x: any) => x.codice), 'HP9X099']; }
   }
   return [];
 }
