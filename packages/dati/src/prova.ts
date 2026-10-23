@@ -62,6 +62,7 @@ function dati(): Tabelle {
     tar('c-snam', 'Base', 'spedizione', 85), tar('c-snam', 'Sponda', 'spedizione', 18, 'Dalla bolla o aggiunta dall’autista'),
     tar('c-snam', 'Giacenza', 'giorno', 5, 'La merce non consegnata resta in deposito'), tar('c-snam', 'Riconsegna', 'spedizione', 85, 'Nuova consegna dopo la giacenza'),
     tar('c-apple', 'Base', 'collo', 9), tar('c-apple', 'Sabato', 'spedizione', 40, 'Consegne di sabato'),
+    tar('c-apple', 'Giacenza', 'giorno', 4, 'La merce non consegnata resta in deposito'), tar('c-apple', 'Riconsegna', 'collo', 9, 'Nuova consegna dopo la giacenza'),
     tar('c-lux', 'Base', 'bancale', 35), tar('c-lux', 'Attesa', 'ora', 30, 'Oltre 30 minuti allo scarico'),
     tar('c-eco', 'Base', 'spedizione', 9), tar('c-eco', 'Entrata merce', 'pezzo', 0.22, 'A ogni device sparato in entrata'),
   ];
@@ -183,14 +184,14 @@ function dati(): Tabelle {
     return { id: id('mp', i + 1), missione_id: 'mi1', posto_id: p.id, attesi: att, letti, mancanti: stato === 'Bloccato' ? att.slice(0, 1) : [], extra: stato === 'Bloccato' ? ['HP9X099'] : [], stato, motivo: null, aggiornato_il: oreFa(1.5) };
   });
   t.storico = [
-    { id: 8, quando: oreFa(2), azienda: 'trasporti', chi_nome: 'Magazziniere 2', operazione: 'Entrata', cosa: 'Apple · 31 colli su 32', dove: 'RIC', come: 'Pistola' },
-    { id: 7, quando: oreFa(3), azienda: 'trasporti', chi_nome: 'Magazziniere 3', operazione: 'Uscita', cosa: 'Snam · 4 bancali sul mezzo GA002BB', dove: 'S03-2-1', come: 'Pistola' },
+    { id: 8, quando: oreFa(2), azienda: 'trasporti', chi_nome: 'Magazziniere 2', operazione: 'Entrata', cosa: 'Apple · 31 colli su 32', dove: 'Ricevimento → Passaggio Apple', come: 'Pistola' },
+    { id: 7, quando: oreFa(3), azienda: 'trasporti', chi_nome: 'Magazziniere 3', operazione: 'Uscita', cosa: 'Snam · 4 bancali sul mezzo GA002BB', dove: 'S03-2-1 → Motrice GA002BB', come: 'Pistola' },
     // due modifiche a mano di oggi (come nel mockup): sempre dopo mezzanotte, anche se la prova si apre presto
     { id: 9, quando: new Date(Math.max(Date.now() - 1.5 * 3600000, Date.parse(g(0) + 'T00:10:00'))).toISOString(), azienda: 'trasporti', chi_nome: 'Magazziniere 2', operazione: 'Modifica', cosa: 'Bancale Apple: colli da 32 a 31', dove: 'RIC', come: 'Manuale' },
     { id: 10, quando: new Date(Math.max(Date.now() - 2.5 * 3600000, Date.parse(g(0) + 'T00:05:00'))).toISOString(), azienda: 'trasporti', chi_nome: 'Magazziniere 2', operazione: 'Modifica', cosa: 'Bancale Econocom: caricabatterie da 40 a 38', dove: 'S07-2-2', come: 'Manuale' },
     { id: 6, quando: oreFa(20), azienda: 'trasporti', chi_nome: 'Magazziniere 2', operazione: 'Modifica', cosa: 'Notebook aziendali · 2 pz (prima 3)', dove: 'S07-2-1', come: 'Manuale' },
     { id: 5, quando: oreFa(22), azienda: 'trasporti', chi_nome: 'Magazziniere 1', operazione: 'Trasferimento', cosa: 'B-0155', dove: 'S05-1-2 → S06-3-1', come: 'Pistola', dettagli: { cliente_id: 'c-lux' } },
-    { id: 4, quando: oreFa(26), azienda: 'trasporti', chi_nome: 'Magazziniere 1', operazione: 'Entrata', cosa: 'Econocom · 1.000 device', dove: 'RIC', come: 'Pistola' },
+    { id: 4, quando: oreFa(26), azienda: 'trasporti', chi_nome: 'Magazziniere 1', operazione: 'Entrata', cosa: 'Econocom · 1.000 device', dove: 'Ricevimento → S08-1-1', come: 'Pistola' },
   ];
   // corporation
   t.lotti = [
@@ -224,7 +225,7 @@ function dati(): Tabelle {
   });
   const tel = (n: number, marca: string, modello: string, ticket: string, r: boolean, s: boolean, tk: boolean, op: string | null) =>
     ({ id: id('tel', n), imei: `35XXXXXXXXXXXX${n}`, marca, modello, cliente_id: 'c-acc', ticket, reset_fatto: r, sblocco_fatto: s, ticket_chiuso: tk, operatore: op,
-      stato: !r ? 'Reset' : !s ? 'Sblocco' : !tk ? 'Ticket' : 'Chiuso', ricevuto_il: oreFa(4) });
+      stato: !r ? 'Reset' : !s ? 'Sblocco' : !tk ? 'Ticket' : 'Chiuso', ricevuto_il: new Date(Math.max(Date.now() - 4 * 3600000, Date.parse(g(0) + 'T00:15:00'))).toISOString() });   // sempre di oggi
   t.stage_telefoni = [tel(1, 'Apple', 'iPhone 13', '[n. ticket]', true, true, true, 'u-sta'), tel(2, 'Samsung', 'Galaxy S21', '[n. ticket]', true, false, false, 'u-sta'),
     tel(3, 'Apple', 'iPhone 12', '[n. ticket]', false, false, false, null), tel(4, 'Apple', 'iPhone SE', 'Aperto', true, true, false, 'u-sta'), tel(5, 'Samsung', 'Galaxy A52', '[n. ticket]', true, true, true, 'u-sta')];
   // presenze

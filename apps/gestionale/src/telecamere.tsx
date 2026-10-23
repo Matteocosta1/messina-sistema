@@ -11,8 +11,12 @@ function Foto({ percorso, className, alt }: { percorso: string | null | undefine
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => { let vivo = true; if (percorso) db.storage.link('telecamere', percorso).then((u) => vivo && setUrl(u), () => {}); return () => { vivo = false; }; }, [percorso]);
   // se la foto non si carica (manca, o in prova) resta il riquadro scuro del mockup
+  // «Trasferisci» nella tabella: il nome del tasto dell'app magazzino, come nel mockup
   return url ? <img src={url} alt={alt} className={className} loading="lazy" onError={() => setUrl(null)} /> : <span className={className === 'cam-mini' ? 'cam-mini' : 'cam-img'} aria-hidden="true" />;
 }
+
+/** posto dove è finita la merce: l'arrivo del movimento se è un posto di scaffale o una zona, altrimenti «—» (es. caricata su un mezzo) */
+const postoFoto = (dove: string | null | undefined) => { const x = String(dove ?? '').split('→').pop()!.trim(); return /^(S\d{2}(-\d+-\d+)?|RIC|PAS|GIA|RES|Ricevimento|Passaggio Apple|Giacenze|Resi)$/.test(x) ? x : '—'; };
 
 /** ordine del mockup: dall'ingresso verso lo stage, come si gira il capannone; le altre dopo, in ordine di nome */
 const GIRO = ['Ingresso', 'Piazzale', 'Baie di carico', 'Corsia S03', 'Corsia S07', 'Stage'];
@@ -55,7 +59,7 @@ export function Telecamere() {
         <span className="lbl">Gli avvisi arrivano anche sul telefono della Direzione.</span></div>
       <div className="glass tbox" style={{ flex: '2 1 520px', minWidth: 0 }}><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Foto delle scansioni</div>
         <table className="t nw"><thead><tr><th>Cosa</th><th>Posto</th><th>Movimento</th><th>Chi</th><th>Ora</th><th>Telecamera</th><th></th></tr></thead><tbody>
-          {dati.foto.length ? dati.foto.map((f) => <tr key={f.id}><td><b>{f.storico?.cosa ?? '—'}</b></td><td>{f.storico?.dove ?? '—'}</td><td>{f.storico?.operazione ?? '—'}</td><td>{f.storico?.chi_nome ?? '—'}</td>
+          {dati.foto.length ? dati.foto.map((f) => <tr key={f.id}><td><b>{f.storico?.cosa ?? '—'}</b></td><td>{postoFoto(f.storico?.dove)}</td><td>{f.storico?.operazione === 'Trasferimento' ? 'Trasferisci' : f.storico?.operazione ?? '—'}</td><td>{f.storico?.chi_nome ?? '—'}</td>
             <td>{giornoCorto(f.quando) === 'Oggi' ? hm(f.quando) : giornoCorto(f.quando) + ' ' + hm(f.quando)}</td><td>{f.telecamere?.nome ?? '—'}</td><td><Foto percorso={f.foto} className="cam-mini" alt="Foto della scansione" /></td></tr>)
             : <tr><td colSpan={7} className="lbl">Nessuna foto ancora.</td></tr>}
         </tbody></table>

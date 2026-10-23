@@ -68,8 +68,10 @@ function Home() {
   if (fall?.length) guarda.push([fall.length === 1 ? '1 postazione interrotta allo stage' : `${fall.length} postazioni interrotte allo stage`, 'stage', 'Stage Computer', true]);
   if (l && l.rimaste < 100) guarda.push([`Licenze Certus: chiavetta ${l.chiavetta} quasi finita`, 'stage', 'Stage Computer', false]);
   const sollecito = (ric ?? []).filter((r) => Date.now() - new Date(r.creata_il).getTime() > 4 * 3600_000).length;
-  if (sollecito) guarda.push([sollecito === 1 ? '1 richiesta di un’azienda senza preventivo da più di 4 ore' : `${sollecito} richieste di aziende senza preventivo da più di 4 ore`, 'richieste', 'Richieste', true]);
-  else if (ric?.length) guarda.push([ric.length === 1 ? '1 richiesta di un’azienda da preventivare' : `${ric.length} richieste di aziende da preventivare`, 'richieste', 'Richieste', false]);
+  // Da decidere (STATO 48): le richieste delle aziende hanno una sezione che il menu del mockup non ha, quindi qui non compaiono
+  const conRichieste = false;
+  if (conRichieste && sollecito) guarda.push([sollecito === 1 ? '1 richiesta di un’azienda senza preventivo da più di 4 ore' : `${sollecito} richieste di aziende senza preventivo da più di 4 ore`, 'richieste', 'Richieste', true]);
+  else if (conRichieste && ric?.length) guarda.push([ric!.length === 1 ? '1 richiesta di un’azienda da preventivare' : `${ric!.length} richieste di aziende da preventivare`, 'richieste', 'Richieste', false]);
   if (posta?.length) guarda.push([posta.length === 1 ? '1 mail da leggere' : `${posta.length} mail da leggere`, 'mail', 'Mail', false]);
   return (<>
     <div className="grid g4">
@@ -340,11 +342,14 @@ function Ricambi({ q }: { q: string }) {
   const az = useAzione();
   const [s, set] = useStato({ nuovo: false, seriale: '', tipo: 'Display', descrizione: '', prezzo: '', vendi: '' as string, canale: 'eBay', venduto: '', msg: '' });
   const { dati } = useDati(async (d) => {
-    const [R, smontati] = await Promise.all([
+    const [R, smontati, stage] = await Promise.all([
       d.from<any>('ricambi').select('*,device(seriale,marca,modello),lotti(codice)').order('creato_il', { ascending: false }),
-      d.from<any>('device').select('id').eq('stato', 'Smontato'),
+      d.from<any>('device').select('id,seriale').eq('stato', 'Smontato'),
+      d.from<any>('stage_pc').select('seriale,esito,certificato'),
     ]);
-    return { R, smontati };
+    // come il mockup: «dischi già cancellati» solo se ogni computer smontato ha il rapporto di cancellazione (dati_cancellati)
+    const cancellati = smontati.every((d) => stage.some((x) => x.seriale === d.seriale && x.certificato && ['Formattato', 'In vendita'].includes(x.esito)));
+    return { R, smontati, cancellati };
   }, []);
   if (!dati) return null;
   const { R } = dati;
@@ -366,7 +371,7 @@ function Ricambi({ q }: { q: string }) {
     <div className="grid g4">
       <div className="glass card"><div className="lbl">Ricambi a magazzino</div><div className="big">{num(R.filter((r) => r.stato === 'Disponibile' || r.stato === 'Da vendere').length)}</div></div>
       <div className="glass card"><div className="lbl">Venduti a {Mese().toLowerCase()}</div><div className="big">{eur0(vendutiMese)}</div><div className="lbl">già nel recupero dei lotti</div></div>
-      <div className="glass card"><div className="lbl">Computer smontati</div><div className="big">{num(dati.smontati.length)}</div><div className="lbl">non si vendono più interi</div></div>
+      <div className="glass card"><div className="lbl">Computer smontati</div><div className="big">{num(dati.smontati.length)}</div><div className="lbl">{dati.cancellati ? 'non funzionanti, dischi già cancellati' : 'non funzionanti, dischi da cancellare'}</div></div>
     </div>
     {s.msg && <Msg>{s.msg}</Msg>}
     <Errore testo={az.errore} />

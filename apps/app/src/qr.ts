@@ -72,5 +72,5 @@ export function qrMatrice(testo: string): boolean[][] {
 export function qrSvg(testo: string, lato = 220) {
   const m = qrMatrice(testo), N = m.length; let r = '';
   m.forEach((riga, y) => riga.forEach((c, x) => { if (c) r += `M${x} ${y}h1v1h-1z`; }));
-  return `<svg viewBox="-4 -4 ${N + 8} ${N + 8}" width="${lato}" height="${lato}" style="background:#fff;border-radius:12px" shape-rendering="crispEdges" role="img" aria-label="Badge QR"><path fill="#111" d="${r}"/></svg>`;
+  return `<svg viewBox="-2 -2 ${N + 4} ${N + 4}" width="${lato}" height="${lato}" style="background:#fff;border-radius:12px" shape-rendering="crispEdges" role="img" aria-label="Badge QR"><path fill="#111" d="${r}"/></svg>`;
 }

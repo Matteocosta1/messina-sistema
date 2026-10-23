@@ -13,3 +13,4 @@
 .video{width:100%;border-radius:18px;background:#1d1e22;aspect-ratio:3/4;object-fit:cover}
 .esci{margin-top:12px}
 @media (max-width:760px){.input,select.input{font-size:16px}.esci{margin:0}}
+@media (max-width:900px){.bollanum{max-width:44px;overflow-wrap:anywhere}}   /* Magazzino › Controllo: il numero di bolla va a capo come «[n. bolla]» del mockup, così Esito resta nel riquadro */

@@ -56,7 +56,7 @@ export function Satellitare() {
       <div className="glass card"><div className="lbl">Mezzi in giro</div><div className="big">{G.length}</div><div className="lbl">posizione dal satellitare</div></div>
       <div className="glass card"><div className="lbl">Km oggi</div><div className="big">{Math.round(kmF)}</div><div className="lbl">{kmP ? `previsti ${Math.round(kmP)}` : 'previsti: servono le fermate del giro'}</div></div>
       <div className="glass card"><div className="lbl">Da guardare</div><div className="big">{A.filter((a) => a.grave && !a.vista_il).length}</div><div className="lbl">deviazioni, soste, rifornimenti</div></div>
-      <div className="glass card"><div className="lbl">Gasolio a {new Date().toLocaleDateString('it-IT', { month: 'long' })}</div><div className="big">{litri.length ? (litri.reduce((s, g) => s + Number(g.litri), 0)).toLocaleString('it-IT') + ' l' : '—'}</div><div className="lbl">carte carburante e km a confronto</div></div>
+      {/* «Gasolio a …» in euro: Da decidere 47 (servono le carte carburante con l'importo); i litri restano in tabella */}
     </div>
     <Errore testo={az.errore} />
     {!G.length ? <Msg>Nessun dato dal satellitare oggi. Si attiva quando colleghiamo il fornitore del satellitare dei mezzi (docs/SETUP.md) e ogni mezzo ha il suo codice in Mezzi.</Msg>

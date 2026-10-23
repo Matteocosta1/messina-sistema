@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Btn, Chip, Msg, Pill, Warn } from '@messina/ui';
 import { useApp, useAzione, useDati, eur, meseISO, oggiISO, Errore } from '../core';
 
-const fmtData = (d: string | null | undefined) => d ? new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '[data]';
+const fmtData = (d: string | null | undefined) => d ? new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';   // dato mancante: «—» come nel mockup
 const UNITA = ['spedizione', 'collo', 'bancale', 'kg', 'km', 'giorno', 'mese', 'ora', 'percentuale', 'pezzo'];
 const comeSiConta = (u: string) => u === 'percentuale' ? 'in percentuale' : u === 'ora' ? 'ogni ora' : u === 'giorno' ? 'al giorno' : u === 'mese' ? 'al mese' : 'a ' + u;
 
@@ -126,7 +126,7 @@ function Scheda({ c }: { c: any }) {
       <div className="glass card"><div className="lbl">Cosa spedisce</div><b>{c.cosa_spedisce ?? '—'}</b>{c.stato === 'Potenziale' && <div style={{ marginTop: 6 }}><Pill tone="red">Potenziale</Pill></div>}</div>
       <div className="glass card"><div className="lbl">Referente interno</div><b>{c.referente_interno ?? '—'}</b></div>
       <div className="glass card"><div className="lbl">Contratto</div><b>dal {fmtData(c.contratto_dal)} al {fmtData(c.contratto_al)}</b></div>
-      <div className="glass card"><div className="lbl">Fatturazione</div><b>{c.fatturazione ?? '[mensile o a spedizione]'}</b></div>
+      <div className="glass card"><div className="lbl">Fatturazione</div><b>{c.fatturazione ?? '—'}</b></div>
     </div>
     {/* Da decidere (STATO): «Anagrafica per la fattura» (P.IVA, PEC, codice destinatario, IVA, split payment, asset) non è nel mockup */}
     {anag && <><div className="glass card stack">

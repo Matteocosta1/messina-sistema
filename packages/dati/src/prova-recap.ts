@@ -66,8 +66,8 @@ estendiProva(({ t, rpc, rel, viste }) => {
   t.cam_foto = [];
   // scansioni di stamattina con la foto della telecamera più vicina (come le registra l'app: il codice letto e il posto)
   const scan: [string, string, string, string, number, number, string, string][] = [
-    ['B-0141', 'S03-2-1', 'Entrata', 'Magazziniere 1', 6, 22, 'cam2', 'c-snam'], ['B-0138', 'S03-2-2', 'Trasferimento', 'Magazziniere 2', 7, 5, 'cam3', 'c-snam'],
-    ['Collo C50-003', '—', 'Uscita', 'Magazziniere 2', 7, 41, 'cam2', 'c-snam'], ['S07-2-1', 'S07-2-1', 'Missione', 'Magazziniere 1', 8, 10, 'cam4', 'c-eco']];
+    ['B-0141', 'Ricevimento → S03-2-1', 'Entrata', 'Magazziniere 1', 6, 22, 'cam2', 'c-snam'], ['B-0138', 'S03-2-1 → S03-2-2', 'Trasferimento', 'Magazziniere 2', 7, 5, 'cam3', 'c-snam'],
+    ['Collo 3 di 4', 'S03-2-1 → Motrice GA002BB', 'Uscita', 'Magazziniere 2', 7, 41, 'cam2', 'c-snam'], ['S07-2-1', 'S07', 'Missione', 'Magazziniere 1', 8, 10, 'cam4', 'c-eco']];
   scan.forEach(([cosa, dove, op, chi, h, m, cam, cli], i) => {
     const quando = new Date(Math.min(Date.now() - (4 - i) * 60000, (() => { const d = new Date(); d.setHours(h, m, 0, 0); return d.getTime(); })())).toISOString();
     t.storico.push({ id: 900 + i, quando, azienda: 'trasporti', chi_nome: chi, operazione: op, cosa, dove, come: 'Pistola', dettagli: { cliente_id: cli } });

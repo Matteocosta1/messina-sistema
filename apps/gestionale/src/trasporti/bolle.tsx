@@ -204,7 +204,9 @@ export function Traffico({ scelto }: { scelto?: string }) {
     {bloccati.length > 0 && <Warn>{bloccati.map((g) => `Giro di ${g.dipendenti?.nome ?? '—'}: ${g.vincoli.join('; ')}`).join(' · ')}. Spostate le fermate su un altro mezzo, poi confermate.</Warn>}
     {!dati.giri.length && <Msg>{giorno === oggiISO() ? 'Oggi non ci sono giri.' : <>I giri li prepara il programma da solo alle {String(dati.ora).padStart(2, '0')}:00 del giorno lavorativo prima, con le spedizioni confermate. Li trovate qui, pronti da controllare.</>}</Msg>}
     {daConfermare.length > 0 && !nuove.length && dati.giri.length > 0 && <Msg>
-      Il programma ha preparato i giri{dati.prep ? ` alle ${hm(dati.prep.eseguita_il)}` : ''}: ha diviso le spedizioni tra i mezzi per zona e ha messo le fermate di ogni mezzo in ordine di fascia oraria{km != null ? ` (${Math.round(km)} km)` : ''}. Controllate, aprite un giro se volete cambiarlo, poi premete «Conferma».</Msg>}
+      {/* testo del mockup; la frase «e ha messo le fermate … nell’ordine più corto per un camion (356 km invece di 412)» è tolta
+          finché l'ottimizzatore per camion non c'è (STATO, Da decidere 43) */}
+      Il programma ha preparato i giri di {nome === 'Domani' ? 'domani' : nome.toLowerCase()}: ha diviso le spedizioni tra i mezzi guardando portata, sponda e fasce orarie dei clienti. Controllate, aprite un giro se volete cambiarlo, poi premete «Conferma».</Msg>}
     {nuove.length > 0 && <Msg>
       {nuove.reduce((n, g) => n + g.da_confermare.length, 0) === 1 ? 'È arrivata una spedizione nuova' : 'Sono arrivate spedizioni nuove'} e il programma l’ha messa nel giro di {nuove.map((g) => g.dipendenti?.nome).join(', ')}: {nuove.flatMap((g) => g.da_confermare).join('; ')}. Controllate e premete «Conferma».</Msg>}
     <Errore testo={az.errore} />
@@ -246,7 +248,7 @@ function MappaGiri({ giri, km, nome }: { giri: any[]; km: number | null; nome: s
       {R.map((d, i) => <path key={i} d={d} stroke={COL[i]} strokeWidth="3" fill="none" strokeLinejoin="round" />)}
       {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="6" fill="#fff" stroke="#111214" strokeWidth="2" />)}
       <rect x="44" y="146" width="32" height="28" rx="6" fill="#111214" /><text x="60" y="190" textAnchor="middle" fontSize="11" fontWeight="700" fill="#111214">Lacchiarella</text></svg>
-    <div className="grid g4" style={{ marginTop: 8 }}><div><div className="lbl">Km totali</div><b style={{ fontSize: 22 }}>{km != null ? Math.round(km) : '—'}</b></div><div><div className="lbl">Mezzi usati</div><b style={{ fontSize: 22 }}>{giri.length}</b></div><div><div className="lbl">Gasolio stimato</div><b style={{ fontSize: 22 }}>—</b></div></div>
+    <div className="grid g4" style={{ marginTop: 8 }}><div><div className="lbl">Km totali</div><b style={{ fontSize: 22 }}>{km != null ? Math.round(km) : '—'}</b></div><div><div className="lbl">Mezzi usati</div><b style={{ fontSize: 22 }}>{giri.length}</b></div>{/* «Gasolio stimato» e «Risparmio»: Da decidere 43 */}</div>
     <p className="lbl" style={{ margin: '8px 0 0' }}>Strade per camion (altezza, peso, ZTL), fasce orarie dei clienti, sponda dove serve. Il navigatore dell’autista riceve il giro già in ordine.</p></div>;
 }
 
@@ -363,7 +365,7 @@ export function Giacenze() {
   const tar = (c: string, v: string) => dati.tariffe.find((t) => t.cliente_id === c && t.voce === v);
   const costoGiacenza = (g: any) => { const t = tar(g.cliente_id, 'Giacenza'); return !t ? 0 : t.unita === 'giorno' ? t.prezzo * Math.max(1, g.giorni) : t.prezzo; };
   const daPren = G.filter((g) => !g.riconsegna_il && (g.motivo !== 'Merce rifiutata' || g.richiesta)).length;
-  const fmtT = (t: any) => t ? `${eur(t.prezzo)} ${t.unita === 'giorno' ? 'al giorno' : t.unita === 'spedizione' ? '' : 'a ' + t.unita}`.trim() : '€ [tariffa]';
+  const fmtT = (t: any) => t ? `${eur(t.prezzo)} ${t.unita === 'giorno' ? 'al giorno' : t.unita === 'spedizione' ? '' : 'a ' + t.unita}`.trim() : '—';   // tariffa che manca nel contratto: «—»
   const prenota = () => az.esegui(() => db.rpc('prenota_riconsegna', { p_giacenza: cur.id, p_data: s.data, p_ora: s.ora })).then((ok) => ok && set({ msg: 'prenotata', prenota: false }));
   const reso = () => az.esegui(() => db.rpc('reso_al_mittente', { p_giacenza: cur.id })).then((ok) => ok && set({ msg: 'reso', reso: false }));
   // un clic: la mail parte e la giacenza resta segnata «chiesta», il tasto non si ripete

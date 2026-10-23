@@ -43,7 +43,7 @@ export function Magazzino() {
   return (
     <div className="pscr">
       <div><div className="lbl">{dataApp()} · {io.nome}</div><div className="ptitle">Magazzino</div></div>
-      {missione && tot > 0 && done < tot && <button type="button" className="pcard" style={{ padding: 14, textAlign: 'left', border: '2px solid var(--alert)', background: 'var(--alert-soft)', cursor: 'pointer', font: 'inherit' }} onClick={() => vai('conta')}>
+      {missione && tot > 0 && done < tot && <button type="button" className="pcard" style={{ padding: 14, textAlign: 'left', border: '2px solid var(--alert)', background: 'var(--alert-soft)', cursor: 'pointer' }} onClick={() => vai('conta')}>
         <b style={{ color: 'var(--alert)' }}>Missione · {nomeMissione}</b><div style={{ fontSize: 14, marginTop: 2 }}>{done} di {tot} posti fatti. Tocca per {done ? 'riprendere' : 'iniziare'}.</div></button>}
       <Big label="Entrata" sub="Scarico dal camion e metto a posto" dark onClick={() => vai('entrata')} />
       <Big label="Uscita" sub="Preparo e carico una spedizione" onClick={() => vai('uscita')} />

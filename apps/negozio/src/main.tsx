@@ -320,7 +320,7 @@ function Carrello(p: { carrello: Voce[]; onCarrello: (c: Voce[]) => void; vai: (
 
 function Grazie({ onSvuota, vai }: { onSvuota: () => void; vai: (s: string) => void }) {
   useEffect(() => { onSvuota(); }, [onSvuota]);
-  return <Pagina titolo="Grazie"><Msg>Ordine ricevuto: ti arriva la mail di conferma con la ricevuta. Spediamo entro [giorni].</Msg><div><Btn ghost sm onClick={() => vai('')}>Guarda i portatili</Btn></div></Pagina>;
+  return <Pagina titolo="Grazie"><Msg>Ordine ricevuto: ti arriva la mail di conferma con la ricevuta.</Msg><div><Btn ghost sm onClick={() => vai('')}>Guarda i portatili</Btn></div></Pagina>;
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

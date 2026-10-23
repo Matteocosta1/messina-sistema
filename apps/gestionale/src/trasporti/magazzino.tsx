@@ -141,7 +141,7 @@ function Controllo({ cc, cli, st }: { cc: any[]; cli: string; st: any[] }) {
     {ko ? <Warn n={ko}>Colli</Warn> : <Msg>Tutto torna.</Msg>}
     <div className="glass tbox"><table className="t" style={{ minWidth: 820 }}><thead><tr><th>Ora</th><th>Bolla</th><th>Cliente</th><th>Movimento</th><th>Colli in bolla</th><th>Scansionati</th><th>Chi</th><th>Esito</th></tr></thead><tbody>
       {list.map((r) => { const ok = r.letti === r.attesi; return <tr key={r.bolla_id} className={ok ? 'okrow' : r.letti ? 'korow' : ''}>
-        <td>{hm(r.ultima_lettura)}</td><td>{r.numero ?? '—'}</td><td><b>{r.cliente}</b></td><td>{entrata(r) ? 'Entrata' : 'Uscita'}</td>
+        <td>{hm(r.ultima_lettura)}</td><td className="bollanum">{r.numero ?? '—'}</td><td><b>{r.cliente}</b></td><td>{entrata(r) ? 'Entrata' : 'Uscita'}</td>
         <td>{num(r.attesi)}</td><td>{num(r.letti)}</td><td>{r.letti ? chi(r) : '—'}</td><td>{esito(r)}</td></tr>; })}
       {!list.length && <tr><td colSpan={8} className="lbl">Nessuna spedizione in movimento.</td></tr>}
     </tbody></table></div>

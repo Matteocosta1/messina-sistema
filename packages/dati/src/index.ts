@@ -236,6 +236,11 @@ function linkProva(t: Tabelle, bucket: string, percorso: string) {
   const esc = (x: string) => x.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]!));
   const nome = esc(percorso.split('/').pop() ?? percorso);
   const cosa = bucket === 'bolle' ? 'Foto della bolla firmata' : bucket === 'telecamere' ? 'Immagine della telecamera' : bucket === 'device' ? 'Foto del seriale' : 'Documento';
+  if (bucket === 'telecamere') {   // fotogramma di esempio scuro, come le immagini delle telecamere nel mockup
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#2a2d33"/><stop offset="1" stop-color="#121316"/></linearGradient></defs><rect width="800" height="480" fill="url(#g)"/></svg>`;
+    return URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  }
   if (bucket !== 'documenti') {   // immagini (bolle, telecamere, seriali): un'immagine di esempio, che si vede anche dentro <img>
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="560" viewBox="0 0 800 560"><rect width="800" height="560" fill="#eceef3"/>
 <rect x="40" y="40" width="720" height="480" rx="24" fill="#fff" stroke="#d6d8de" stroke-width="2"/>
