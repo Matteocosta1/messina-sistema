@@ -246,7 +246,7 @@ export function Fatturazione() {
   return (<>
     <div className="glass tbox"><table className="t"><thead><tr><th>Cliente</th><th>Consegne</th><th>Accessori ed extra</th><th>Totale</th><th>Stato</th><th>Incasso</th></tr></thead><tbody>
       {F.map((f) => <tr key={f.id} className="click" onClick={() => setAperta(f.id)}>
-        <td><b>{f.clienti?.nome}</b></td><td>{nBolle(f) || '—'}</td><td>{voci(f)}</td><td style={{ whiteSpace: 'nowrap' }}>{eur(Number(f.totale))}</td><td>{pillStato(f)}</td>
+        <td><b>{f.clienti?.nome}</b></td><td>{nBolle(f) || '—'}</td><td>{voci(f)}</td><td>{eur(Number(f.totale))}</td><td>{pillStato(f)}</td>
         <td onClick={(e) => e.stopPropagation()}>{f.stato === 'Pagata' ? <Pill tone="ok">Pagata</Pill> : f.stato === 'Inviata' && !sola ? <Btn ghost sm onClick={() => pagata(f)} disabled={az.inCorso}>Pagata</Btn> : <span className="lbl">—</span>}</td></tr>)}
       {!F.length && <tr><td colSpan={6} className="lbl">Nessuna fattura per {nomeMese(mese).toLowerCase()}.</td></tr>}
     </tbody></table></div>

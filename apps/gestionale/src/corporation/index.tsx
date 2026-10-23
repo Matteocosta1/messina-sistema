@@ -241,7 +241,8 @@ function Inventario({ q }: { q: string }) {
   if (!D) return null;
   const marche = ['Tutti', ...Array.from(new Set(['Lenovo', 'HP', 'Dell', 'Apple', ...D.map((d) => d.marca).filter(Boolean)]))];
   const daConfermare = (d: any) => d.stato !== 'Venduto' && d.prezzo != null && !d.prezzo_confermato_da;
-  const perStato = (d: any) => s.stato === 'Tutti' || (s.stato === 'Da confermare' ? daConfermare(d) : s.stato === 'Resi' ? d.stato === 'Reso' : d.stato === s.stato);
+  // «Tutti» = quello che è in magazzino, come nel mockup (venduti e smontati si vedono con i filtri per stato, Da decidere 29)
+  const perStato = (d: any) => s.stato === 'Tutti' ? !['Venduto', 'Smontato'].includes(d.stato) : (s.stato === 'Da confermare' ? daConfermare(d) : s.stato === 'Resi' ? d.stato === 'Reso' : d.stato === s.stato);
   const list = D.filter((d) => (s.brand === 'Tutti' || d.marca === s.brand) && (s.grado === 'Tutti' || d.grado === s.grado) && perStato(d)
     && has(q, d.seriale, d.modello, d.marca, d.lotti?.codice, d.bancali?.codice, d.bancali?.posti?.codice, d.colore, d.memoria));
   const posto = (d: any) => d.bancali?.posti?.codice ?? (d.bancali ? 'Ricevimento' : '—');

@@ -137,7 +137,10 @@ function Pagina(p: { titolo: string; children: React.ReactNode }) {
 
 function Vetrina(p: { prodotti: Prodotto[] | null; errore: string | null; brand: string; onBrand: (b: string) => void; vai: (s: string) => void }) {
   const marche = ['Tutti', ...new Set(['Lenovo', 'HP', 'Dell', 'Apple', ...(p.prodotti ?? []).map((x) => x.marca)])];   // ordine del mockup
-  const vis = (p.prodotti ?? []).filter((x) => p.brand === 'Tutti' || x.marca === p.brand);
+  // come la vetrina del mockup: un modello per marchio a giro, nell'ordine dei filtri (Lenovo, HP, Dell, Apple, poi di nuovo Lenovo…)
+  const giro = (() => { const per = marche.slice(1).map((m) => (p.prodotti ?? []).filter((x) => x.marca === m)); const out: Prodotto[] = [];
+    for (let i = 0; per.some((l) => l[i]); i++) per.forEach((l) => { if (l[i]) out.push(l[i]); }); return out; })();
+  const vis = giro.filter((x) => p.brand === 'Tutti' || x.marca === p.brand);
   return (
     <div className="shopbody"><h1 className="shoph1">Messina Corporation</h1>
       <div className="row" style={{ marginBottom: 18 }}>
@@ -148,7 +151,7 @@ function Vetrina(p: { prodotti: Prodotto[] | null; errore: string | null; brand:
       {p.prodotti === null && !p.errore ? <p className="lbl">Carico…</p> : (
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(230px,1fr))' }}>
           {vis.map((x) => (
-            <a key={x.slug} className="prod" href={'#/p/' + x.slug} style={{ color: 'inherit', textDecoration: 'none' }}>
+            <a key={x.slug} className="prod" href={'#/p/' + x.slug} style={{ color: 'inherit', textDecoration: 'none', fontSize: 13.333, lineHeight: 'normal' }}>
               <span className="ph">{LAPTOP}</span><span className="lbl">{x.marca}</span>
               <b style={{ fontSize: 19, letterSpacing: '-.02em' }}>{x.modello}</b><span className="lbl">{x.spec}</span>
               <span>da <b style={{ fontSize: 20 }}>{eur(x.da)}</b></span>

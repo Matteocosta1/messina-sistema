@@ -10,7 +10,8 @@ function Foto({ percorso, className, alt }: { percorso: string | null | undefine
   const { db } = useApp();
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => { let vivo = true; if (percorso) db.storage.link('telecamere', percorso).then((u) => vivo && setUrl(u), () => {}); return () => { vivo = false; }; }, [percorso]);
-  return url ? <img src={url} alt={alt} className={className} loading="lazy" /> : <span className={className === 'cam-mini' ? 'cam-mini' : 'cam-img'} aria-hidden="true" />;
+  // se la foto non si carica (manca, o in prova) resta il riquadro scuro del mockup
+  return url ? <img src={url} alt={alt} className={className} loading="lazy" onError={() => setUrl(null)} /> : <span className={className === 'cam-mini' ? 'cam-mini' : 'cam-img'} aria-hidden="true" />;
 }
 
 /** ordine del mockup: dall'ingresso verso lo stage, come si gira il capannone; le altre dopo, in ordine di nome */

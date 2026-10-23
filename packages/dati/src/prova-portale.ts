@@ -17,9 +17,12 @@ estendiProva(({ t, rpc, rel, viste }) => {
   );
   for (const b of t.bolle.filter((x) => x.id.startsWith('b-p'))) for (let k = 1; k <= b.colli_previsti; k++)
     t.colli.push({ id: crypto.randomUUID(), bolla_id: b.id, codice: `CP${b.id.slice(-2)}-${k}`, letto_entrata: null, letto_carico: b.stato !== 'Confermata' ? oreFa(30) : null, letto_consegna: b.stato !== 'Confermata' ? oreFa(26) : null });
+  // i giri dei giorni in cui sono state consegnate (non quello di oggi, che resta come nel mockup)
+  t.giri.push({ id: 'giro-p1', data: g(-1), mezzo_id: 'm1', autista_id: 'd-a1', zona: 'Milano', stato: 'Chiuso', confermato_il: oreFa(40), confermato_da: 'u-tra', da_confermare: [] },
+    { id: 'giro-p2', data: g(-6), mezzo_id: 'm1', autista_id: 'd-a1', zona: 'Lacchiarella', stato: 'Chiuso', confermato_il: oreFa(170), confermato_da: 'u-tra', da_confermare: [] });
   t.fermate.push(
-    { id: 'f-p01', giro_id: 'giro1', bolla_id: 'b-p01', ordine: 90, esito: 'Consegnata', motivo: null, dopo: null, firmata: true, foto_bolla: 'f-p01/bolla.jpg', nitidezza: 82, chiusa_il: oreFa(26) },
-    { id: 'f-p02', giro_id: 'giro1', bolla_id: 'b-p02', ordine: 91, esito: 'Consegnata', motivo: null, dopo: null, firmata: true, foto_bolla: 'f-p02/bolla.jpg', nitidezza: 77, chiusa_il: oreFa(150) },
+    { id: 'f-p01', giro_id: 'giro-p1', bolla_id: 'b-p01', ordine: 90, esito: 'Consegnata', motivo: null, dopo: null, firmata: true, foto_bolla: 'f-p01/bolla.jpg', nitidezza: 82, chiusa_il: oreFa(26) },
+    { id: 'f-p02', giro_id: 'giro-p2', bolla_id: 'b-p02', ordine: 91, esito: 'Consegnata', motivo: null, dopo: null, firmata: true, foto_bolla: 'f-p02/bolla.jpg', nitidezza: 77, chiusa_il: oreFa(150) },
   );
   // un bancale di UniCredit, che Econocom vede perché UniCredit passa da Econocom
   t.bancali.push({ id: 'k-uni', codice: 'B-0190', cliente_id: 'c-uni', posto_id: 'p8-6-3', creato_il: oreFa(70), uscito_il: null });

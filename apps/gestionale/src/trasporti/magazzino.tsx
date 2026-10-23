@@ -246,8 +246,8 @@ function Storico({ cc }: { cc: any[] }) {
   cc.filter((r) => r.letti > 0 && r.letti < r.attesi).forEach((r) => {
     const ultimo = dati.find((s) => String(s.cosa).startsWith(r.cliente) && ['Uscita', 'Entrata'].includes(s.operazione));
     carte.push([`Collo ${r.cliente} mancante`, `Bolla ${r.numero ?? '—'}: ${r.attesi} colli, ${r.letti} letti${r.ultima_lettura ? ' alle ' + hm(r.ultima_lettura) : ''}.${ultimo ? ` L’ultimo a toccarli è stato ${ultimo.chi_nome}; dopo, nessuna scansione.` : ''}`]); });
-  const mano: Record<string, number> = {};
-  dati.filter((r) => r.come === 'Manuale' && new Date(new Date(r.quando).getTime() - new Date(r.quando).getTimezoneOffset() * 60000).toISOString().slice(0, 10) === oggi)   // giorno italiano, non UTC.forEach((r) => { mano[r.chi_nome ?? '—'] = (mano[r.chi_nome ?? '—'] ?? 0) + 1; });
+  const mano: Record<string, number> = {};   // conta per giorno italiano, non UTC
+  dati.filter((r) => r.come === 'Manuale' && new Date(new Date(r.quando).getTime() - new Date(r.quando).getTimezoneOffset() * 60000).toISOString().slice(0, 10) === oggi).forEach((r) => { mano[r.chi_nome ?? '—'] = (mano[r.chi_nome ?? '—'] ?? 0) + 1; });
   Object.entries(mano).filter(([, n]) => n >= 2).forEach(([chi, n]) => carte.push(['Modifiche a mano', `${chi} oggi ha fatto ${n} modifiche a mano.`]));
   const all = dati.filter((r) => f === 'Tutto' || r.come === f);
   return (<>
