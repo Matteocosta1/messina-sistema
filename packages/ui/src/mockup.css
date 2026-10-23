@@ -217,23 +217,58 @@ textarea{font:inherit;font-size:15px;line-height:1.5;min-height:110px;border-rad
   .g4,.kv{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
-
-/* Telecamere (aggiunte il 20 ottobre, uguali alla prova) */
-.camgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.tcam{display:block;width:100%;min-height:0;position:relative;aspect-ratio:16/9;border-radius:16px;overflow:hidden;border:0;padding:0;cursor:pointer;background:#1b1d21;color:#fff;font:inherit;text-align:left}
-.tcam.on{outline:3px solid var(--solid);outline-offset:3px}
-.tcam img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.cam-img{position:absolute;inset:0;background:radial-gradient(120% 90% at 30% 20%,rgba(255,255,255,.16),transparent 60%),linear-gradient(160deg,#2a2d33,#121316)}
-.cam-top{position:absolute;left:10px;top:8px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;text-shadow:0 1px 2px rgba(0,0,0,.5)}
-.cam-top .dot{width:8px;height:8px;border-radius:99px;background:#e5484d}
-.cam-nome{position:absolute;left:10px;bottom:8px;font-weight:700;font-size:14px;text-shadow:0 1px 2px rgba(0,0,0,.5)}
-.cam-ora{position:absolute;right:10px;bottom:8px;font-size:12px;opacity:.85}
-.big-cam{aspect-ratio:16/8;cursor:default}
-.cam-mini{display:inline-block;width:46px;height:28px;border-radius:6px;background:linear-gradient(160deg,#2a2d33,#121316);vertical-align:middle;object-fit:cover}
-@media (max-width:760px){.camgrid{grid-template-columns:1fr 1fr}}
-/* Traffico: schede dei giri e pagina del giro (prova-messina mod12) */
+/* vita del sistema: notifiche, presentazione, punto evidenziato */
+#toasts{position:fixed;z-index:60;right:max(16px,env(safe-area-inset-right,0px));top:calc(78px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:8px;width:min(380px,calc(100vw - 32px));pointer-events:none}
+.toast{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:16px;font-size:14px;line-height:1.4;animation:tin .35s ease}
+.toast .pill{flex:none}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media (max-width:760px){
+  #toasts{top:auto;bottom:calc(14px + env(safe-area-inset-bottom,0px));right:12px;left:12px;width:auto}
+}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+.g4b{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+@media (max-width:520px){.g4b{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+.schedat{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:0 24px;margin-top:10px}
+.schedat>div{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid var(--line)}
 .giro{display:flex;flex-direction:column;align-items:stretch;text-align:left;cursor:pointer;font:inherit;color:inherit}
 .giro:hover{background:rgba(255,255,255,.9)}
 .ferm{display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
 .ferm:first-child{border-top:0;padding-top:0}
 .fn{width:30px;height:30px;border-radius:99px;background:var(--solid);color:var(--on-solid);display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+.seg{display:flex;padding:4px;border-radius:14px;background:var(--soft);gap:4px}
+.seg button{flex:1;font:inherit;font-weight:700;font-size:16px;padding:10px;border:0;border-radius:10px;background:transparent;cursor:pointer;color:var(--ink)}
+.seg button.on{background:var(--solid);color:var(--on-solid)}
+.camgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tcam{display:block;width:100%;min-height:0;position:relative;aspect-ratio:16/9;border-radius:16px;overflow:hidden;border:0;padding:0;cursor:pointer;background:#1b1d21;color:#fff;font:inherit;text-align:left}
+.tcam.on{outline:3px solid var(--solid);outline-offset:3px}
+.cam-img{position:absolute;inset:0;background:radial-gradient(120% 90% at 30% 20%,rgba(255,255,255,.16),transparent 60%),linear-gradient(160deg,#2a2d33,#121316)}
+.cam-img::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 2px,transparent 2px 4px)}
+.cam-top{position:absolute;left:10px;top:8px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px}
+.cam-top .dot{width:8px;height:8px;border-radius:99px;background:#e5484d}
+.cam-nome{position:absolute;left:10px;bottom:8px;font-weight:700;font-size:14px}
+.cam-ora{position:absolute;right:10px;bottom:8px;font-size:12px;opacity:.8}
+.big-cam{aspect-ratio:16/8;cursor:default}
+.cam-mini{display:inline-block;width:46px;height:28px;border-radius:6px;background:linear-gradient(160deg,#2a2d33,#121316);vertical-align:middle}
+@media (max-width:760px){.camgrid{grid-template-columns:1fr 1fr}}
+.browser{border-radius:22px;overflow:hidden;padding:0}
+.bbar{display:flex;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.bbar .dots{display:flex;gap:6px;flex:none}.bbar .dots i{width:10px;height:10px;border-radius:99px;background:rgba(17,18,20,.16)}
+.bbar .url{flex:1;min-width:0;text-align:center;font-size:13px;color:var(--muted);background:var(--soft);border-radius:99px;padding:6px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sitoframe{display:block;width:100%;height:calc(100vh - 230px);height:calc(100dvh - 230px);min-height:520px;border:0;background:#f2f3f5}
+.gruppo-tit{font-size:20px;font-weight:800;letter-spacing:-.02em;margin:6px 2px 12px}
+.g-prog{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g-siti{grid-template-columns:repeat(4,minmax(0,1fr))}
+.sitocard{padding:20px}
+.sitocard h3{font-size:20px;letter-spacing:-.02em}
+.minibar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:12px;background:var(--soft);margin-bottom:8px}
+.minibar i{width:8px;height:8px;border-radius:99px;background:rgba(17,18,20,.18);flex:none}
+.minibar span{flex:1;min-width:0;text-align:center;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1000px){.g-prog{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:1000px){.g-siti{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.g-siti{grid-template-columns:1fr}}
+.portbar{display:flex;flex-direction:column;gap:12px;padding:14px 16px;margin-bottom:14px}
+@media (max-width:760px){.sitoframe{height:calc(100dvh - 190px);min-height:460px}}
+
+/* Aggiunte del 20 ottobre al programma vero (foto vere delle telecamere): non cambiano l'aspetto del mockup */
+.tcam img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cam-mini{object-fit:cover}

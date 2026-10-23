@@ -129,7 +129,7 @@ function Shell() {
   const asset = clienti.some((c) => c.traccia_asset);
   const corpo = { home: asset ? <HomeAsset /> : <Home />, spedizioni: asset ? <SpedizioniAsset /> : <Spedizioni />, magazzino: asset ? <Asset /> : <Magazzino />, giacenze: <Giacenze />, fatture: <Fatture /> }[cur] ?? <Home />;
   return (
-    <div className="wrap" style={{ paddingTop: 0 }}>
+    <div className="wrap">
       <div className="glass portbar">
         <div className="row between"><b style={{ fontSize: 17 }}>Messina Autotrasporti <span style={{ fontWeight: 500 }}>· Area clienti</span></b><span className="lbl">{location.host || 'portale.[dominio]'} · entra {nome}</span></div>
         <div className="row" style={{ gap: 6 }}>{NAV.map(([id, n]) => <Chip key={id} on={cur === id} onClick={() => vai(id)}>{n}</Chip>)}</div>

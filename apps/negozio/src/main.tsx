@@ -96,7 +96,7 @@ function App() {
       <div className="row" style={{ gap: 4 }}>
         <button type="button" className="tab" onClick={() => { setBrand('Tutti'); vai(''); }}>Portatili</button>
         <button type="button" className="tab" onClick={() => { setBrand('Apple'); vai(''); }}>Apple</button>
-        <button type="button" className="tab" onClick={() => vai('aziende')}>Aziende</button>
+        <button type="button" className="tab" onClick={() => vai('aziende')}>Per aziende</button>
         <button type="button" className="tab" onClick={() => vai('ricambi')}>Ricambi</button>
       </div>
       <Btn sm onClick={() => vai('carrello')}>{'Carrello · ' + carrello.length}</Btn>
@@ -118,12 +118,13 @@ function App() {
       <div className="glass shop">
         {head}
         {inner}
-        <footer className="shopfoot lbl">
+        {/* Da decidere (STATO): il piede con P.IVA, Privacy, Termini e Resi non è nel mockup (serve per legge su un negozio online) */}
+        {false && <footer className="shopfoot lbl">
           <span>© Messina Corporation · P.IVA [da inserire]</span>
           <span className="row" style={{ gap: 14 }}>
             <a href="#/privacy">Privacy</a><a href="#/termini">Termini</a><a href="#/resi">Resi</a>
           </span>
-        </footer>
+        </footer>}
       </div>
     </div>
   );
@@ -242,9 +243,9 @@ function Aziende({ modelli }: { modelli: string[] }) {
   };
   const campo = (k: 'azienda' | 'nome' | 'email' | 'telefono', l: string, type = 'text', auto = '') => <label className="field"><span className="lbl">{l}</span>
     <input className="input" type={type} autoComplete={auto || undefined} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} /></label>;
-  if (stato === 'ok') return <Pagina titolo="Aziende"><Msg>Richiesta ricevuta: entro poche ore vi mandiamo l’offerta per email.</Msg></Pagina>;
+  if (stato === 'ok') return <Pagina titolo="Per aziende"><Msg>Richiesta ricevuta: entro poche ore vi mandiamo l’offerta per email.</Msg></Pagina>;
   const pronta = v.azienda.trim() && v.nome.trim() && /@/.test(v.email) && modello && Number(v.quantita) >= 1 && v.privacy;
-  return <Pagina titolo="Aziende">
+  return <Pagina titolo="Per aziende">
     <p className="muted" style={{ margin: 0 }}>Più portatili usati e testati per la vostra azienda, con fattura e consegna in tutta Italia. Diteci modello e quantità: vi mandiamo l’offerta.</p>
     <div className="grid g2">{campo('azienda', 'Azienda', 'text', 'organization')}{campo('nome', 'Nome e cognome', 'text', 'name')}{campo('email', 'Email', 'email', 'email')}{campo('telefono', 'Telefono', 'tel', 'tel')}
       <label className="field"><span className="lbl">Modello</span><select className="input" value={v.modello} onChange={(e) => setV({ ...v, modello: e.target.value })}>

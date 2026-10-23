@@ -99,7 +99,7 @@ export function Carico() {
   if (scr === 'scan') return (
     <div className="pscr">
       <Passi cur="scan" />
-      {(aperti?.length ?? 0) > 1 && <div className="row" style={{ gap: 8 }}>{aperti!.map((l) => <button key={l.id} type="button" className={'chipbtn' + (lotto?.id === l.id ? ' on' : '')} onClick={() => setLottoId(l.id)}>{l.codice}</button>)}</div>}
+      {/* Da decidere (STATO): la scelta del lotto quando ce n'è più di uno aperto non è nel mockup (si usa il più recente) */}{void setLottoId}
       {lotto ? <div className="lbl">Lotto {lotto.codice} · {caricati ?? 0} di {lotto.pezzi} caricati</div> : aperti && <div className="lbl">Nessun lotto aperto: si carica senza lotto.</div>}
       <div className="cam" style={{ position: 'relative', overflow: 'hidden' }}>
         <video ref={cam.video} playsInline muted style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: cam.pronta ? 'block' : 'none' }} />
@@ -122,7 +122,7 @@ export function Carico() {
     return (
       <div className="pscr">
         <Passi cur="scheda" />
-        <div className="row" style={{ gap: 8 }}>{(['PC', 'Telefono'] as const).map((x) => <button key={x} type="button" className={'chipbtn' + (scheda.tipo === x ? ' on' : '')} onClick={() => setScheda({ ...scheda, tipo: x })}>{x}</button>)}</div>
+        {/* Da decidere (STATO): la scelta PC / Telefono non è nel mockup (il mockup mostra un PC) */}
         {manuale ? <label className="pcard" style={{ padding: '12px 14px', display: 'block' }}><div className="lbl">Seriale</div>
           <input className="input" value={scheda.seriale} onChange={(e) => setScheda({ ...scheda, seriale: e.target.value.toUpperCase() })} autoCapitalize="characters" autoCorrect="off" style={{ marginTop: 6 }} /></label>
           : <div className="pcard row between" style={{ padding: '12px 14px' }}><div><div className="lbl">Letto dalla foto</div><b style={{ fontSize: 18 }}>{scheda.seriale}</b></div>

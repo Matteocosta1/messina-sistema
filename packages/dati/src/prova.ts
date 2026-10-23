@@ -196,7 +196,7 @@ function dati(): Tabelle {
   ];
   t.stage_pc = Array.from({ length: 60 }, (_, k) => {
     const i = k + 1; const esito = i === 23 || i === 47 ? 'Fallito' : i % 9 === 0 ? 'Ricevuto' : i % 4 === 0 || i % 7 === 0 ? 'In corso' : 'Formattato';
-    return { id: id('st', i), seriale: `ST${String(i).padStart(5, '0')}`, cliente_id: 'c-acc', postazione: i, esito, iniziato_il: oreFa(5), finito_il: esito === 'Formattato' || esito === 'Fallito' ? oreFa(1) : null, errore: esito === 'Fallito' ? 'Cancellazione interrotta' : null };
+    return { id: id('st', i), seriale: `ST${String(i).padStart(5, '0')}`, cliente_id: 'c-acc', postazione: i, esito, iniziato_il: ora(0, 30), finito_il: esito === 'Formattato' || esito === 'Fallito' ? ora(0, 50) : null, errore: esito === 'Fallito' ? 'Cancellazione interrotta' : null };
   });
   const tel = (n: number, marca: string, modello: string, ticket: string, r: boolean, s: boolean, tk: boolean, op: string | null) =>
     ({ id: id('tel', n), imei: `35XXXXXXXXXXXX${n}`, marca, modello, cliente_id: 'c-acc', ticket, reset_fatto: r, sblocco_fatto: s, ticket_chiuso: tk, operatore: op,
@@ -204,7 +204,8 @@ function dati(): Tabelle {
   t.stage_telefoni = [tel(1, 'Apple', 'iPhone 13', '[n. ticket]', true, true, true, 'u-sta'), tel(2, 'Samsung', 'Galaxy S21', '[n. ticket]', true, false, false, 'u-sta'),
     tel(3, 'Apple', 'iPhone 12', '[n. ticket]', false, false, false, null), tel(4, 'Apple', 'iPhone SE', 'Aperto', true, true, false, 'u-sta'), tel(5, 'Samsung', 'Galaxy A52', '[n. ticket]', true, true, true, 'u-sta')];
   // presenze
-  t.badge = [{ id: 'bg1', dipendente_id: 'd-a1', dispositivo: 'iphone-autista-1', attivo: true }];
+  t.badge = [{ id: 'bg1', dipendente_id: 'd-a1', dispositivo: 'iphone-autista-1', attivo: true },
+    { id: 'bg-ch', dipendente_id: 'd-ch', dispositivo: 'iphone-christian', attivo: true }];   // App presenze della prova: il telefono di Christian è già approvato
   t.timbrature = [];
   let tid = 1;
   const timb = (dip: string, h: number, m: number, verso: string, giorni = 0) => t.timbrature.push({ id: tid++, dipendente_id: dip, quando: ora(h, m, giorni), verso, esito: 'Valida', motivo: null, lettore: 'Ingresso' });

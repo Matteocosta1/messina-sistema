@@ -150,7 +150,7 @@ function Lotti({ q }: { q: string }) {
   const { dati: dev } = useDati((d) => d.from<any>('device').select('id,stato,caricato_il').neq('stato', 'Venduto'));
   const az = useAzione();
   if (!L || !dev || !Q) return null;
-  const scrive = io.ruolo === 'vendite' || io.ruolo === 'amministrazione';
+  const scrive = io.ruolo === 'vendite' || io.ruolo === 'amministrazione' || io.ruolo === 'direzione';
   const qd = (id: string) => Q.find((x) => x.id === id) ?? {};
   const pezzi = L.reduce((a, l) => a + Number(l.pezzi), 0), costo = L.reduce((a, l) => a + Number(l.costo), 0);
   const cur = L.find((l) => l.id === s.sel) ?? L[0];
@@ -186,6 +186,7 @@ function Lotti({ q }: { q: string }) {
     </div>
     {s.msg && <Msg>{s.msg}</Msg>}
     <Errore testo={az.errore} />
+    {/* Da decidere (STATO): «Nuovo» lotto, colonne Caricati e Stato, riquadro del lotto (quadratura, documenti, Chiudi) non sono nel mockup */}
     {scrive && (s.nuovo ? <div className="glass card stack">
       <b>Nuovo lotto</b>
       <div className="row" style={{ alignItems: 'flex-end' }}>
@@ -196,15 +197,16 @@ function Lotti({ q }: { q: string }) {
         <label className="field"><span className="lbl">Costo €</span><input className="input" style={{ maxWidth: 130 }} inputMode="decimal" value={s.costo} onChange={(e) => set({ costo: e.target.value })} /></label>
       </div>
       <div className="row"><Btn onClick={crea} disabled={az.inCorso || !pronto}>Apri</Btn><Btn ghost onClick={() => set({ nuovo: false })}>Annulla</Btn></div>
-    </div> : <div className="row"><Btn onClick={() => set({ nuovo: true, msg: '' })}>Nuovo</Btn></div>)}
-    <div className="glass tbox"><table className="t nw"><thead><tr><th>Lotto</th><th>Acquisto</th><th>Pezzi</th><th>Caricati</th><th>Costo</th><th>Venduti</th><th>Incassato</th><th>Recuperato</th><th>Stato</th></tr></thead><tbody>
-      {lista.length ? lista.map((r) => { const x = qd(r.id); return <tr key={r.id} className="click" onClick={() => set({ sel: r.id, chiudi: false })} style={cur?.id === r.id ? { background: 'var(--soft)' } : undefined}>
-        <td><b>{r.codice}</b></td><td>{acquisto(r.acquistato_il)}</td><td>{num(r.pezzi)}</td><td>{num(x.caricati)}</td><td>{eur0(r.costo)}</td><td>{num(r.venduti)}</td><td><b>{eur0(r.incassato)}</b></td><td>{Math.round(Number(r.recuperato_pct))}%</td>
-        <td>{x.stato === 'Chiuso' ? <Pill tone="dark">Chiuso</Pill> : <Pill>Aperto</Pill>}</td></tr>; })
-        : <tr><td colSpan={9} className="lbl">Nessun lotto.</td></tr>}
+    </div> : null)}
+    <div className="glass tbox"><table className="t"><thead><tr><th>Lotto</th><th>Acquisto</th><th>Pezzi</th><th>Costo</th><th>Venduti</th><th>Incassato finora</th><th>Recuperato</th></tr></thead><tbody>
+      {lista.length ? lista.map((r) => <tr key={r.id} onClick={() => set({ sel: r.id, chiudi: false })}>
+        <td><b>{r.codice}</b></td><td>{acquisto(r.acquistato_il)}</td><td>{num(r.pezzi)}</td><td>{eur0(r.costo)}</td><td>{num(r.venduti)}</td><td><b>{eur0(r.incassato)}</b></td><td>{Math.round(Number(r.recuperato_pct))}%</td></tr>)
+        : <tr><td colSpan={7} className="lbl">Nessun lotto.</td></tr>}
     </tbody></table></div>
-    <p className="lbl" style={{ margin: 0 }}>L’incassato è netto: tolte commissioni, spese, IVA del margine e rimborsi dei resi.</p>
-    {cur && <div className="glass card stack">
+    {scrive && <div className="row"><Btn onClick={() => file.current?.click()} disabled={az.inCorso || !cur}>Carica fattura d’acquisto e DDT</Btn><span className="lbl">Il programma confronta i seriali del DDT con l’archivio dei PC lavorati.</span></div>}
+    <input ref={file} type="file" multiple accept=".pdf,image/*,.xml,.xlsx,.csv" hidden onChange={(e) => carica(e.target.files)} />
+    {void dCur}{void apri}{void chiudi}{void crea}{void pronto}{void cq}
+    {false && cur && <div className="glass card stack">
       <div className="row between"><h3 style={{ fontSize: 18 }}>Lotto {cur.codice}</h3>{cq.stato === 'Chiuso' ? <Pill tone="dark">Chiuso</Pill> : <Pill>Aperto</Pill>}</div>
       <div className="grid g4">
         <div><div className="lbl">Pezzi nel DDT</div><b>{num(cq.pezzi_dichiarati)}</b></div>
@@ -214,7 +216,6 @@ function Lotti({ q }: { q: string }) {
       </div>
       <div className="list">{dCur.length ? dCur.map((x) => <button key={x.id} type="button" className="li" onClick={() => apri(x)}><span className="row between" style={{ width: '100%' }}><span>{x.nome ?? x.percorso.split('/').pop()}</span><Pill>{x.tipo}</Pill></span></button>)
         : <div className="lbl" style={{ padding: 10 }}>Nessun documento.</div>}</div>
-      <input ref={file} type="file" multiple accept=".pdf,image/*,.xml,.xlsx,.csv" hidden onChange={(e) => carica(e.target.files)} />
       {scrive && <div className="row">
         <Btn ghost onClick={() => file.current?.click()} disabled={az.inCorso}>Carica</Btn>
         {cq.stato === 'Aperto' && !s.chiudi && <Btn onClick={() => set({ chiudi: true, msg: '' })}>Chiudi</Btn>}
@@ -248,9 +249,7 @@ function Inventario({ q }: { q: string }) {
     {['Tutti', 'A', 'B', 'C', 'D'].map((x) => <Chip key={x} on={s.grado === x} onClick={() => set({ grado: x })}>{x === 'Tutti' ? 'Tutti i gradi' : 'Grado ' + x}</Chip>)}
     <div className="row" style={{ marginLeft: 'auto', gap: 4, padding: 4, borderRadius: 999 }}>
       <Chip on={s.vista === 'schede'} onClick={() => set({ vista: 'schede' })}>Schede</Chip><Chip on={s.vista === 'tabella'} onClick={() => set({ vista: 'tabella' })}>Tabella</Chip></div>
-  </div><div className="row">
-    {['Tutti', 'Disponibile', 'In carico', 'Da confermare', 'Resi', 'Fermo', 'Venduto'].map((x) => <Chip key={x} on={s.stato === x} onClick={() => set({ stato: x })}>{x === 'Da confermare' && nConf ? `${x} · ${nConf}` : x}</Chip>)}
-  </div></div>;
+  </div>{/* Da decidere (STATO): i filtri per stato (Disponibile, Da confermare, Resi…) non sono nel mockup */}{void nConf}</div>;
   const empty = <div className="glass card lbl">Nessun computer con questi filtri.</div>;
   const aperto = D.find((d) => d.id === s.apri);
   const spec = (d: any) => d.tipo === 'Telefono' ? [d.marca, d.memoria, d.colore, d.batteria != null ? `batteria ${d.batteria}%` : null] : [d.marca, d.cpu, d.gpu, d.ram, d.disco];
@@ -378,17 +377,17 @@ function Ricambi({ q }: { q: string }) {
           <label className="field"><span className="lbl">Prezzo</span><input className="input" style={{ maxWidth: 120 }} inputMode="decimal" value={s.prezzo} onChange={(e) => set({ prezzo: e.target.value })} /></label>
         </div>
         <div className="row"><Btn onClick={smonta} disabled={az.inCorso || !s.seriale.trim()}>Registra</Btn><Btn ghost onClick={() => set({ nuovo: false })}>Annulla</Btn></div>
-      </div>) : <div className="row"><Btn onClick={() => set({ nuovo: true, msg: '' })}>Smonta un computer</Btn></div>}
-    <div className="glass tbox"><table className="t nw"><thead><tr><th>Ricambio</th><th>Da</th><th>Seriale del computer</th><th>Lotto</th><th>Prezzo</th><th>Stato</th><th /></tr></thead><tbody>
+      </div>) : null}{/* Da decidere (STATO): «Smonta un computer» e i tasti della colonna finale non sono nel mockup */}
+    <div className="glass tbox"><table className="t nw"><thead><tr><th>Ricambio</th><th>Da</th><th>Seriale del computer</th><th>Lotto</th><th>Prezzo</th><th>Stato</th></tr></thead><tbody>
       {lista.length ? lista.map((r) => <tr key={r.id}>
         <td><b>{r.descrizione}</b></td><td>{r.device?.modello ?? '—'}</td><td>{r.device?.seriale ?? '—'}</td><td>{r.lotti?.codice ?? '—'}</td>
         <td>{r.prezzo != null ? '€ ' + num(Number(r.prezzo)) : '—'}</td><td>{statoR(r.stato)}</td>
-        <td>{r.stato === 'Da vendere' ? <Btn ghost sm onClick={() => inVendita(r)} disabled={az.inCorso}>Metti in vendita</Btn>
+        {false && <td>{r.stato === 'Da vendere' ? <Btn ghost sm onClick={() => inVendita(r)} disabled={az.inCorso}>Metti in vendita</Btn>
           : r.stato === 'Disponibile' ? (s.vendi === r.id
             ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><select className="input" value={s.canale} onChange={(e) => set({ canale: e.target.value })}>{['eBay', 'Sito', 'Subito', 'Di persona'].map((c) => <option key={c}>{c}</option>)}</select>
               <input className="input" style={{ maxWidth: 90 }} inputMode="decimal" placeholder={String(r.prezzo)} value={s.venduto} onChange={(e) => set({ venduto: e.target.value })} /><Btn sm onClick={() => vendi(r)} disabled={az.inCorso}>Conferma</Btn></span>
-            : <Btn ghost sm onClick={() => set({ vendi: r.id, venduto: '' })}>Venduto</Btn>) : null}</td></tr>)
-        : <tr><td colSpan={7} className="lbl">Nessun ricambio.</td></tr>}
+            : <Btn ghost sm onClick={() => set({ vendi: r.id, venduto: '' })}>Venduto</Btn>) : null}</td>}</tr>)
+        : <tr><td colSpan={6} className="lbl">Nessun ricambio.</td></tr>}
     </tbody></table></div>
     <p className="lbl" style={{ margin: 0 }}>Prima di smontare, il disco passa dalla cancellazione certificata come tutto il resto: un disco non si vende mai senza rapporto.</p>
   </>);
@@ -415,20 +414,19 @@ function Ordini({ q }: { q: string }) {
   const lista = O.filter((o) => has(q, o.riferimento, o.canale, o.device?.modello, o.device?.seriale, o.cliente, o.tracking));
   const statoO = (o: any) => { const v = vend(o); return v?.reso_il ? <Pill tone="red">Reso</Pill> : o.stato === 'Da preparare' ? <Pill>{o.stato}</Pill> : o.stato === 'Annullato' ? <Pill tone="red">{o.stato}</Pill> : <Pill tone="dark">{o.stato}</Pill>; };
   return (<>
-    <p className="lbl" style={{ margin: 0 }}>Un solo inventario: quando un computer si vende su un sito, sparisce subito dagli altri. Le vendite fatte su un sito a mano si registrano dalla scheda del PC in Inventario («Vendi»).</p>
+    <p className="lbl" style={{ margin: 0 }}>Un solo inventario: quando un computer si vende su un sito, sparisce subito dagli altri.</p>
     {s.msg && <Msg>{s.msg}</Msg>}
     <Errore testo={az.errore} />
-    <div className="glass tbox"><table className="t nw" style={{ minWidth: 1000 }}><thead><tr><th>Ora</th><th>Sito</th><th>Marchio</th><th>Modello</th><th>Grado</th><th>Seriale</th><th>Posto</th><th>Tracking</th><th>Stato</th><th /></tr></thead><tbody>
+    <div className="glass tbox"><table className="t" style={{ minWidth: 900 }}><thead><tr><th>Ora</th><th>Sito</th><th>Marchio</th><th>Modello</th><th>Grado</th><th>Seriale</th><th>Posto</th><th>Stato</th><th /></tr></thead><tbody>
       {lista.length ? lista.map((o) => { const v = vend(o), qui = s.apri === o.id; return <React.Fragment key={o.id}><tr>
         <td>{quandoOrdine(o.creato_il)}</td><td>{o.canale}</td><td>{o.device?.marca ?? '—'}</td><td><b>{o.device?.modello ?? '—'}</b></td><td>{o.device?.grado && <Pill tone="dark">{o.device.grado}</Pill>}</td>
-        <td>{o.device?.seriale ?? '—'}</td><td>{o.device?.bancali?.posti?.codice ?? '—'}</td><td className="lbl">{o.tracking ?? '—'}</td>
+        <td>{o.device?.seriale ?? '—'}</td><td>{o.device?.bancali?.posti?.codice ?? '—'}</td>
         <td>{statoO(o)}</td>
         <td><span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-          {o.stato === 'Da preparare' && <Btn ghost sm disabled={az.inCorso} onClick={() => etichetta(o)}>Etichetta</Btn>}
-          {(o.stato === 'Da preparare' || o.stato === 'Pronto') && <Btn ghost sm onClick={() => set({ apri: o.id, cosa: 'spedito', tracking: '' })}>Spedito</Btn>}
-          {o.stato === 'Spedito' && v && !v.reso_il && <Btn ghost sm onClick={() => set({ apri: o.id, cosa: 'reso', rimborso: String(v.prezzo), motivo: '', rivendibile: true })}>Reso</Btn>}
+          {o.stato === 'Da preparare' && <Btn ghost sm disabled={az.inCorso} onClick={() => etichetta(o)}>Etichetta spedizione</Btn>}
+          {/* Da decidere (STATO): «Spedito» (tracking) e «Reso» non sono nel mockup */}
         </span></td></tr>
-        {qui && s.cosa === 'spedito' && <tr><td colSpan={10}><span className="row">
+        {qui && s.cosa === 'spedito' && <tr><td colSpan={9}><span className="row">
           <input className="input" style={{ maxWidth: 240 }} placeholder="Numero di spedizione" value={s.tracking} onChange={(e) => set({ tracking: e.target.value })} />
           <Btn sm onClick={() => spedito(o)} disabled={az.inCorso || !s.tracking.trim()}>Conferma</Btn><Btn ghost sm onClick={() => set({ apri: '' })}>Annulla</Btn></span></td></tr>}
         {qui && s.cosa === 'reso' && v && <tr><td colSpan={10}><span className="row">
@@ -437,7 +435,7 @@ function Ordini({ q }: { q: string }) {
           <Chip on={s.rivendibile} onClick={() => set({ rivendibile: true })}>Rivendibile</Chip><Chip on={!s.rivendibile} onClick={() => set({ rivendibile: false })}>Fermo</Chip>
           <Btn sm onClick={() => reso(o, v)} disabled={az.inCorso || !s.motivo.trim() || s.rimborso.trim() === ''}>Conferma</Btn><Btn ghost sm onClick={() => set({ apri: '' })}>Annulla</Btn></span></td></tr>}
       </React.Fragment>; })
-        : <tr><td colSpan={10} className="lbl">Nessun ordine.</td></tr>}
+        : <tr><td colSpan={9} className="lbl">Nessun ordine.</td></tr>}
     </tbody></table></div>
   </>);
 }
@@ -507,9 +505,10 @@ function StageTel({ q }: { q: string }) {
     <div className="glass tbox"><table className="t" style={{ minWidth: 1000 }}><thead><tr><th>IMEI</th><th>Marchio</th><th>Modello</th><th>Cliente</th><th>Ticket</th><th>Reset</th><th>Sblocco</th><th>Operatore</th><th>Stato</th></tr></thead><tbody>
       {list.length ? list.map((x) => <tr key={x.id}>
         <td>{x.imei}</td><td>{x.marca}</td><td><b>{x.modello}</b></td><td>{x.clienti?.nome ?? '—'}</td>
-        <td>{x.stato === 'Ticket' ? <Btn ghost sm disabled={az.inCorso} label="Chiudi il ticket" onClick={() => segna(x, 'ticket_chiuso')}>Chiudi</Btn> : x.ticket ?? '—'}</td>
-        <td>{x.reset_fatto ? 'Fatto' : <Btn ghost sm disabled={az.inCorso} label="Segna reset fatto" onClick={() => segna(x, 'reset_fatto')}>Fatto</Btn>}</td>
-        <td>{x.sblocco_fatto ? 'Fatta' : x.reset_fatto ? <Btn ghost sm disabled={az.inCorso} label="Segna sblocco fatto" onClick={() => segna(x, 'sblocco_fatto')}>Fatta</Btn> : 'Da fare'}</td>
+        {/* Da decidere (STATO): i tasti per segnare reset, sblocco e ticket non sono nel mockup (in prova li segna l'app) */}{void segna}
+        <td>{x.stato === 'Ticket' ? 'Aperto' : x.ticket ?? '—'}</td>
+        <td>{x.reset_fatto ? 'Fatto' : 'Da fare'}</td>
+        <td>{x.sblocco_fatto ? 'Fatta' : 'Da fare'}</td>
         <td>{x.profili?.nome ?? '—'}</td>
         <td>{x.stato === 'Chiuso' ? <Pill tone="dark">Chiuso</Pill> : x.stato === 'Ticket' ? <Pill tone="red">{x.stato}</Pill> : <Pill>{x.stato}</Pill>}</td></tr>)
         : <tr><td colSpan={9} className="lbl">Nessun telefono.</td></tr>}
