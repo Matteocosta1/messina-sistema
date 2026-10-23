@@ -35,6 +35,7 @@ function dati(): Tabelle {
     { id: 'u-amm', azienda: 'trasporti', ruolo: 'amministrazione', nome: 'Angela', cliente_id: null },
     { id: 'u-bol', azienda: 'trasporti', ruolo: 'bolle', nome: 'Gabriele', cliente_id: null },
     { id: 'u-chr', azienda: 'trasporti', ruolo: 'bolle', nome: 'Christian', cliente_id: null },   // App presenze della prova: il badge di Christian
+    { id: 'u-alb', azienda: 'trasporti', ruolo: 'bolle', nome: 'Alberto', cliente_id: null },   // ufficio bolle: le bolle nuove si dividono tra Gabriele, Christian e Alberto
     { id: 'u-tra', azienda: 'trasporti', ruolo: 'traffico', nome: 'Mauro', cliente_id: null },
     { id: 'u-com', azienda: 'trasporti', ruolo: 'commerciale', nome: 'Gianluca', cliente_id: null },
     { id: 'u-cms', azienda: 'trasporti', ruolo: 'commercialista', nome: 'Commercialista', cliente_id: null },
@@ -71,7 +72,7 @@ function dati(): Tabelle {
     { id: 'd-a4', azienda: 'trasporti', nome: 'Autista 4', mansione: 'Autista', reparto: 'Strada', ore_settimana: 39, inizio: '06:00', fine: '15:00', patente_scadenza: g(300), cqc_scadenza: g(300), profilo_id: null, contratto: 'CCNL Logistica' },
     { id: 'd-ch', azienda: 'trasporti', nome: 'Christian', mansione: 'Ufficio bolle', reparto: 'Ufficio bolle', ore_settimana: 40, inizio: '08:00', fine: '17:00', profilo_id: 'u-chr', contratto: 'CCNL Commercio' },
     { id: 'd-ga', azienda: 'trasporti', nome: 'Gabriele', mansione: 'Ufficio bolle', reparto: 'Ufficio bolle', ore_settimana: 40, inizio: '08:00', fine: '17:00', profilo_id: 'u-bol', contratto: 'CCNL Commercio' },
-    { id: 'd-al', azienda: 'trasporti', nome: 'Alberto', mansione: 'Ufficio bolle', reparto: 'Ufficio bolle', ore_settimana: 40, inizio: '08:00', fine: '17:00', profilo_id: null, contratto: 'CCNL Commercio' },
+    { id: 'd-al', azienda: 'trasporti', nome: 'Alberto', mansione: 'Ufficio bolle', reparto: 'Ufficio bolle', ore_settimana: 40, inizio: '08:00', fine: '17:00', profilo_id: 'u-alb', contratto: 'CCNL Commercio' },
     { id: 'd-ma', azienda: 'trasporti', nome: 'Mauro', mansione: 'Traffico', reparto: 'Traffico', ore_settimana: 40, inizio: '06:00', fine: '15:00', profilo_id: 'u-tra', contratto: 'CCNL Commercio' },
     { id: 'd-an', azienda: 'trasporti', nome: 'Angela', mansione: 'Amministrazione', reparto: 'Amministrazione', ore_settimana: 40, inizio: '08:30', fine: '17:30', profilo_id: 'u-amm', contratto: 'CCNL Commercio' },
     { id: 'd-m1', azienda: 'trasporti', nome: 'Magazziniere 1', mansione: 'Magazzino', reparto: 'Magazzino', ore_settimana: 40, inizio: '06:00', fine: '14:00', profilo_id: 'u-mag', contratto: 'CCNL Logistica' },
@@ -367,6 +368,16 @@ type Estensione = (x: { t: Tabelle; rpc: RpcProva; rel: Relazioni; funzioni: Fun
 const estensioni: Estensione[] = [];
 export function estendiProva(f: Estensione) { estensioni.push(f); }
 
+/** come la regola del database (bolle_assegna): la bolla nuova va a chi dell'ufficio bolle ha meno bolle «Nuova»; solo la Direzione sceglie a mano */
+export function operatoreBolle(t: Tabelle, u: string | null, scelto?: string | null): string | null {
+  const io = t.profili.find((p) => p.id === u);
+  if (scelto && io?.ruolo === 'direzione') return scelto;
+  const carico = (id: string) => t.bolle.filter((b) => b.operatore_id === id && b.stato === 'Nuova').length;
+  const chi = t.profili.filter((p) => p.azienda === 'trasporti' && p.ruolo === 'bolle' && p.attivo !== false)
+    .sort((x, y) => carico(x.id) - carico(y.id) || String(x.nome).localeCompare(String(y.nome)) || String(x.id).localeCompare(String(y.id)))[0];
+  return chi?.id ?? scelto ?? u;
+}
+
 /** Edge Functions simulate in prova (quelle vere sono in supabase/functions) */
 const FUNZIONI: FunzioniProva = {
   'crea-bolla': (c, t, u) => {
@@ -377,7 +388,7 @@ const FUNZIONI: FunzioniProva = {
     const id = crypto.randomUUID();
     t.bolle.unshift({ id, numero: null, cliente_id: cli.id, tipo: /ritir/i.test(m.oggetto) ? 'Ritiro' : 'Consegna', data_consegna: g(1), fascia: /entro le 12/i.test(m.testo ?? '') ? 'Entro le 12:00' : null,
       destinatario: cli.nome, indirizzo: 'Via [indirizzo]', citta: 'Milano', colli_previsti: Number((m.testo ?? '').match(/(\d+) (bancal|coll)/)?.[1] ?? 1), accessori: /sponda/i.test(m.testo ?? '') ? ['Sponda'] : [],
-      dati_mancanti: ['Piano di consegna'], stato: 'Nuova', operatore_id: u, creata_il: new Date().toISOString(), note: null, mail_id: m.id });
+      dati_mancanti: ['Piano di consegna'], stato: 'Nuova', operatore_id: operatoreBolle(t, null), creata_il: new Date().toISOString(), note: null, mail_id: m.id });
     m.bolla_id = id; return { bolla_id: id };
   },
   'fatture-in-cloud': (c, t) => { const f = t.fatture.find((x) => x.id === c.fattura_id);

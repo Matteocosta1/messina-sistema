@@ -228,6 +228,8 @@ Per gli autisti e il magazzino serve anche il collegamento alla scheda dipendent
 
 I clienti del portale hanno ruolo `cliente` e il loro `cliente_id`.
 
+**Ufficio bolle.** Ogni bolla nuova va da sola a chi ha ruolo `bolle` nei Trasporti e ha meno bolle «Nuova» da confermare (a parità, in ordine di nome); chi ha `attivo = false` non ne riceve. Solo la Direzione può assegnarla a mano.
+
 **Chi lavora in tutte e due le società** (Matteo, Pier, i genitori, il commercialista): il profilo parte in una società, poi si aggiunge l'accesso all'altra. Nel gestionale compare il pulsante per passare da una all'altra; si lavora sempre in una alla volta, così i dati non si mescolano.
 
 ```sql

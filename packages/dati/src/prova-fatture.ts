@@ -1,7 +1,7 @@
 // Prova: tariffe a regole, chiusura del mese, fatture (IVA, invio, esito SdI, note di credito),
 // preventivi dei Trasporti e richieste delle aziende per la Corporation.
 // Stessa logica delle migrazioni 20261022000200 e 20261022000300, con gli stessi messaggi.
-import { estendiProva } from './prova';
+import { estendiProva, operatoreBolle } from './prova';
 
 type R = Record<string, any>;
 const giorno = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
@@ -385,7 +385,8 @@ estendiProva(({ t, rpc, rel, funzioni, viste, regole }) => {
   };
   // un potenziale non riceve bolle
   const bolleBase = regole.bolle;
-  regole.bolle = (a, b, x, u) => { if (!a && t.clienti.find((c) => c.id === b.cliente_id)?.stato === 'Potenziale') throw new Error('Cliente ancora potenziale: prima si accetta il preventivo'); bolleBase?.(a, b, x, u); };
+  regole.bolle = (a, b, x, u) => { if (!a && t.clienti.find((c) => c.id === b.cliente_id)?.stato === 'Potenziale') throw new Error('Cliente ancora potenziale: prima si accetta il preventivo'); bolleBase?.(a, b, x, u);
+    if (!a) b.operatore_id = operatoreBolle(t, u, b.operatore_id); };   // divisa nell'ufficio bolle, come bolle_assegna
 
   // ------------------------------------------------------------------ richieste delle aziende (Corporation)
   const assegna = () => t.profili.filter((p) => p.azienda === 'corporation' && p.ruolo === 'vendite')
