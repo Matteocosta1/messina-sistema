@@ -38,11 +38,11 @@ estendiProva(({ t, rpc, rel, viste }) => {
   const base: [number, number] = [45.2905, 9.1384];
   const stop: [number, number][] = [[45.455, 9.185], [45.478, 9.205], [45.503, 9.232]];
   t.sat_giornate = [
-    { data: oggi(), mezzo_id: 'm2', autista_id: 'd-a2', giro_id: 'giro1', km_previsti: 54, km_fatti: 67, litri: 21.4,
+    { data: oggi(), mezzo_id: 'm2', autista_id: 'd-a2', giro_id: 'giro2', km_previsti: 54, km_fatti: 67, litri: 14.3,   // litri del giorno (21,4 l/100 km)
       previsto: [base, ...stop, base], percorso: [base, [45.36, 9.15], [45.43, 9.11], [45.42, 9.11], [45.44, 9.16], stop[0], stop[1], stop[2], [45.46, 9.2]] },
-    { data: oggi(), mezzo_id: 'm1', autista_id: 'd-a1', giro_id: null, km_previsti: 86, km_fatti: 88, litri: 9.8,
+    { data: oggi(), mezzo_id: 'm1', autista_id: 'd-a1', giro_id: 'giro1', km_previsti: 86, km_fatti: 88, litri: 8.6,
       previsto: [base, [45.53, 9.04], [45.51, 9.08], [45.55, 9.06], base], percorso: [base, [45.4, 9.08], [45.53, 9.04], [45.51, 9.08], [45.55, 9.06], [45.42, 9.1]] },
-    { data: oggi(), mezzo_id: 'm3', autista_id: 'd-a3', giro_id: null, km_previsti: 210, km_fatti: 214, litri: 31.2,
+    { data: oggi(), mezzo_id: 'm3', autista_id: 'd-a3', giro_id: null, km_previsti: 210, km_fatti: 214, litri: 66.8,
       previsto: [base, [45.69, 9.67], [45.54, 10.21], base], percorso: [base, [45.5, 9.4], [45.69, 9.67], [45.54, 10.21], [45.13, 10.02], [45.3, 9.5]] },
   ];
   t.sat_anomalie = [
@@ -63,7 +63,17 @@ estendiProva(({ t, rpc, rel, viste }) => {
     { id: 'av2', telecamera_id: 'cam1', quando: alle(3, 40), tipo: 'Mezzo', descrizione: 'Auto ferma 6 minuti davanti all’ingresso', foto: 'avvisi/2.jpg', grave: true, visto_il: null },
     { id: 'av3', telecamera_id: 'cam0', quando: alle(5, 52), tipo: 'Apertura', descrizione: 'Apertura del magazzino: Magazziniere 1, badge regolare', foto: 'avvisi/3.jpg', grave: false, visto_il: null },
   ];
-  t.cam_foto = t.storico.filter((s) => s.come === 'Pistola').slice(0, 6).map((s, i) => ({ id: 'cf' + i, storico_id: s.id, telecamera_id: 'cam2', quando: s.quando, foto: `scansioni/${s.id}.jpg` }));
+  t.cam_foto = [];
+  // scansioni di stamattina con la foto della telecamera più vicina (come le registra l'app: il codice letto e il posto)
+  const scan: [string, string, string, string, number, number, string, string][] = [
+    ['B-0141', 'S03-2-1', 'Entrata', 'Magazziniere 1', 6, 22, 'cam2', 'c-snam'], ['B-0138', 'S03-2-2', 'Trasferimento', 'Magazziniere 2', 7, 5, 'cam3', 'c-snam'],
+    ['Collo C50-003', '—', 'Uscita', 'Magazziniere 2', 7, 41, 'cam2', 'c-snam'], ['S07-2-1', 'S07-2-1', 'Missione', 'Magazziniere 1', 8, 10, 'cam4', 'c-eco']];
+  scan.forEach(([cosa, dove, op, chi, h, m, cam, cli], i) => {
+    const quando = new Date(Math.min(Date.now() - (4 - i) * 60000, (() => { const d = new Date(); d.setHours(h, m, 0, 0); return d.getTime(); })())).toISOString();
+    t.storico.push({ id: 900 + i, quando, azienda: 'trasporti', chi_nome: chi, operazione: op, cosa, dove, come: 'Pistola', dettagli: { cliente_id: cli } });
+    t.cam_foto.push({ id: 'cf' + i, storico_id: 900 + i, telecamera_id: cam, quando, foto: `scansioni/${900 + i}.jpg` });
+  });
+  t.storico.sort((x, y) => String(y.quando).localeCompare(String(x.quando)));
   rel.cam_avvisi = { telecamere: 'telecamera_id' };
   rel.cam_foto = { telecamere: 'telecamera_id', storico: 'storico_id' };
   rpc.avviso_visto = (a, t2, u) => { direzione(u); const x = t.cam_avvisi.find((y) => y.id === a.p_id && !y.visto_il); if (!x) throw new Error('Avviso non trovato o già visto'); x.visto_il = new Date().toISOString(); };

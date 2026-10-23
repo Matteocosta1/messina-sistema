@@ -222,7 +222,9 @@ export function Fatturazione() {
   if (!dati) return null;
   const F = dati.filter((f) => f.periodo === mese || APERTE.includes(f.stato) || (f.stato === 'Inviata' && f.periodo < mese));
   const pronte = F.filter((f) => f.stato === 'Pronta');
-  const nBolle = (f: any) => (f.fatture_bolle ?? []).filter((x: any) => x.valida).length;
+  // consegne della fattura: le bolle collegate; per le fatture senza collegamento, le righe della tariffa base (una per spedizione)
+  const nBolle = (f: any) => (f.fatture_bolle ?? []).filter((x: any) => x.valida).length
+    || (f.righe_fattura ?? []).filter((r: any) => /^(Base|Consegna|Ritiro e consegna|Spedizion)/i.test(r.voce)).reduce((n: number, r: any) => n + Number(r.quantita), 0);
   const chiudi = () => az.prendi(() => db.rpc<number>('chiudi_mese', { p_mese: mese })).then((n) => n !== undefined && setMsg(n
     ? `${nomeMese(mese)}: ${n} ${n === 1 ? 'fattura preparata' : 'fatture preparate'} con tutte le bolle consegnate e non ancora fatturate. Quelle «Da controllare» dicono cosa manca.`
     : `${nomeMese(mese)}: nessuna bolla nuova da fatturare.`));
@@ -235,17 +237,22 @@ export function Fatturazione() {
   // Le fatture del mese le prepara comunque «Chiudi mese» (rpc chiudi_mese), che resta nel codice.
   void chiudi; void esiti; void setMese; void mesePrima;
   const pagata = (f: any) => az.esegui(() => db.from('fatture').update({ stato: 'Pagata' }).eq('id', f.id)).then((ok) => ok && setMsg(`Pagamento di ${f.clienti?.nome} registrato: sale l’Incassato in Home.`));
-  const voci = (f: any) => (f.righe_fattura ?? []).filter((r: any) => !/^(Base|Consegna|Ritiro e consegna|Spedizion)/i.test(r.voce)).map((r: any) => `${r.voce} ×${Number(r.quantita).toLocaleString('it-IT')}`).join(' · ') || '—';
+  // come nel mockup: «Sabato ×3 · Giacenza ×1», una voce per tipo (la descrizione dopo « · » resta nella fattura)
+  const voci = (f: any) => {
+    const m = new Map<string, number>();
+    for (const r of f.righe_fattura ?? []) { const v = String(r.voce).split(' · ')[0]; if (!/^(Base|Consegna|Ritiro e consegna|Spedizion)/i.test(v)) m.set(v, (m.get(v) ?? 0) + Number(r.quantita)); }
+    return [...m].map(([v, q]) => `${v} ×${q.toLocaleString('it-IT')}`).join(' · ') || '—';
+  };
   return (<>
     <div className="glass tbox"><table className="t"><thead><tr><th>Cliente</th><th>Consegne</th><th>Accessori ed extra</th><th>Totale</th><th>Stato</th><th>Incasso</th></tr></thead><tbody>
       {F.map((f) => <tr key={f.id} className="click" onClick={() => setAperta(f.id)}>
-        <td><b>{f.clienti?.nome}</b></td><td>{nBolle(f) || '—'}</td><td>{voci(f)}</td><td>{eur(Number(f.totale))}</td><td>{pillStato(f)}</td>
+        <td><b>{f.clienti?.nome}</b></td><td>{nBolle(f) || '—'}</td><td>{voci(f)}</td><td style={{ whiteSpace: 'nowrap' }}>{eur(Number(f.totale))}</td><td>{pillStato(f)}</td>
         <td onClick={(e) => e.stopPropagation()}>{f.stato === 'Pagata' ? <Pill tone="ok">Pagata</Pill> : f.stato === 'Inviata' && !sola ? <Btn ghost sm onClick={() => pagata(f)} disabled={az.inCorso}>Pagata</Btn> : <span className="lbl">—</span>}</td></tr>)}
       {!F.length && <tr><td colSpan={6} className="lbl">Nessuna fattura per {nomeMese(mese).toLowerCase()}.</td></tr>}
     </tbody></table></div>
     {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
-    {!sola && <div className="row">{pronte.length > 0 && <Btn onClick={() => invia(pronte)} disabled={az.inCorso}>Invia</Btn>}<Btn ghost onClick={() => setNuova(!nuova)}>{nuova ? 'Chiudi' : 'Nuova'}</Btn>
+    {!sola && <div className="row"><Btn onClick={() => invia(pronte)} disabled={az.inCorso || !pronte.length}>Invia</Btn><Btn ghost onClick={() => setNuova(!nuova)}>{nuova ? 'Chiudi' : 'Nuova'}</Btn>
       <span className="lbl">Ogni voce della fattura rimanda alla sua consegna. Quando il cliente paga, premi «Pagata»: sale l’Incassato in Home.</span></div>}
     {nuova && <NuovaFattura onFatto={(id) => { setNuova(false); setAperta(id); }} />}
   </>);

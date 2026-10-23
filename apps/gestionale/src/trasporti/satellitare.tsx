@@ -17,10 +17,12 @@ function Mappa({ fatto, previsto, male, soste }: { fatto: P[]; previsto: P[]; ma
   return <>
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }} role="img" aria-label="Percorso previsto e percorso fatto">
       <rect width={W} height={H} rx="16" fill="rgba(17,18,20,.03)" />
+      <path d="M0 110 Q170 90 340 130" stroke="rgba(17,18,20,.07)" strokeWidth="10" fill="none" /><path d="M160 0 Q170 120 150 220" stroke="rgba(17,18,20,.07)" strokeWidth="8" fill="none" />
       <path d={linea(previsto)} stroke="#111214" strokeWidth="3" fill="none" strokeDasharray="7 6" />
       <path d={linea(fatto)} stroke={male ? '#b42318' : '#146c43'} strokeWidth="3" fill="none" strokeLinejoin="round" />
       {previsto.map((p, i) => { const [x, y] = xy(p).split(' '); return <circle key={i} cx={x} cy={y} r="6" fill="#fff" stroke="#111214" strokeWidth="2" />; })}
       {soste.map((p, i) => { const [x, y] = xy(p).split(' '); return <circle key={'s' + i} cx={x} cy={y} r="9" fill="#b42318" />; })}
+      {(previsto[0] ?? fatto[0]) && (() => { const [x, y] = xy((previsto[0] ?? fatto[0])!).split(' ').map(Number); return <rect x={x - 14} y={y - 12} width="28" height="24" rx="6" fill="#111214" />; })()}
     </svg>
     <div className="row lbl" style={{ gap: 14, marginTop: 6 }}><span>- - - giro previsto</span><span style={{ color: male ? 'var(--alert)' : 'var(--ok)' }}>——— percorso fatto</span></div>
   </>;
@@ -39,7 +41,7 @@ export function Satellitare() {
     return { giornate, anomalie };
   }, []);
   if (!dati) return null;
-  const G = dati.giornate, A = dati.anomalie;
+  const G = [...dati.giornate].sort((x, y) => String(x.dipendenti?.nome ?? '').localeCompare(String(y.dipendenti?.nome ?? ''), 'it', { numeric: true })), A = dati.anomalie;   // come nel mockup: per autista
   const cur = G.find((g) => g.mezzo_id === sel) ?? G[0];
   const sue = (g: any) => A.filter((a) => a.mezzo_id === g.mezzo_id);
   const gravi = (g: any) => sue(g).filter((a) => a.grave && !a.vista_il).length;
@@ -59,10 +61,10 @@ export function Satellitare() {
     <Errore testo={az.errore} />
     {!G.length ? <Msg>Nessun dato dal satellitare oggi. Si attiva quando colleghiamo il fornitore del satellitare dei mezzi (docs/SETUP.md) e ogni mezzo ha il suo codice in Mezzi.</Msg>
       : <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
-        <div className="glass tbox" style={{ flex: '1 1 520px', minWidth: 0 }}><table className="t nw"><thead><tr><th>Autista</th><th>Mezzo</th><th>Giro</th><th>Km previsti</th><th>Km fatti</th><th>Litri</th><th>Controllo</th></tr></thead><tbody>
+        <div className="glass tbox" style={{ flex: '1 1 520px', minWidth: 0 }}><table className="t nw"><thead><tr><th>Autista</th><th>Mezzo</th><th>Giro</th><th>Km previsti</th><th>Km fatti</th><th>Litri/100 km</th><th>Controllo</th></tr></thead><tbody>
           {G.map((g) => <tr key={g.mezzo_id} className="click" onClick={() => setSel(g.mezzo_id)} style={cur?.mezzo_id === g.mezzo_id ? { background: 'var(--soft)' } : undefined}>
             <td><b>{g.dipendenti?.nome ?? '—'}</b></td><td>{g.mezzi?.tipo} {g.mezzi?.targa}</td><td>{g.giri?.zona ?? '—'}</td><td>{g.km_previsti ?? '—'}</td>
-            <td>{g.km_previsti && g.km_fatti > g.km_previsti * 1.1 ? <span className="miss">{g.km_fatti}</span> : g.km_fatti ?? '—'}</td><td>{g.litri != null ? Number(g.litri).toLocaleString('it-IT') : '—'}</td>
+            <td>{g.km_previsti && g.km_fatti > g.km_previsti * 1.1 ? <span className="miss">{g.km_fatti}</span> : g.km_fatti ?? '—'}</td><td>{g.litri != null && Number(g.km_fatti) > 0 ? (Math.round(Number(g.litri) / Number(g.km_fatti) * 1000) / 10).toLocaleString('it-IT') : '—'}</td>
             <td>{gravi(g) ? <Pill tone="red">{gravi(g) === 1 ? '1 da guardare' : gravi(g) + ' da guardare'}</Pill> : <Pill tone="ok">In regola</Pill>}</td></tr>)}
         </tbody></table></div>
         {cur && <div className="glass card stack" style={{ flex: '1 1 380px', minWidth: 0 }}>

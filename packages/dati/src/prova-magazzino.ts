@@ -7,12 +7,9 @@ const ora = () => new Date().toISOString();
 
 estendiProva(({ t, rpc, viste }) => {
   // dati di esempio: articoli senza seriale (si contano) e il deposito di Luxiona
-  const mpEco = t.missioni_posti.find((m) => m.stato === 'Da fare' && t.bancali.some((b) => b.cliente_id === 'c-eco' && b.posto_id === m.posto_id));
-  const kEco = mpEco && t.bancali.find((b) => b.cliente_id === 'c-eco' && b.posto_id === mpEco.posto_id);
-  if (kEco) {
-    t.contenuto.push({ id: crypto.randomUUID(), bancale_id: kEco.id, articolo: 'Scatole imballo', quantita: 10, codici: [], inserito: 'Pistola', da: 'u-mag', il: ora() });
-    mpEco!.attesi = [...mpEco!.attesi, { articolo: 'Scatole imballo', codice: null, quantita: 10 }];
-  }
+  // (fuori dalla missione di S07, che ha gli stessi articoli del mockup: in un'altra missione si contano a numero)
+  const kEco = t.bancali.find((b) => b.cliente_id === 'c-eco' && !t.missioni_posti.some((m) => m.posto_id === b.posto_id));
+  if (kEco) t.contenuto.push({ id: crypto.randomUUID(), bancale_id: kEco.id, articolo: 'Scatole imballo', quantita: 10, codici: [], inserito: 'Pistola', da: 'u-mag', il: ora() });
   t.tariffe.push({ id: crypto.randomUUID(), cliente_id: 'c-lux', voce: 'Deposito', unita: 'giorno', prezzo: 0.6, zona: null, quando: 'Per bancale, ogni giorno in magazzino',
     valida_dal: '2026-01-01', valida_al: null, stato: 'Attiva', minimo: null, scaglione_su: null, scaglione_da: null, scaglione_a: null });
 

@@ -5,7 +5,7 @@ import { conScheda, datiCancellati } from './prova-ricambi';
 
 estendiProva(({ t, rpc, funzioni }) => {
   const dv = (n: number, x: Record<string, any>) => ({ id: `dv-n${n}`, tipo: 'PC', difetti: [], costo: 61, prezzo_minimo: null, prezzo_confermato_da: 'u-ven', foto: [],
-    caricato_il: new Date().toISOString(), lotto_id: 'l15', bancale_id: null, stato: 'Disponibile', siti: ['Sito', 'Back Market'], ...x });
+    caricato_il: new Date().toISOString(), lotto_id: 'l15', bancale_id: ['k11-1-3', 'k11-2-3', 'k11-3-2'][n % 3], stato: 'Disponibile', siti: ['Sito', 'Back Market'], ...x });
   const hp = { marca: 'HP', modello: 'EliteBook 840 G8', cpu: 'i7-1165G7', gpu: 'Intel Iris Xe', disco: '512 GB SSD', schermo: '14"' };
   const dell = { marca: 'Dell', modello: 'Latitude 5420', cpu: 'i5-1145G7', gpu: 'Intel Iris Xe', disco: '256 GB SSD', schermo: '14"' };
   const pro = { marca: 'HP', modello: 'ProBook 450 G8', cpu: 'i5-1135G7', gpu: 'Intel UHD', disco: '256 GB SSD', schermo: '15,6"' };

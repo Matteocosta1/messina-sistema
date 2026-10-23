@@ -450,4 +450,6 @@ estendiProva(({ t, rpc, rel, funzioni, viste, regole }) => {
         .reduce((s, f) => s + (f.tipo === 'Nota di credito' ? -1 : 1) * Number(f.totale ?? 0), 0) + 9600);
     }
   });
+  // come se l'amministrazione avesse già premuto «Chiudi mese» sul mese scorso: in Fatturazione ci sono le fatture pronte da inviare (percorso del mockup)
+  try { chiudiMese(giorno(-30).slice(0, 7), 'u-amm'); } catch { /* resta da fare a mano */ }
 });

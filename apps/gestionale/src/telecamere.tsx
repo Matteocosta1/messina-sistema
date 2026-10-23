@@ -13,6 +13,10 @@ function Foto({ percorso, className, alt }: { percorso: string | null | undefine
   return url ? <img src={url} alt={alt} className={className} loading="lazy" /> : <span className={className === 'cam-mini' ? 'cam-mini' : 'cam-img'} aria-hidden="true" />;
 }
 
+/** ordine del mockup: dall'ingresso verso lo stage, come si gira il capannone; le altre dopo, in ordine di nome */
+const GIRO = ['Ingresso', 'Piazzale', 'Baie di carico', 'Corsia S03', 'Corsia S07', 'Stage'];
+const ordine = (n: string) => { const i = GIRO.indexOf(n); return i < 0 ? GIRO.length : i; };
+
 export function Telecamere() {
   const { db } = useApp();
   const az = useAzione();
@@ -20,9 +24,9 @@ export function Telecamere() {
   const { dati } = useDati(async (d) => {
     const ieri = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     const [cam, avvisi, foto] = await Promise.all([
-      d.from<any>('telecamere').select('*').eq('attiva', true).order('nome'),
-      d.from<any>('cam_avvisi').select('*,telecamere(nome)').gte('quando', ieri).order('quando', { ascending: false }).limit(30),
-      d.from<any>('cam_foto').select('*,telecamere(nome),storico(cosa,dove,operazione,chi_nome,quando)').order('quando', { ascending: false }).limit(30),
+      d.from<any>('telecamere').select('*').eq('attiva', true).order('nome').then((r) => r.sort((a, b) => ordine(a.nome) - ordine(b.nome))),
+      d.from<any>('cam_avvisi').select('*,telecamere(nome)').gte('quando', ieri).order('quando', { ascending: true }).limit(30),
+      d.from<any>('cam_foto').select('*,telecamere(nome),storico(cosa,dove,operazione,chi_nome,quando)').order('quando', { ascending: false }).limit(30).then((r) => r.reverse()),   // le ultime 30, dalla più vecchia come nel mockup
     ]);
     return { cam, avvisi, foto };
   }, []);
@@ -51,7 +55,7 @@ export function Telecamere() {
       <div className="glass tbox" style={{ flex: '2 1 520px', minWidth: 0 }}><div style={{ padding: '14px 14px 0', fontWeight: 700 }}>Foto delle scansioni</div>
         <table className="t nw"><thead><tr><th>Cosa</th><th>Posto</th><th>Movimento</th><th>Chi</th><th>Ora</th><th>Telecamera</th><th></th></tr></thead><tbody>
           {dati.foto.length ? dati.foto.map((f) => <tr key={f.id}><td><b>{f.storico?.cosa ?? '—'}</b></td><td>{f.storico?.dove ?? '—'}</td><td>{f.storico?.operazione ?? '—'}</td><td>{f.storico?.chi_nome ?? '—'}</td>
-            <td>{giornoCorto(f.quando)} {hm(f.quando)}</td><td>{f.telecamere?.nome ?? '—'}</td><td><Foto percorso={f.foto} className="cam-mini" alt="Foto della scansione" /></td></tr>)
+            <td>{giornoCorto(f.quando) === 'Oggi' ? hm(f.quando) : giornoCorto(f.quando) + ' ' + hm(f.quando)}</td><td>{f.telecamere?.nome ?? '—'}</td><td><Foto percorso={f.foto} className="cam-mini" alt="Foto della scansione" /></td></tr>)
             : <tr><td colSpan={7} className="lbl">Nessuna foto ancora.</td></tr>}
         </tbody></table>
         <p className="lbl" style={{ margin: 0, padding: '0 14px 14px' }}>A ogni scansione la telecamera più vicina salva una foto insieme al movimento: se qualcosa non torna, si apre il movimento e si vede cos’è successo.</p></div>

@@ -7,6 +7,8 @@ import { Richieste } from './richieste';
 import { Presenze } from '../trasporti/presenze';
 import { Shell, vociPer, useApp, useDati, useAzione, useStato, MailView, type Mail, Errore, hm, Mese, num, eur0, oggiISO, meseISO } from '../core';
 
+// telefono: stesso tratto dell'icona del portatile (il mockup ha solo portatili, vedi STATO)
+const PHONE = <svg width="40" height="58" viewBox="0 0 28 44" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="2" width="22" height="40" rx="4" /><path d="M11 37h6" /></svg>;
 const LAPTOP = <svg width="84" height="58" viewBox="0 0 64 44" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="10" y="4" width="44" height="28" rx="2" /><path d="M2 38h60l-4 4H6z" /></svg>;
 const TITOLI: Record<string, string> = { home: 'Home', mail: 'Mail', lotti: 'Lotti', inv: 'Inventario', ordini: 'Ordini', stage: 'Stage Computer', stageTel: 'Stage Cellulari', ricambi: 'Ricambi', richieste: 'Richieste', presenze: 'Presenze', telecamere: 'Telecamere' };
 const giorniDa = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
@@ -74,8 +76,8 @@ function Home() {
       <div className="glass card"><div className="lbl">Dispositivi in magazzino</div><div className="big">{num(dev.length)}</div><div className="lbl">{num(inVendita)} in vendita</div></div>
       <div className="glass card"><div className="lbl">Venduti questo mese</div><div className="big">{num(ven.length)}</div><div className="lbl">online {num(ven.length - persona)} · di persona {num(persona)}</div></div>
       <div className="glass card"><div className="lbl">Ordini da spedire</div><div className="big">{num(ord.length)}</div><div className="lbl">{entro ? 'entro le ' + hm(entro) : 'nessuna scadenza'}</div></div>
-      <div className="glass card"><div className="lbl">Incassato oggi</div><div className="big">{eur0(i.incassato_oggi)}</div><div className="lbl">netto di commissioni, spese, IVA e resi</div></div>
-      <div className="glass card"><div className="lbl">Incassato {Mese().toLowerCase()}</div><div className="big">{eur0(i.incassato_mese)}</div><div className="lbl">netto di commissioni, spese, IVA e resi</div></div>
+      <div className="glass card"><div className="lbl">Incassato oggi</div><div className="big">{eur0(i.incassato_oggi)}</div><div className="lbl">al netto delle commissioni</div></div>
+      <div className="glass card"><div className="lbl">Incassato {Mese().toLowerCase()}</div><div className="big">{eur0(i.incassato_mese)}</div><div className="lbl">al netto delle commissioni</div></div>
     </div>
     <div className="glass card stack">
       <div className="row between"><h3 style={{ fontSize: 18 }}>Stage</h3><div className="row" style={{ gap: 4 }}>{(['Oggi', 'Mese'] as const).map((x) => <Chip key={x} on={per === x} onClick={() => setPer(x)}>{x}</Chip>)}</div></div>
@@ -259,7 +261,7 @@ function Inventario({ q }: { q: string }) {
     {!list.length ? empty : s.vista === 'schede'
       ? <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))' }}>{list.map((d) => (
         <div key={d.id} className="glass card stack" style={{ gap: 8, cursor: 'pointer' }} onClick={() => set({ apri: d.id })}>
-          <div className="ph">{LAPTOP}</div><div className="row between"><b>{d.modello}</b>{d.grado && <Pill tone="dark">{d.grado}</Pill>}</div>
+          <div className="ph">{d.tipo === 'Telefono' ? PHONE : LAPTOP}</div><div className="row between"><b>{d.modello}</b>{d.grado && <Pill tone="dark">{d.grado}</Pill>}</div>
           <div className="lbl">{spec(d).filter(Boolean).join(' · ')}</div>
           <div className="lbl">Seriale {d.seriale} · {d.bancali?.codice ?? '—'} · {posto(d)}</div>
           <div className="row between"><span style={{ fontSize: 20, fontWeight: 800 }}>{d.prezzo != null ? eur0(d.prezzo) : '€ —'}</span><span className="lbl">{daConfermare(d) ? 'Da confermare' : d.stato}</span></div>
@@ -268,7 +270,7 @@ function Inventario({ q }: { q: string }) {
       : <div className="glass tbox"><table className="t nw" style={{ minWidth: 1700 }}><thead><tr>{['Seriale', 'Marchio', 'Modello', 'Processore', 'Scheda video', 'RAM', 'Disco', 'Schermo', 'Grado', 'Difetti', 'Lotto', 'Bancale', 'Posto', 'Costo', 'Prezzo', 'Stato', 'Siti', 'Giorni'].map((c) => <th key={c}>{c}</th>)}</tr></thead><tbody>
         {list.map((d) => <tr key={d.id} className="click" onClick={() => set({ apri: d.id })} style={s.apri === d.id ? { background: 'var(--soft)' } : undefined}>
           <td>{d.seriale}</td><td>{d.marca}</td><td><b>{d.modello}</b></td>
-          {d.tipo === 'Telefono' ? <><td colSpan={2} className="lbl">{[d.memoria, d.colore].filter(Boolean).join(' · ') || '—'}</td><td colSpan={3} className="lbl">{d.batteria != null ? `Batteria ${d.batteria}%` : '—'}</td></>
+          {d.tipo === 'Telefono' ? <><td className="lbl">—</td><td className="lbl">—</td><td className="lbl">—</td><td>{d.memoria ?? '—'}</td><td className="lbl">—</td></>
             : <><td>{d.cpu}</td><td>{d.gpu}</td><td>{d.ram}</td><td>{d.disco}</td><td>{d.schermo}</td></>}
           <td>{d.grado && <Pill tone="dark">{d.grado}</Pill>}</td><td className="lbl">{d.difetti?.join(', ') || '—'}</td><td>{d.lotti?.codice ?? '—'}</td><td>{d.bancali?.codice ?? '—'}</td><td>{posto(d)}</td>
           <td>{d.costo != null ? eur0(d.costo) : '—'}</td><td><b>{d.prezzo != null ? eur0(d.prezzo) : '—'}</b>{daConfermare(d) && <div className="lbl">da confermare</div>}</td><td>{statoPill(d.stato)}</td><td className="lbl">{d.siti?.join(', ') || '—'}</td><td>{giorniDa(d.caricato_il)}</td></tr>)}

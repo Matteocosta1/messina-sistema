@@ -71,7 +71,10 @@ export function Carico() {
     setLettura(false);
     if (r) { setScheda({ ...VUOTA, tipo: scheda.tipo, ...Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v ?? ''])) } as Scheda); setManuale(!r.seriale); vibra(); vai('scheda'); }
   };
-  const scattaFoto = async () => { const b = await cam.scatta(); if (b) leggiFoto(b); else file.current?.click(); };
+  // in Prova, senza fotocamera, si usa la foto di esempio dell'etichetta (il servizio leggi-seriale è simulato come gli altri)
+  const fotoEsempio = () => new Promise<Blob | null>((ok) => { const c = document.createElement('canvas'); c.width = 800; c.height = 500; const x = c.getContext('2d')!;
+    x.fillStyle = '#e9e8ee'; x.fillRect(0, 0, 800, 500); x.fillStyle = '#2b2a31'; x.font = 'bold 64px sans-serif'; x.fillText('S/N PF3XXXXX', 60, 260); c.toBlob((b) => ok(b), 'image/jpeg', .9); });
+  const scattaFoto = async () => { const b = await cam.scatta(); if (b) leggiFoto(b); else if (db.modo === 'prova') { const e = await fotoEsempio(); if (e) leggiFoto(e); } else file.current?.click(); };
 
   // 5 · bancale
   const codiciBanc = useCodiciProva('bancale');
@@ -103,6 +106,8 @@ export function Carico() {
       {lotto ? <div className="lbl">Lotto {lotto.codice} · {caricati ?? 0} di {lotto.pezzi} caricati</div> : aperti && <div className="lbl">Nessun lotto aperto: si carica senza lotto.</div>}
       <div className="cam" style={{ position: 'relative', overflow: 'hidden' }}>
         <video ref={cam.video} playsInline muted style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: cam.pronta ? 'block' : 'none' }} />
+        {/* senza fotocamera accesa: il disegno dell'etichetta da inquadrare, come nel mockup */}
+        {!cam.pronta && <div className="label" style={{ position: 'relative' }}><div style={{ fontSize: 11, color: '#6a6874' }}>MTM 20W0XXXXIX</div><div style={{ fontSize: 20, fontWeight: 800, marginTop: 4 }}>S/N PF3XXXXX</div><div style={{ fontSize: 11, color: '#6a6874', marginTop: 4 }}>20V 3.25A</div></div>}
         <div className="camtxt" style={{ position: 'relative', ...(cam.pronta ? { marginTop: 'auto', background: 'rgba(0,0,0,.45)', borderRadius: 12, padding: '8px 10px' } : {}) }}>
           {lettura ? 'Leggo il seriale…' : 'Inquadra l’etichetta sotto il PC. Il seriale si legge dalla foto e si controlla sul sito del marchio.'}</div>
       </div>
@@ -130,10 +135,11 @@ export function Carico() {
         {(scheda.nel_ddt || stage) && <div className="row" style={{ gap: 6 }}>{scheda.nel_ddt && <Pill>Nel DDT</Pill>}{stage && <Pill>Lavorato da noi</Pill>}</div>}
         {!manuale && <div className="ptitle" style={{ fontSize: 24 }}>{[scheda.marca, scheda.modello].filter(Boolean).join(' ') || 'Modello non letto'}</div>}
         <div className="pcard" style={{ padding: '4px 14px' }}>
-          {campi.filter(([k]) => manuale || (k !== 'marca' && k !== 'modello')).map(([k, l]) => <div key={k} className="kvp">
+          {/* come nel mockup la scheda letta dalla foto non mostra la scheda video (resta salvata) */}
+          {campi.filter(([k]) => manuale || (k !== 'marca' && k !== 'modello' && k !== 'gpu')).map(([k, l]) => <div key={k} className="kvp">
             <span>{l}</span>{manuale || scheda.tipo === 'Telefono' ? <input aria-label={l} value={String(scheda[k] ?? '')} onChange={(e) => setScheda({ ...scheda, [k]: e.target.value })}
               style={{ font: 'inherit', fontWeight: 700, textAlign: 'right', border: 0, background: 'transparent', minWidth: 0, flex: 1 }} /> : <b>{String(scheda[k] || '—')}</b>}</div>)}
-          {stage && <div className="kvp"><span>Cancellazione dati</span><b>{stage.esito === 'Formattato' || stage.esito === 'In vendita' ? 'Completata' : stage.esito}</b></div>}
+          {stage && <div className="kvp"><span>Cancellazione Certus</span><b>{stage.esito === 'Formattato' || stage.esito === 'In vendita' ? 'Completata' : stage.esito}</b></div>}
           {scheda.tipo === 'PC' && scheda.batteria && <div className="kvp" style={{ border: 0 }}><span>Batteria dal report</span><b>{scheda.batteria}</b></div>}
         </div>
         <div style={{ flex: 1 }} />

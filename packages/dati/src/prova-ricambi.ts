@@ -40,7 +40,7 @@ estendiProva(({ t, rpc, rel, regole, viste }) => {
     r('ri3', 'dv-r01', 'l13', 'Disco', 'SSD 256 GB, dati cancellati con rapporto', 19, 'Disponibile'),
     r('ri4', 'dv-r02', 'l15', 'Batteria', 'Batteria, 81%', 35, 'Venduto', { canale: 'eBay', venduto_prezzo: 35, commissione: 4, incassato: 31, venduto_il: ora }),
     r('ri5', 'dv-r02', 'l15', 'Display', 'Display 15,6" Full HD', 45, 'Disponibile'),
-    r('ri6', 'dv-r02', 'l15', 'Memoria', 'RAM 8 GB DDR4', 15, 'Da vendere', { siti: [] }),
+    r('ri6', 'dv-r02', 'l15', 'Memoria', 'RAM 8 GB DDR4', 15, 'Disponibile'),
   ];
   rel.ricambi = { device: 'device_id', lotti: 'lotto_id' };
 

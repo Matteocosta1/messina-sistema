@@ -36,13 +36,11 @@ export function Portale() {
     return () => { fr.removeEventListener('load', carica); ro?.disconnect(); };
   }, [sorgente, url]);
   return (<>
-    <div>
       {prova && <div className="row" style={{ gap: 6 }}>{CLIENTI.map(([n]) => <Chip key={n} on={cli === n} onClick={() => setCli(n)}>{n}</Chip>)}<span className="lbl">Prova: scegli il cliente</span></div>}
       <div style={{ height: 12 }} />
       {sorgente || url
         ? <iframe ref={f} key={cli} title={'Portale di ' + cli} name={'portale-' + cli.toLowerCase()} {...(sorgente ? { srcDoc: sorgente } : { src: url })}
             style={{ display: 'block', width: '100%', height: 640, border: 0, background: 'transparent' }} />
         : <div className="glass card lbl">Il portale si apre qui quando è collegato il suo indirizzo (portaleUrl).</div>}
-    </div>
   </>);
 }

@@ -56,6 +56,8 @@ estendiProva(({ t, rpc, rel, viste }) => {
   };
   // come se fossero già le 15:00: i giri di domani sono pronti
   prepara(giorno(1));
+  // in prova facciamo finta che l'ottimizzatore per camion (HERE/TomTom, non ancora collegato) abbia già calcolato i km dei giri di domani
+  t.giri.filter((g) => g.data === giorno(1)).forEach((g, i) => { g.km_previsti ??= [118, 96, 142, 74, 131, 88][i % 6]; });
   t.giri_preparazioni.forEach((p) => { const d = new Date(); if (d.getHours() >= 15) d.setHours(15, 0, 0, 0); p.eseguita_il = d.toISOString(); });
   // trigger bolle_nei_giri: spedizione confermata per un giorno che ha già i giri
   viste.push(() => {

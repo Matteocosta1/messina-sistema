@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Btn, Chip, Msg, Pill, Warn, Badge } from '@messina/ui';
-import { useApp, useAzione, useDati, useStato, hm, quando, Mese, meseNome, oggiISO, Errore } from '../core';
+import { useApp, useAzione, useDati, useStato, hm, quando, giornoCorto, Mese, meseNome, oggiISO, Errore } from '../core';
 
 const TABS: [string, string][] = [['oggi', 'Oggi'], ['correzioni', 'Correzioni'], ['allarmi', 'Allarmi'], ['riep', 'Riepiloghi'], ['ferie', 'Ferie'], ['telefoni', 'Telefoni'], ['mese', Mese()]];
 
@@ -83,7 +83,7 @@ function Oggi({ nFix }: { nFix: number }) {
     </div>
     <div className="glass tbox"><table className="t" style={{ minWidth: 720 }}><thead><tr><th>Dipendente</th><th>Reparto</th><th>Contratto</th><th>Entrata</th><th>Uscita</th><th>Stato</th></tr></thead><tbody>
       {P.map((d) => <tr key={d.dipendente_id}><td><b>{d.nome}</b></td><td>{d.reparto ?? '—'}</td><td>{d.ore_settimana ? `${Number(d.ore_settimana)} h a settimana` : '—'}</td><td>{hm(d.entrata)}</td><td>{hm(d.uscita)}</td>
-        <td>{String(d.stato).startsWith('Ritardo') ? <Pill tone="red">{d.stato}</Pill> : d.stato === 'Ferie' ? <Pill>Ferie</Pill> : d.uscita ? 'Uscito' : d.stato}</td></tr>)}
+        <td>{d.stato === 'Ferie' ? <Pill>Ferie</Pill> : d.uscita ? 'Uscito' : d.stato}</td></tr>)}
     </tbody></table></div>
   </>);
 }
@@ -137,7 +137,7 @@ function Allarmi({ n }: { n: number }) {
     {msg && <Msg>{msg}</Msg>}
     <Errore testo={az.errore} />
     <div className="glass tbox"><table className="t" style={{ minWidth: 980 }}><thead><tr><th>Quando</th><th>Badge di</th><th>Da quale telefono</th><th>Dove</th><th>Cosa è successo</th><th></th></tr></thead><tbody>
-      {dati.A.map((a) => { const g = dati.g.has(String(a.id)); return <tr key={a.id} className={g ? '' : 'korow'}><td>{quando(a.quando)}</td><td><b>{a.dipendenti?.nome ?? 'Sconosciuto'}</b></td>
+      {dati.A.map((a) => { const g = dati.g.has(String(a.id)); return <tr key={a.id} className={g ? '' : 'korow'}><td>{quandoAllarme(a.quando)}</td><td><b>{a.dipendenti?.nome ?? 'Sconosciuto'}</b></td>
         <td>{a.dispositivo ?? 'Telefono non registrato'}</td><td>{a.lettore ?? '—'}</td><td>{a.motivo}</td>
         <td>{g ? <Pill tone="ok">Gestito</Pill> : <Btn ghost sm onClick={() => avvisa(a)} disabled={az.inCorso}>Avvisa il dipendente</Btn>}</td></tr>; })}
       {!dati.A.length && <tr><td colSpan={6} className="lbl">Nessuna timbratura rifiutata negli ultimi 30 giorni.</td></tr>}
@@ -198,7 +198,7 @@ function Ferie() {
   return (<>
     {s.msg && <Msg>{s.msg}</Msg>}
     <Errore testo={az.errore} />
-    <div className="glass tbox"><table className="t nw" style={{ minWidth: 1100 }}><thead><tr><th>Dipendente</th>{s.mod && <th>L’anno</th>}<th>Ferie maturate</th><th>Godute</th><th>Restano</th><th>Permessi spettanti</th><th>Usati</th><th>Restano</th><th>Da guardare</th></tr></thead><tbody>
+    <div className="glass tbox"><table className="t nw" style={{ minWidth: s.mod ? 1100 : 900 }}><thead><tr><th>Dipendente</th>{s.mod && <th>L’anno</th>}<th>Ferie maturate</th><th>Godute</th><th>Restano</th><th>Permessi spettanti</th><th>Usati</th><th>Restano</th><th>Da guardare</th></tr></thead><tbody>
       {dati.D.map((d) => {
         const f = dati.F.find((x) => x.dipendente_id === d.id);
         const nota = !d.ferie_anno ? 'Manca quanto spetta l’anno (contratto)' : f && Number(f.ferie_godute) < 10 && new Date().getMonth() >= 8 ? 'Meno di 2 settimane godute quest’anno: va pianificato entro dicembre' : '';
@@ -213,9 +213,12 @@ function Ferie() {
           {s.mod === d.id && <td><span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><Btn sm onClick={() => salva(d.id)} disabled={az.inCorso}>Salva</Btn><Btn ghost sm onClick={() => set({ mod: '' })}>Annulla</Btn></span></td>}</tr>; })}
       {!dati.D.length && <tr><td colSpan={10} className="lbl">Nessun dipendente.</td></tr>}
     </tbody></table></div>
-    <p className="lbl" style={{ margin: 0 }}>Ferie e permessi maturano da soli il primo di ogni mese, un dodicesimo di quanto spetta l’anno (dal mese di assunzione, se entro il 15). Quanto spetta lo dice il contratto collettivo di ciascuno. Per legge almeno 4 settimane di ferie l’anno: 2 da godere nell’anno, le altre entro i 18 mesi dopo.</p>
+    <p className="lbl" style={{ margin: 0 }}>Si aggiorna da solo ogni mese. Per legge almeno 4 settimane di ferie l’anno: 2 da godere nell’anno, le altre entro i 18 mesi dopo. I permessi dipendono dal contratto collettivo: i numeri qui sono di esempio finché non sappiamo quale applicate.</p>
   </>);
 }
+
+/** come nel mockup degli Allarmi: «Oggi 07:52», «Ieri 13:04», «12 ottobre 06:10» */
+const quandoAllarme = (iso: string) => { const g = giornoCorto(iso); return (g === 'Oggi' || g === 'Ieri' ? g : new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })) + ' ' + hm(iso); };
 
 // Telefoni del badge: il primo telefono e ogni cambio li approva l'amministrazione (così nessuno registra il badge sul telefono di un altro)
 function Telefoni() {

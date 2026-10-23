@@ -60,7 +60,7 @@ estendiProva(({ t, rpc, viste, regole }) => {
   const base = t.device.find((d) => d.bancale_id) ?? {};
   t.device.push(
     { id: 'dv-0101', tipo: 'Telefono', seriale: '35PROVA00001', marca: 'Apple', modello: 'iPhone 13', memoria: '128 GB', batteria: 89, colore: 'Blu', grado: 'A', difetti: [], lotto_id: 'l15', bancale_id: base.bancale_id,
-      costo: 220, prezzo: 390, prezzo_minimo: null, prezzo_confermato_da: 'u-ven', stato: 'Disponibile', siti: ['Back Market', 'Sito'], foto: [], caricato_il: new Date(Date.now() - 2 * 86400000).toISOString() },
+      costo: 220, prezzo: 390, prezzo_minimo: null, prezzo_confermato_da: 'u-ven', stato: 'Disponibile', siti: ['Back Market'], foto: [], caricato_il: new Date(Date.now() - 2 * 86400000).toISOString() },   // il negozio del mockup vende portatili: il telefono è solo su Back Market
     { id: 'dv-0102', tipo: 'PC', seriale: 'PF5XXXX1', marca: 'Lenovo', modello: 'ThinkPad T14 Gen 2', cpu: 'i5-1145G7', gpu: 'Intel Iris Xe', ram: '16 GB', disco: '256 GB SSD', schermo: '14"', grado: 'B', difetti: [], lotto_id: 'l16', bancale_id: base.bancale_id,
       costo: 150, prezzo: 259, prezzo_minimo: null, prezzo_confermato_da: null, stato: 'Disponibile', siti: ['eBay', 'Subito'], foto: [], caricato_il: ora() },
   );

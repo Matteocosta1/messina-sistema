@@ -86,7 +86,7 @@ function Pianta({ cli }: { cli: string }) {
               <td>{full ? articoli(b) : '—'}</td><td>{full ? arrivo(b) : '—'}</td></tr>; })}
         </tbody></table></div></div>
     </div>);
-  if (!s.posto) return <><p className="lbl" style={{ margin: 0 }}>Tocca un posto pieno nella tabella per vedere i suoi articoli.</p>{pianta}</>;
+  if (!s.posto) return <><p className="lbl" style={{ margin: 0 }}>Tocca un posto pieno nella tabella per vedere il suo contenuto.</p>{pianta}</>;
   const p = dati.posti.find((x) => x.id === s.posto)!;
   return <><Contenuto posto={p} bancali={inPosto(p.id)} />{pianta}</>;
 }
@@ -150,15 +150,23 @@ function Controllo({ cc, cli, st }: { cc: any[]; cli: string; st: any[] }) {
 }
 
 // ------------------------------------------------------------------ Movimenti
-const clienteDi = (r: any) => r.dettagli?.cliente ?? String(r.cosa).split(' · ')[0];
 function Movimenti({ cli }: { cli: string }) {
-  const { dati } = useDati((d) => d.from<any>('storico').select('*').eq('azienda', 'trasporti').in('operazione', ['Entrata', 'Uscita', 'Trasferimento']).order('quando', { ascending: false }).limit(300), []);
-  if (!dati) return null;
+  const { dati: tutto } = useDati(async (d) => {
+    const [mov, clienti] = await Promise.all([
+      d.from<any>('storico').select('*').eq('azienda', 'trasporti').in('operazione', ['Entrata', 'Uscita', 'Trasferimento']).order('quando', { ascending: false }).limit(300),
+      d.from<any>('clienti').select('id,nome'),
+    ]);
+    return { mov, nomi: Object.fromEntries(clienti.map((c) => [c.id, c.nome])) as Record<string, string> };
+  }, []);
+  if (!tutto) return null;
+  const dati = tutto.mov;
+  // il cliente lo scrive il database nello storico (dettagli.cliente_id, trigger storico_capannone); i testi vecchi cominciano con il nome
+  const clienteDi = (r: any) => (r.dettagli?.cliente_id && tutto.nomi[r.dettagli.cliente_id]) || String(r.cosa).split(' · ')[0];
   const list = dati.filter((r) => cli === 'Tutti' || clienteDi(r) === cli);
   return <div className="glass tbox"><table className="t" style={{ minWidth: 760 }}><thead><tr><th>Ora</th><th>Movimento</th><th>Cliente</th><th>Cosa</th><th>Da → a</th><th>Chi</th></tr></thead><tbody>
     {list.length ? list.map((r) => <tr key={r.id}><td>{quando(r.quando)}</td>
       <td>{r.operazione === 'Entrata' ? <Pill tone="dark">Entrata</Pill> : r.operazione === 'Uscita' ? <Pill>Uscita</Pill> : <Pill>Spostamento</Pill>}</td>
-      <td><b>{clienteDi(r)}</b></td><td>{String(r.cosa).split(' · ').slice(1).join(' · ') || r.cosa}</td><td>{r.dove ?? '—'}</td><td>{r.chi_nome ?? '—'}</td></tr>)
+      <td><b>{clienteDi(r)}</b></td><td>{String(r.cosa).startsWith(clienteDi(r) + ' · ') ? String(r.cosa).slice(clienteDi(r).length + 3) : r.cosa}</td><td>{r.dove ?? '—'}</td><td>{r.chi_nome ?? '—'}</td></tr>)
       : <tr><td colSpan={6} className="lbl">Nessun movimento per questo cliente.</td></tr>}
   </tbody></table></div>;
 }
@@ -171,6 +179,7 @@ function Missioni() {
   const [filtro, setFiltro] = useState('');
   const [motivi, setMotivi] = useState<Record<string, string>>({});
   const [errSbl, setErrSbl] = useState('');
+  const { dati: cm } = useDati((d) => d.from<any>('bancali').select('clienti(nome),posti(codice)').is('uscito_il', null), []);
   const { dati } = useDati(async (d) => {
     const m = await d.from<any>('missioni').select('*').eq('stato', 'Aperta').order('creata_il', { ascending: false }).limit(1);
     const mp = m.length ? await d.from<any>('missioni_posti').select('*,posti(codice)').eq('missione_id', m[0].id) : [];
@@ -181,28 +190,35 @@ function Missioni() {
   const fatti = mp.filter((x) => x.stato !== 'Da fare').length;
   const bloccati = mp.filter((x) => x.stato === 'Bloccato');
   const conBlocco = mp.filter((x) => x.stato === 'Bloccato' || x.stato === 'Sbloccato');
-  const lancia = () => az.esegui(() => db.rpc('lancia_missione', { p_ambito: ambito, p_filtro: ambito === 'Tutto' ? null : filtro.trim() || null }));
+  // il mockup non ha il campo per scrivere quale zona/scaffale/cliente (Da decidere): finché non c'è si usa quello della missione in corso
+  const f0 = filtro.trim() || (m && m.ambito === ambito ? m.filtro : '') || '';
+  const lancia = () => az.esegui(() => db.rpc('lancia_missione', { p_ambito: ambito, p_filtro: ambito === 'Tutto' ? null : f0 || null }));
   // Sblocca: il magazzino resta com'era (errore di lettura, pezzo ritrovato). Rettifica: il magazzino diventa quello trovato.
   const sblocca = (x: any, fn: 'sblocca_posto' | 'rettifica_posto') => { const v = (motivi[x.id] ?? '').trim(); if (!v) { setErrSbl(x.id); return; } setErrSbl('');
     az.esegui(() => db.rpc(fn, { p_posto: x.id, p_motivo: v })); };
   const appUrl = (window as any).MESSINA?.appUrl as string | undefined;
+  // nella pagina della prova l'app magazzino è un'altra parte della pagina; online è l'indirizzo dell'app (config appUrl)
+  const apriApp = () => { if (appUrl) window.open(appUrl, '_blank', 'noopener'); else try { window.top?.postMessage({ tipo: 'messina-vai', dove: 'appMagazzino' }, '*'); } catch { /* */ } };
+  const nomiCm = !m || m.ambito !== 'Scaffale' ? [] : [...new Set((cm ?? []).filter((b) => String(b.posti?.codice ?? '').startsWith((m?.filtro ?? '') + '-')).map((b) => b.clienti?.nome).filter(Boolean))];
+  const clienteMissione = nomiCm.length === 1 ? nomiCm[0] : '';
   const ph: Record<string, string> = { Zona: 'Ricevimento, Resi…', Scaffale: 'S07', Cliente: 'Econocom' };
   return (<>
     <div className="grid g2">
-      <div className="glass card stack"><b>{m ? `Missione in corso · ${m.ambito}${m.filtro ? ' ' + m.filtro : ''}` : 'Nessuna missione in corso'}</b>
+      <div className="glass card stack"><b>{m ? `Missione in corso · ${m.ambito}${m.filtro ? ' ' + m.filtro : ''}${clienteMissione ? ` (${clienteMissione})` : ''}` : 'Nessuna missione in corso'}</b>
         {m && <><div className="bar"><i style={{ width: `${mp.length ? Math.round(fatti / mp.length * 100) : 0}%` }} /></div>
           <div className="lbl">{fatti} di {mp.length} posti controllati · si salva a ogni scansione, anche se il magazziniere esce dall’app</div></>}
-        {bloccati.length > 0 && <Warn n={bloccati.length}>Bloccati</Warn>}
-        {appUrl && <div className="row"><Btn ghost onClick={() => window.open(appUrl, '_blank', 'noopener')}>Apri l’app magazzino</Btn></div>}
+        {/* Da decidere (STATO): il riquadro «Bloccati» non è nel mockup */}{void bloccati}
+        <div className="row"><Btn ghost onClick={apriApp}>Apri l’app magazzino</Btn></div>
       </div>
       <div className="glass card stack"><b>Nuova missione</b><div className="lbl">Tutto il magazzino, una zona, uno scaffale o un cliente. Al magazziniere arriva come compito obbligatorio.</div>
         <div className="row">{['Tutto', 'Zona', 'Scaffale', 'Cliente'].map((x) => <Chip key={x} on={ambito === x} onClick={() => setAmbito(x)}>{x}</Chip>)}</div>
         {/* Da decidere (STATO): il campo per scrivere quale zona, scaffale o cliente non è nel mockup */}
         {void ph}{void setFiltro}
         <Errore testo={az.errore} />
-        <div className="row"><Btn onClick={lancia} disabled={az.inCorso || (ambito !== 'Tutto' && !filtro.trim())}>Lancia</Btn></div></div>
+        <div className="row"><Btn onClick={lancia} disabled={az.inCorso || (ambito !== 'Tutto' && !f0)}>Lancia</Btn></div></div>
     </div>
-    {conBlocco.map((x) => { const ok = x.stato === 'Sbloccato';
+    {/* Da decidere (STATO): i riquadri dei posti bloccati («Sblocca», «Rettifica») non sono nel mockup: le funzioni restano */}
+    {false && conBlocco.map((x) => { const ok = x.stato === 'Sbloccato';
       const manca = (x.mancanti ?? []).map((a: any) => a.articolo + (a.codice ? ' ' + a.codice : a.quantita ? ' × ' + a.quantita : ''));
       const extra = (x.extra ?? []).map((a: any) => typeof a === 'string' ? a : a.articolo + ' × ' + a.quantita);
       return <div key={x.id} className="glass card stack" style={ok ? undefined : { border: '2px solid var(--alert)' }}>
@@ -231,7 +247,7 @@ function Storico({ cc }: { cc: any[] }) {
     const ultimo = dati.find((s) => String(s.cosa).startsWith(r.cliente) && ['Uscita', 'Entrata'].includes(s.operazione));
     carte.push([`Collo ${r.cliente} mancante`, `Bolla ${r.numero ?? '—'}: ${r.attesi} colli, ${r.letti} letti${r.ultima_lettura ? ' alle ' + hm(r.ultima_lettura) : ''}.${ultimo ? ` L’ultimo a toccarli è stato ${ultimo.chi_nome}; dopo, nessuna scansione.` : ''}`]); });
   const mano: Record<string, number> = {};
-  dati.filter((r) => r.come === 'Manuale' && r.quando.slice(0, 10) === oggi).forEach((r) => { mano[r.chi_nome ?? '—'] = (mano[r.chi_nome ?? '—'] ?? 0) + 1; });
+  dati.filter((r) => r.come === 'Manuale' && new Date(new Date(r.quando).getTime() - new Date(r.quando).getTimezoneOffset() * 60000).toISOString().slice(0, 10) === oggi)   // giorno italiano, non UTC.forEach((r) => { mano[r.chi_nome ?? '—'] = (mano[r.chi_nome ?? '—'] ?? 0) + 1; });
   Object.entries(mano).filter(([, n]) => n >= 2).forEach(([chi, n]) => carte.push(['Modifiche a mano', `${chi} oggi ha fatto ${n} modifiche a mano.`]));
   const all = dati.filter((r) => f === 'Tutto' || r.come === f);
   return (<>

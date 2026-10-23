@@ -41,7 +41,7 @@ export function Mezzi() {
     <div className="glass tbox"><table className="t"><thead><tr><th>Targa</th><th>Tipo</th><th>Sponda</th><th>Autista</th><th>Telepass</th><th>Satellitare</th><th>Scadenza</th><th>Oggi</th></tr></thead><tbody>
       {list.length ? list.map((m) => { const o = oggi(m); const sc = scad(m);
         return <tr key={m.id}><td><b>{m.targa}</b></td><td>{m.tipo}</td><td>{m.sponda ? 'Sì' : 'No'}</td>{/* Da decidere (STATO): la colonna Portata non è nel mockup */}
-          <td><select className="input" aria-label={'Autista fisso del mezzo ' + m.targa} value={m.autista_id ?? ''} disabled={az.inCorso} onChange={(e) => fisso(m, e.target.value)} style={{ padding: '6px 8px', minWidth: 130 }}>
+          <td><select aria-label={'Autista fisso del mezzo ' + m.targa} value={m.autista_id ?? ''} disabled={az.inCorso} onChange={(e) => fisso(m, e.target.value)} style={{ font: 'inherit', padding: '6px 8px', borderRadius: 10, border: '1px solid var(--line)', background: '#fff' }}>
             <option value="">—</option>{dati.autisti.map((a: any) => <option key={a.id} value={a.id}>{a.nome}</option>)}</select></td>
           <td>{m.telepass ?? '—'}</td><td>{m.satellitare ? <Pill tone="ok">Collegato</Pill> : <span className="lbl">—</span>}</td>
           <td>{vicino(m.revisione, 30) || vicino(m.assicurazione, 30) ? <span className="miss">{sc}</span> : sc}</td><td>{o === 'Fermo' ? <Pill tone="red">Fermo</Pill> : <Pill tone="dark">{o}</Pill>}</td></tr>; })
@@ -104,7 +104,7 @@ export function Telepass() {
   const aut = [...new Set(P.map((p) => p.autista ?? p.targa))];
   const R = aut.map((n) => { const l = P.filter((p) => (p.autista ?? p.targa) === n);
     return { n, mezzo: `${l[0].tipo} ${l[0].targa}`, oggi: l.filter((p) => p.quando.slice(0, 10) === oggi).reduce((s, p) => s + Number(p.importo), 0), mese: l.reduce((s, p) => s + Number(p.importo), 0), num: l.length, flag: l.filter(daCtrl).length, l }; })
-    .sort((a, b) => b.flag - a.flag || b.mese - a.mese);
+    .sort((a, b) => String(a.n).localeCompare(String(b.n), 'it', { numeric: true }));   // come nel mockup: per autista
   const cur = R.find((r) => r.n === sel) ?? R[0];
   const somma = (f: (p: any) => boolean) => P.filter(f).reduce((s, p) => s + Number(p.importo), 0);
   void Btn;

@@ -108,7 +108,7 @@ estendiProva(({ t, rpc, funzioni }) => {
     const p = t.posti.find((x) => x.codice === a.p_posto && x.attivo); if (!p) throw new Error(`Posto ${a.p_posto} inesistente`);
     const b = t.bancali.find((x) => x.codice === a.p_codice && !x.uscito_il);
     if (bloccato(p.id) || (b && bloccato(b.posto_id))) throw new Error('Posto bloccato da una missione: prima lo sblocca l\'ufficio');
-    if (b) { const da = posto(b.posto_id); b.posto_id = p.id; t.colli.filter((k) => k.bancale_id === b.id).forEach((k) => { k.posto_id = p.id; }); registra(u, 'Trasferimento', b.codice, `${da ?? '—'} → ${p.codice}`); return { bancale: b.codice, posto: p.codice }; }
+    if (b) { const da = posto(b.posto_id); b.posto_id = p.id; t.colli.filter((k) => k.bancale_id === b.id).forEach((k) => { k.posto_id = p.id; }); registra(u, 'Trasferimento', b.codice, `${da ?? '—'} → ${p.codice}`); t.storico[0].dettagli = { cliente_id: b.cliente_id }; return { bancale: b.codice, posto: p.codice }; }
     const k = t.colli.find((x) => x.codice === a.p_codice); if (!k) throw new Error(`Codice sconosciuto: ${a.p_codice}`);
     if (bloccato(k.posto_id)) throw new Error('Posto bloccato da una missione: prima lo sblocca l\'ufficio');
     const da = posto(k.posto_id); k.posto_id = p.id; k.bancale_id = null; k.letto_entrata ??= ora();
@@ -195,8 +195,10 @@ estendiProva(({ t, rpc, funzioni }) => {
 
   // ---------------------------------------------------------- App Corporation
   let n = 1;
-  funzioni['leggi-seriale'] = () => ({ seriale: 'PF3T' + String(1000 + n++).padStart(4, '0'), marca: 'Lenovo', modello: 'ThinkPad T14 Gen 2', cpu: 'Intel i5-1135G7', gpu: 'Intel Iris Xe',
-    ram: '16 GB', disco: '256 GB SSD', schermo: '14", Full HD', verificato: true, batteria: '87%' });
+  // in prova il seriale letto è uno di quelli del DDT del lotto L-015, già passati dallo stage (Nel DDT, Lavorato da noi)
+  funzioni['leggi-seriale'] = () => { const seriale = 'PF3T' + String(1000 + n++).padStart(4, '0');
+    if (!t.stage_pc.some((x) => x.seriale === seriale)) t.stage_pc.push({ id: 'st-' + seriale, seriale, cliente_id: null, postazione: null, esito: 'Formattato', certificato: `certificati/${seriale}.pdf`, iniziato_il: ora(), finito_il: ora() });
+    return { seriale, marca: 'Lenovo', modello: 'ThinkPad T14 Gen 2', cpu: 'Intel i5-1135G7', gpu: 'Intel Iris Xe', ram: '16 GB', disco: '256 GB SSD', schermo: '14", Full HD', verificato: true, nel_ddt: true, batteria: '87%' }; };
 
   // ---------------------------------------------------------- solo prova: i codici delle etichette finte
   rpc.prova_codici = (a) => codiciProva(t, a.cosa, a.id);

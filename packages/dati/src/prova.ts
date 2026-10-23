@@ -84,6 +84,8 @@ function dati(): Tabelle {
     { id: 'm3', targa: 'GA003CC', tipo: 'Bilico', sponda: true, autista_id: 'd-a3', telepass: 'TP-03', revisione: g(12), stato: 'Attivo' },
     { id: 'm4', targa: 'GA004DD', tipo: 'Furgone', sponda: true, autista_id: null, telepass: 'TP-04', revisione: g(90), stato: 'Officina' },
     { id: 'm5', targa: 'GA005EE', tipo: 'Tre assi', sponda: true, autista_id: null, telepass: 'TP-05', revisione: g(150), stato: 'Fermo' },
+    { id: 'm6', targa: 'GA006FF', tipo: 'Sprinter', sponda: false, autista_id: null, telepass: 'TP-06', revisione: g(220), stato: 'Attivo' },
+    { id: 'm7', targa: 'GA007GG', tipo: 'Sprinter', sponda: false, autista_id: null, telepass: 'TP-07', revisione: g(18), stato: 'Attivo' },
   ];
   const b = (n: number, c: string, x: Record<string, any>) => ({ id: id('b', n), numero: null, cliente_id: c, tipo: 'Consegna', data_consegna: g(1), fascia: null, destinatario: null,
     indirizzo: 'Via [indirizzo]', citta: null, colli_previsti: 1, accessori: [], dati_mancanti: [], stato: 'Nuova', operatore_id: 'u-bol', creata_il: oreFa(3), note: null, mail_id: null, ...x });
@@ -93,7 +95,7 @@ function dati(): Tabelle {
     b(3, 'c-lux', { fascia: '9:00–13:00', destinatario: 'Luxiona', citta: 'Assago', colli_previsti: 3, accessori: ['Piano terra'], creata_il: ora(7, 58) }),
     b(4, 'c-vel', { data_consegna: g(2), fascia: null, destinatario: '[Cliente]', citta: 'Torino', colli_previsti: 2, creata_il: ora(7, 41) }),
     b(5, 'c-vel', { data_consegna: g(5), fascia: null, destinatario: '[Cliente]', indirizzo: null, colli_previsti: 1, accessori: ['Sabato'], dati_mancanti: ['Indirizzo', 'Fascia oraria'], creata_il: ora(7, 30) }),
-    b(6, 'c-snam', { numero: '26-000038', data_consegna: g(0), fascia: 'Entro le 12', destinatario: 'Snam', citta: 'Milano', colli_previsti: 4, accessori: ['Sponda'], stato: 'In giro' }),
+    b(6, 'c-snam', { numero: '26-000038', data_consegna: g(0), fascia: 'entro le 12', destinatario: 'Snam', citta: 'Milano', colli_previsti: 4, accessori: ['Sponda'], stato: 'In giro' }),
     b(7, 'c-lux', { numero: '26-000039', data_consegna: g(0), fascia: '9–13', destinatario: 'Luxiona', citta: 'Assago', colli_previsti: 3, accessori: ['Piano terra'], stato: 'In giro' }),
     b(8, 'c-apple', { numero: '26-000040', data_consegna: g(0), fascia: '10–12', destinatario: 'Apple', citta: 'Rozzano', colli_previsti: 12, stato: 'In giro' }),
     b(9, 'c-vel', { numero: '26-000041', data_consegna: g(0), fascia: '14–17', destinatario: '[Cliente]', citta: 'Opera', colli_previsti: 1, stato: 'In giro' }),
@@ -143,6 +145,9 @@ function dati(): Tabelle {
   t.posti = [];
   for (let s = 1; s <= 12; s++) for (let p = 1; p <= 6; p++) for (let n = 1; n <= 3; n++)
     t.posti.push({ id: `p${s}-${p}-${n}`, codice: `S${String(s).padStart(2, '0')}-${p}-${n}`, scaffale: s, piano: p, numero: n, zona: 'Scaffale', attivo: true });
+  // zone a terra (come nella pianta del mockup)
+  for (const [z, c] of [['Ricevimento', 'RIC'], ['Passaggio Apple', 'PAS'], ['Giacenze', 'GIA'], ['Resi', 'RES']] as const)
+    t.posti.push({ id: 'pz-' + c, codice: c, scaffale: null, piano: null, numero: null, zona: z, attivo: true });
   const SC_CLI = ['c-apple', 'c-snam', 'c-snam', 'c-snam', 'c-lux', 'c-lux', 'c-eco', 'c-eco', 'c-apple', 'c-snam', 'c-corp', 'c-corp'];
   t.bancali = []; t.contenuto = [];
   let nb = 100;
@@ -154,19 +159,37 @@ function dati(): Tabelle {
     t.contenuto.push({ id: crypto.randomUUID(), bancale_id: bid, articolo: art, quantita: (s + p + n) % 20 + 4,
       codici: cli === 'c-eco' || cli === 'c-snam' ? [`SN${s}${p}${n}01`, `SN${s}${p}${n}02`] : [], inserito: (s + p) % 11 === 0 ? 'Manuale' : 'Pistola', da: 'u-mag', il: oreFa(20 + s) });
   }
+  // S07, i sei posti della missione: gli stessi articoli del mockup, uno per seriale
+  const S07: [string, string[]][] = [['p7-1-1', ['Notebook Lenovo T14', 'Notebook Lenovo T14', 'Docking Lenovo']], ['p7-1-2', ['Monitor Dell 24″', 'Monitor Dell 24″', 'Monitor Dell 24″']],
+    ['p7-2-1', ['Notebook HP EliteBook', 'Alimentatore HP', 'Notebook HP EliteBook']], ['p7-2-2', ['Notebook Dell Latitude', 'Notebook Dell Latitude', 'Docking Dell', 'Notebook Dell Latitude']],
+    ['p7-3-1', ['Scatola tastiere ×10', 'Scatola mouse ×10']], ['p7-3-2', ['Notebook Lenovo T14', 'Notebook Lenovo T14', 'Notebook Lenovo T14']]];
+  for (const [pid, arts] of S07) {
+    const bid = 'k' + pid.slice(1);
+    if (!t.bancali.some((k) => k.id === bid)) t.bancali.push({ id: bid, codice: 'B-0' + nb++, cliente_id: 'c-eco', posto_id: pid, creato_il: oreFa(48), uscito_il: null });
+    t.contenuto = t.contenuto.filter((c) => c.bancale_id !== bid);
+    const per: Record<string, string[]> = {};
+    arts.forEach((x, j) => (per[x] ??= []).push(`SN${pid.slice(1).replace(/-/g, '')}0${j + 1}`));
+    for (const [articolo, codici] of Object.entries(per)) t.contenuto.push({ id: crypto.randomUUID(), bancale_id: bid, articolo, quantita: codici.length, codici, inserito: 'Pistola', da: 'u-mag', il: oreFa(27) });
+  }
+  // a terra: bancali in ricevimento, nel passaggio Apple, in giacenza e nei resi
+  for (const [z, n, cli] of [['RIC', 3, 'c-snam'], ['PAS', 2, 'c-apple'], ['GIA', 4, 'c-vel'], ['RES', 2, 'c-lux']] as const)
+    for (let i = 0; i < n; i++) t.bancali.push({ id: `kz-${z}-${i}`, codice: 'B-0' + nb++, cliente_id: cli, posto_id: 'pz-' + z, creato_il: oreFa(3 + i), uscito_il: null });
   t.missioni = [{ id: 'mi1', ambito: 'Scaffale', filtro: 'S07', stato: 'Aperta', creata_il: oreFa(5) }];
-  t.missioni_posti = t.posti.filter((p) => p.scaffale === 7).map((p, i) => {
+  // come nel mockup: 6 posti di S07, nessuno ancora fatto
+  t.missioni_posti = t.posti.filter((p) => p.scaffale === 7 && p.piano <= 3 && p.numero <= 2).map((p, i) => {
     const att = t.contenuto.filter((c) => t.bancali.some((k) => k.id === c.bancale_id && k.posto_id === p.id)).flatMap((c) => c.codici.map((cod: string) => ({ articolo: c.articolo, codice: cod })));
-    const stato = i < 4 ? 'Fatto' : i === 4 ? 'Bloccato' : 'Da fare';
+    const stato = 'Da fare' as string;
     const letti = stato === 'Fatto' ? att.map((a) => a.codice) : stato === 'Bloccato' ? [...att.slice(1).map((a) => a.codice), 'HP9X099'] : [];
     return { id: id('mp', i + 1), missione_id: 'mi1', posto_id: p.id, attesi: att, letti, mancanti: stato === 'Bloccato' ? att.slice(0, 1) : [], extra: stato === 'Bloccato' ? ['HP9X099'] : [], stato, motivo: null, aggiornato_il: oreFa(1.5) };
   });
   t.storico = [
-    { id: 9, quando: oreFa(1.5), azienda: 'trasporti', chi_nome: 'Magazziniere 1', operazione: 'Blocco', cosa: 'Mancano 1, in più 1', dove: 'S07-1-2', come: 'Sistema' },
     { id: 8, quando: oreFa(2), azienda: 'trasporti', chi_nome: 'Magazziniere 2', operazione: 'Entrata', cosa: 'Apple · 31 colli su 32', dove: 'RIC', come: 'Pistola' },
     { id: 7, quando: oreFa(3), azienda: 'trasporti', chi_nome: 'Magazziniere 3', operazione: 'Uscita', cosa: 'Snam · 4 bancali sul mezzo GA002BB', dove: 'S03-2-1', come: 'Pistola' },
+    // due modifiche a mano di oggi (come nel mockup): sempre dopo mezzanotte, anche se la prova si apre presto
+    { id: 9, quando: new Date(Math.max(Date.now() - 1.5 * 3600000, Date.parse(g(0) + 'T00:10:00'))).toISOString(), azienda: 'trasporti', chi_nome: 'Magazziniere 2', operazione: 'Modifica', cosa: 'Bancale Apple: colli da 32 a 31', dove: 'RIC', come: 'Manuale' },
+    { id: 10, quando: new Date(Math.max(Date.now() - 2.5 * 3600000, Date.parse(g(0) + 'T00:05:00'))).toISOString(), azienda: 'trasporti', chi_nome: 'Magazziniere 2', operazione: 'Modifica', cosa: 'Bancale Econocom: caricabatterie da 40 a 38', dove: 'S07-2-2', come: 'Manuale' },
     { id: 6, quando: oreFa(20), azienda: 'trasporti', chi_nome: 'Magazziniere 2', operazione: 'Modifica', cosa: 'Notebook aziendali · 2 pz (prima 3)', dove: 'S07-2-1', come: 'Manuale' },
-    { id: 5, quando: oreFa(22), azienda: 'trasporti', chi_nome: 'Magazziniere 1', operazione: 'Trasferimento', cosa: 'B-0155', dove: 'S05-1-2 → S06-3-1', come: 'Pistola' },
+    { id: 5, quando: oreFa(22), azienda: 'trasporti', chi_nome: 'Magazziniere 1', operazione: 'Trasferimento', cosa: 'B-0155', dove: 'S05-1-2 → S06-3-1', come: 'Pistola', dettagli: { cliente_id: 'c-lux' } },
     { id: 4, quando: oreFa(26), azienda: 'trasporti', chi_nome: 'Magazziniere 1', operazione: 'Entrata', cosa: 'Econocom · 1.000 device', dove: 'RIC', come: 'Pistola' },
   ];
   // corporation
@@ -214,10 +237,29 @@ function dati(): Tabelle {
   timb('d-a1', 6, 2, 'Entrata'); timb('d-a2', 6, 15, 'Entrata'); timb('d-a3', 5, 58, 'Entrata'); timb('d-m1', 5, 55, 'Entrata'); timb('d-mn', 8, 4, 'Entrata');
   for (const d of ['d-ch', 'd-ga', 'd-ma', 'd-an', 'd-a2', 'd-mn']) { timb(d, 8, 5, 'Entrata', 1); timb(d, 17, 2, 'Uscita', 1); }
   timb('d-a1', 6, 4, 'Entrata', 1); timb('d-m1', 5, 50, 'Entrata', 1); timb('d-al', 8, 40, 'Entrata', 1);
+  // il resto del mese (dal primo a due giorni fa): giorni lavorativi normali, qualche straordinario, un giorno di ferie e due di malattia
+  {
+    const fest = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
+    const ritardo: Record<string, number> = { 'd-al': 9, 'd-a2': 11 };
+    for (let gg = 2; gg < 31; gg++) {
+      const d = new Date(); d.setDate(d.getDate() - gg);
+      if (d.getMonth() !== new Date().getMonth()) break;
+      if (fest(d)) continue;
+      for (const x of t.dipendenti.filter((y) => y.azienda === 'trasporti' && !(y.id === 'd-a4' && gg < 7))) {   // Autista 4 è in ferie da qualche giorno
+        if ((x.id === 'd-ga' && gg === 6) || (x.id === 'd-al' && (gg === 8 || gg === 9))) continue;   // ferie e malattia
+        const [hi, mi] = String(x.inizio).split(':').map(Number), [hf, mf] = String(x.fine).split(':').map(Number);
+        const rit = ritardo[x.id] && gg % 5 === 0 ? ritardo[x.id] : 0;
+        const extra = x.reparto === 'Strada' || x.reparto === 'Magazzino' ? (gg % 3 === 0 ? 60 : 0) : 0;
+        timb(x.id, hi, mi + rit, 'Entrata', gg); timb(x.id, hf, mf + extra, 'Uscita', gg);
+      }
+    }
+  }
   t.timbrature.push({ id: tid++, dipendente_id: 'd-al', quando: ora(7, 49), verso: null, esito: 'Rifiutata', motivo: 'Telefono non registrato (iPhone)', lettore: 'Ingresso uffici' });
   t.timbrature.push({ id: tid++, dipendente_id: 'd-ch', quando: ora(18, 3, 2), verso: null, esito: 'Rifiutata', motivo: 'Codice scaduto (foto o screenshot?)', lettore: 'Ingresso magazzino' });
   t.correzioni = []; t.allarmi_gestiti = [];
-  t.ferie = t.dipendenti.map((d, i) => ({ dipendente_id: d.id, anno: new Date().getFullYear(), ferie_maturate: 21.7, ferie_godute: [12, 8, 4, 15, 2, 10, 6, 20, 9, 3, 5][i] ?? 5, permessi_spettanti: 72, permessi_usati: [20, 8, 40, 16, 2, 30, 12, 60, 4, 10, 6][i] ?? 8 }));
+  // quanto spetta l'anno (di esempio: il contratto collettivo vero non lo sappiamo); Autista 4 senza, per vedere «Manca quanto spetta l'anno»
+  t.dipendenti.forEach((d) => { if (d.id !== 'd-a4') { d.ferie_anno = 26; d.permessi_anno = 72; } });
+  t.ferie = t.dipendenti.map((d, i) => ({ dipendente_id: d.id, anno: new Date().getFullYear(), ferie_maturate: d.ferie_anno ? Math.round(d.ferie_anno * new Date().getMonth() / 12 * 10) / 10 : 0, ferie_godute: [12, 11, 4, 0, 10, 15, 6, 17, 12, 11, 5][i] ?? 5, permessi_spettanti: d.permessi_anno ? Math.round(d.permessi_anno * new Date().getMonth() / 12 * 10) / 10 : 0, permessi_usati: [20, 8, 40, 0, 2, 30, 12, 44, 4, 10, 6][i] ?? 8 }));
   // mail
   t.mail = [
     { id: 'ma1', azienda: 'trasporti', casella: 'ordini@', cartella: 'Ordini', etichetta: 'Ordine', da_nome: 'Snam', da_indirizzo: 'logistica@[dominio]', oggetto: 'Ritiro 4 bancali domani', anteprima: 'Domani mattina ritirare 4 bancali…', ricevuta_il: ora(8, 12), allegati: [], stato: 'Da leggere',

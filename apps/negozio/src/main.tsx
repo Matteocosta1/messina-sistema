@@ -136,7 +136,7 @@ function Pagina(p: { titolo: string; children: React.ReactNode }) {
 }
 
 function Vetrina(p: { prodotti: Prodotto[] | null; errore: string | null; brand: string; onBrand: (b: string) => void; vai: (s: string) => void }) {
-  const marche = ['Tutti', ...new Set((p.prodotti ?? []).map((x) => x.marca))];
+  const marche = ['Tutti', ...new Set(['Lenovo', 'HP', 'Dell', 'Apple', ...(p.prodotti ?? []).map((x) => x.marca)])];   // ordine del mockup
   const vis = (p.prodotti ?? []).filter((x) => p.brand === 'Tutti' || x.marca === p.brand);
   return (
     <div className="shopbody"><h1 className="shoph1">Messina Corporation</h1>
@@ -162,7 +162,7 @@ function Vetrina(p: { prodotti: Prodotto[] | null; errore: string | null; brand:
 }
 
 function Scheda(p: { p: Prodotto; carrello: Voce[]; onCarrello: (c: Voce[]) => void; vai: (s: string) => void }) {
-  const configs = useMemo(() => [...new Set(p.p.righe.map(configDi))].sort(), [p.p]);
+  const configs = useMemo(() => [...new Set(p.p.righe.map(configDi))].sort((x, y) => parseFloat(x) - parseFloat(y) || x.localeCompare(y)), [p.p]);   // 8 GB prima di 16 GB
   const riga = (cfg: string, g: Condizione) => {
     const rr = p.p.righe.filter((r) => configDi(r) === cfg && r.grado === GRADO[g]);
     if (!rr.length) return null;
@@ -196,7 +196,7 @@ function Scheda(p: { p: Prodotto; carrello: Voce[]; onCarrello: (c: Voce[]) => v
             {CONDIZIONI.map((x) => { const rx = riga(cfg, x); return (
               <button key={x} type="button" className={'gopt' + (g === x ? ' on' : '')} disabled={!rx} aria-pressed={g === x}
                 style={rx ? undefined : { opacity: .35, cursor: 'not-allowed' }} onClick={() => { setAdded(false); setScelta([cfg, x]); }}>
-                <span style={{ fontWeight: 700 }}>{x}</span><span style={{ fontSize: 18, fontWeight: 800 }}>{rx ? eur(rx.prezzo) : 'Esaurito'}</span>
+                <span style={{ fontWeight: 700 }}>{x}</span><span style={{ fontSize: rx ? 18 : 14, fontWeight: 800, overflowWrap: 'anywhere' }}>{rx ? eur(rx.prezzo) : 'Esaurito'}</span>
               </button>); })}
           </div>
           <p style={{ margin: '10px 0 0' }} className="muted">{GDESC[g]}</p>

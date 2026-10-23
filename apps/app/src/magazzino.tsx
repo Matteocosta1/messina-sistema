@@ -26,13 +26,19 @@ export function Magazzino() {
   const { dati: missione } = useDati((d) => d.from<any>('missioni').select('id,ambito,filtro').eq('stato', 'Aperta').order('creata_il', { ascending: false }).limit(1).then((r) => r[0] ?? null), [scr]);
   // solo la missione più recente: i posti bloccati di quelle vecchie li sistema l'ufficio
   const posti = tutti && missione ? tutti.filter((p) => p.missione_id === missione.id) : tutti;
+  // di chi è la merce in ogni posto (come nel mockup: «3 pezzi · Econocom»)
+  const { dati: clientiPosto } = useDati((d) => scr === 'conta' ? d.from<any>('bancali').select('posti(codice),clienti(nome)').is('uscito_il', null).then((r) => {
+    const m: Record<string, string[]> = {};
+    for (const b of r) { const k = b.posti?.codice, n = b.clienti?.nome; if (k && n && !(m[k] ??= []).includes(n)) m[k].push(n); }
+    return m;
+  }) : Promise.resolve({} as Record<string, string[]>), [scr]);
   const vai = (s: Scr) => { setScr(s); window.scrollTo(0, 0); };
   const back = <button type="button" className="back" onClick={() => vai('home')}>Magazzino</button>;
   const nomeMissione = missione ? (missione.ambito === 'Tutto' ? 'Tutto il magazzino' : missione.ambito === 'Cliente' ? missione.filtro : (missione.ambito === 'Scaffale' ? 'Scaffale ' : 'Zona ') + missione.filtro) : '';
   if (scr === 'entrata') return <Entrata back={back} />;
   if (scr === 'uscita') return <UscitaScr back={back} />;
   if (scr === 'sposta') return <Sposta back={back} />;
-  if (scr === 'conta') return <Missione back={back} posti={posti ?? []} nome={nomeMissione} breve={missione?.filtro ?? ''} />;
+  if (scr === 'conta') return <Missione back={back} posti={posti ?? []} nome={nomeMissione} breve={missione?.filtro ?? ''} clienti={clientiPosto ?? {}} />;
   const done = (posti ?? []).filter((p) => p.stato !== 'Da fare').length, tot = posti?.length ?? 0;
   return (
     <div className="pscr">
@@ -54,6 +60,16 @@ function Entrata({ back }: { back: React.ReactNode }) {
   const [tipo, setTipo] = useState<Tipo>('Bancale');
   const [info, setInfo] = useState<Info | null>(null);   // ultimo bancale o collo letto, in attesa del posto o del bancale
   const [bolla, setBolla] = useState<{ cliente: string; numero: string | null; totale: number; messi: number } | null>(null);
+  // la prossima bolla di entrata di oggi (come nel mockup: «Bolla Snam … · 4 bancali», prima ancora di scansionare)
+  const { dati: prossima } = useDati(async (d) => {
+    const oggi = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const bb = await d.from<any>('bolle').select('id,numero,clienti(nome),colli(posto_id,letto_entrata)').in('tipo', ['Magazzino', 'Ritiro']).eq('data_consegna', oggi).in('stato', ['Confermata', 'In giro']).order('numero');
+    const x = bb.map((b) => ({ cliente: b.clienti?.nome ?? '—', numero: b.numero, totale: (b.colli ?? []).length, messi: (b.colli ?? []).filter((k: any) => k.posto_id && k.letto_entrata).length, letti: (b.colli ?? []).filter((k: any) => k.letto_entrata).length }))
+      .filter((y) => y.totale > 0 && y.messi < y.totale)
+      .sort((x, y) => x.letti - y.letti)[0];   // prima quella ancora da cominciare: una già scaricata con un collo mancante resta in Controllo
+    return x ?? null;
+  }, []);
+  const b0 = bolla ?? prossima ?? null;
   const [step, setStep] = useState<0 | 1>(0);
   const codici = useCodiciProva(step === 0 ? 'entrata' : tipo === 'Collo' ? 'su-bancale' : 'posto', step === 0 ? tipo : tipo === 'Collo' ? info?.codice ?? null : info?.proposto ?? null, bolla?.messi);
   const leggi = async (c: string) => {
@@ -79,8 +95,8 @@ function Entrata({ back }: { back: React.ReactNode }) {
     : info?.proposto ? <>Posto proposto: <b>{info.proposto}</b></> : 'Nessun posto libero proposto: scegli tu';
   return (
     <div className="pscr">{back}
-      <div><div className="lbl">{bolla ? `Bolla ${bolla.cliente}${bolla.numero ? ' ' + bolla.numero : ''} · ${bolla.totale} colli` : 'Scansiona il primo bancale o collo'}</div><div className="ptitle">Entrata</div></div>
-      {bolla && <><div className="bar"><i style={{ width: (bolla.messi / Math.max(1, bolla.totale) * 100) + '%' }} /></div><div className="lbl">{bolla.messi} di {bolla.totale} colli messi a posto</div></>}
+      <div><div className="lbl">{b0 ? `Bolla ${b0.cliente}${b0.numero ? ' ' + b0.numero : ''} · ${b0.totale} ${b0.totale === 1 ? 'collo' : 'colli'}` : 'Scansiona il primo bancale o collo'}</div><div className="ptitle">Entrata</div></div>
+      {b0 && <><div className="bar"><i style={{ width: (b0.messi / Math.max(1, b0.totale) * 100) + '%' }} /></div><div className="lbl">{b0.messi} di {b0.totale} messi a posto</div></>}
       <ErroreApp testo={az.errore} />
       {fin ? <><Esito ok titolo={`Bolla completa: ${bolla!.totale} su ${bolla!.totale}`}>Il cliente lo vede subito sul suo portale.</Esito>
           <button type="button" className="btn ghost" onClick={() => { setBolla(null); setInfo(null); }}>Nuova entrata</button></>
@@ -100,7 +116,9 @@ function UscitaScr({ back }: { back: React.ReactNode }) {
   const [sbagliato, setSbagliato] = useState<string | null>(null);
   const [via, setVia] = useState(false);
   const [uscito, setUscito] = useState<string[]>([]);
-  const u = uscite?.find((x) => x.bolla_id === sel) ?? (uscite?.length === 1 ? uscite[0] : null);
+  // come nel mockup si apre subito una spedizione: la prima ancora da caricare (Da decidere: come si sceglie tra più spedizioni)
+  const [elenco, setElenco] = useState(false);
+  const u = uscite?.find((x) => x.bolla_id === sel) ?? (elenco ? null : uscite?.find((x) => x.caricati < x.totale) ?? uscite?.[0] ?? null);
   const codici = useCodiciProva('uscita', u?.bolla_id ?? null, u?.caricati);
   const leggi = async (c: string) => {
     if (!u) return;
@@ -135,7 +153,7 @@ function UscitaScr({ back }: { back: React.ReactNode }) {
     </div>);
   const n = u.colli.filter((x) => x.caricato).length, tot = u.colli.length, adesso = u.colli.findIndex((x) => !x.caricato);
   return (
-    <div className="pscr">{uscite.length > 1 ? <button type="button" className="back" onClick={() => { setSel(null); setVia(false); setSbagliato(null); setUscito([]); }}>Uscita</button> : back}
+    <div className="pscr">{back}{void setElenco}
       <div><div className="lbl">Spedizione {u.cliente} · {u.mezzo} · {u.autista}</div><div className="ptitle">Uscita</div></div>
       {u.colli.map((k, i) => <div key={k.codice} className="pcard row between" style={{ padding: '12px 14px' }}>
         <span><b>Collo {i + 1} di {tot}</b><span className="lbl" style={{ display: 'block' }}>{k.posto ? 'prendi da ' + k.posto : k.codice}</span></span>
@@ -147,7 +165,7 @@ function UscitaScr({ back }: { back: React.ReactNode }) {
       {via ? <Esito ok titolo="Mezzo pronto a partire">{tot} colli su {tot} scansionati sul mezzo giusto.</Esito>
         : n < tot ? <button type="button" className="bigbtn" onClick={async () => { const c = await scan(`Collo ${n + 1} di ${tot}`, codici); if (c) leggi(c); }}>Scansiona il collo</button> : null}
       {/* merce in deposito del cliente: il bancale esce con questa bolla */}
-      {!via && (u.in_deposito ?? 0) > 0 && <button type="button" className="bigbtn ghost" onClick={async () => { const c = await scan('Bancale in deposito', codici); if (c) leggi(c); }}>Bancale</button>}
+      {/* Da decidere (STATO): «Bancale» per la merce in deposito non è nel mockup (il bancale si può comunque leggere con «Scansiona il collo» o con la pistola) */}
       {(u.usciti?.length ?? 0) > 0 && !uscito.length && <div className="lbl">Bancali già usciti con questa spedizione: {u.usciti!.join(', ')}</div>}
       {!via && <button type="button" className={'bigbtn' + (n === tot ? '' : ' ghost')} onClick={() => { if (n === tot) { setVia(true); vibra(); } }}
         {...(n === tot ? {} : { disabled: true, style: { opacity: .4, cursor: 'not-allowed' } })}>{n === tot ? 'Spedizione completa: può partire' : 'Non parte finché mancano colli'}</button>}
@@ -192,7 +210,7 @@ function Sposta({ back }: { back: React.ReactNode }) {
   );
 }
 
-function Missione({ back, posti, nome, breve }: { back: React.ReactNode; posti: PostoMissione[]; nome: string; breve: string }) {
+function Missione({ back, posti, nome, breve, clienti }: { back: React.ReactNode; posti: PostoMissione[]; nome: string; breve: string; clienti: Record<string, string[]> }) {
   const { db } = useApp();
   const scan = useScan();
   const az = useAzione();
@@ -222,7 +240,7 @@ function Missione({ back, posti, nome, breve }: { back: React.ReactNode; posti: 
       {posti.map((x, i) => <button key={x.id} type="button" className={'stop' + (x.stato === 'Fatto' || x.stato === 'Sbloccato' ? ' done' : '')}
         style={x.stato === 'Bloccato' ? { border: '2px solid var(--alert)', background: 'var(--alert-soft)' } : undefined}
         onClick={() => { if (x.stato === 'Da fare') { setCur(x.id); setMsg(''); az.setErrore(null); } }}>
-        <span className="n">{i + 1}</span><span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}><b style={{ fontSize: 16 }}>{x.posto}</b><span className="lbl">{x.pezzi === 1 ? '1 pezzo' : x.pezzi + ' pezzi'}</span></span>
+        <span className="n">{i + 1}</span><span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}><b style={{ fontSize: 16 }}>{x.posto}</b><span className="lbl">{(x.pezzi === 1 ? '1 pezzo' : x.pezzi + ' pezzi') + (clienti[x.posto]?.length ? ' · ' + clienti[x.posto].join(', ') : '')}</span></span>
         <b style={{ fontSize: 12, ...(x.stato === 'Bloccato' ? { color: 'var(--alert)' } : {}) }}>{x.stato === 'Da fare' ? '' : x.stato}</b></button>)}
       {posti.length > 0 && (done === posti.length
         ? <div className="pcard" style={{ padding: 14, textAlign: 'center' }}><b>Missione finita</b><div className="lbl" style={{ marginTop: 4 }}>{posti.some((x) => x.stato === 'Bloccato') ? 'I posti bloccati li sblocca l’ufficio.' : 'Tutto torna.'}</div></div>

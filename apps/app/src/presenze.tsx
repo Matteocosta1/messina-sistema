@@ -11,7 +11,8 @@ export function dispositivo() {
   try { let d = localStorage.getItem(K); if (!d) { d = crypto.randomUUID(); localStorage.setItem(K, d); } return d; }
   catch { return 'senza-memoria'; }
 }
-const nomeTelefono = (nome: string) => (/iPhone/.test(navigator.userAgent) ? 'iPhone' : /Android/.test(navigator.userAgent) ? 'telefono Android' : 'questo dispositivo') + ' di ' + nome;
+// i telefoni aziendali sono iPhone (in Prova si dice così anche dal computer, come nel mockup)
+const nomeTelefono = (nome: string, prova = false) => (prova || /iPhone/.test(navigator.userAgent) ? 'iPhone' : /Android/.test(navigator.userAgent) ? 'telefono Android' : 'questo dispositivo') + ' di ' + nome;
 const inizioMese = () => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.toISOString(); };
 const inizioOggi = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
 
@@ -72,9 +73,9 @@ export function Presenze() {
       </>}
       {esitoProva && <div className="lbl" style={{ textAlign: 'center' }}>{esitoProva}</div>}
       {codice && <>
-      <div className="lbl" style={{ textAlign: 'center' }}>{sel ? `${sel}: avvicina il telefono al lettore all’ingresso` : 'Premi Entrata o Uscita e avvicina il telefono al lettore'} · telefono registrato: {nomeTelefono(dip.nome)}</div>
+      <div className="lbl" style={{ textAlign: 'center' }}>Avvicina il telefono al lettore all’ingresso · telefono registrato: {nomeTelefono(dip.nome, db.modo === 'prova')}</div>
       <div className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
-        {(['Entrata', 'Uscita'] as const).map((v) => <button key={v} type="button" className={'bigbtn' + (sel === v ? '' : ' ghost')} style={{ flex: 1, ...(v === prossimo ? {} : { opacity: .35, cursor: 'not-allowed' }) }}
+        {(['Entrata', 'Uscita'] as const).map((v) => <button key={v} type="button" className="bigbtn" aria-pressed={sel === v} style={{ flex: 1, ...(v === prossimo ? {} : { cursor: 'not-allowed' }) }}
           disabled={v !== prossimo} onClick={() => setScelto(v)}>{v}</button>)}
       </div>
       </>}

@@ -233,14 +233,17 @@ export function Traffico({ scelto }: { scelto?: string }) {
 /** mappaGiri() del mockup: i percorsi del giorno, uno per mezzo, con i numeri dei giri veri */
 function MappaGiri({ giri, km, nome }: { giri: any[]; km: number | null; nome: string }) {
   const COL = ['#111214', '#5b5e66', '#9a9da5'];
-  const R = ['M60 160 L120 90 L175 70 L230 60 L290 80', 'M60 160 L130 170 L200 150 L250 175', 'M60 160 L110 220 L190 240 L280 230'];
-  const pts = [[120, 90], [175, 70], [230, 60], [290, 80], [130, 170], [200, 150], [250, 175], [110, 220], [190, 240], [280, 230]];
+  // tre direzioni come nel mockup; su ognuna tanti punti quante sono le fermate del giro
+  const DIR = [[[120, 90], [175, 70], [230, 60], [290, 80], [320, 95]], [[130, 170], [200, 150], [250, 175], [300, 165], [325, 185]], [[110, 220], [190, 240], [280, 230], [310, 250], [330, 262]]];
+  const giro3 = giri.slice(0, 3).map((g, i) => DIR[i].slice(0, Math.max(1, Math.min(5, (g.fermate ?? []).length))));
+  const R = giro3.map((ps) => 'M60 160 ' + ps.map((p) => `L${p[0]} ${p[1]}`).join(' '));
+  const pts = giro3.flat();
   const ottim = km != null;   // i km ci sono solo con l'ottimizzatore per camion
   return <div className="glass card mappa"><div className="row between"><b>Percorsi di {nome === 'Domani' ? 'domani' : nome.toLowerCase()}</b>{ottim && <Pill tone="ok">Ottimizzati per camion</Pill>}</div>
     <svg viewBox="0 0 340 280" style={{ width: '100%', maxWidth: 520, display: 'block', margin: '10px auto 0' }} role="img" aria-label="Mappa dei giri">
       <rect x="0" y="0" width="340" height="280" rx="16" fill="rgba(17,18,20,.03)" />
       <path d="M0 120 Q170 100 340 140" stroke="rgba(17,18,20,.08)" strokeWidth="10" fill="none" /><path d="M150 0 Q160 140 140 280" stroke="rgba(17,18,20,.08)" strokeWidth="8" fill="none" />
-      {giri.slice(0, 3).map((_, i) => <path key={i} d={R[i]} stroke={COL[i]} strokeWidth="3" fill="none" strokeLinejoin="round" />)}
+      {R.map((d, i) => <path key={i} d={d} stroke={COL[i]} strokeWidth="3" fill="none" strokeLinejoin="round" />)}
       {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="6" fill="#fff" stroke="#111214" strokeWidth="2" />)}
       <rect x="44" y="146" width="32" height="28" rx="6" fill="#111214" /><text x="60" y="190" textAnchor="middle" fontSize="11" fontWeight="700" fill="#111214">Lacchiarella</text></svg>
     <div className="grid g4" style={{ marginTop: 8 }}><div><div className="lbl">Km totali</div><b style={{ fontSize: 22 }}>{km != null ? Math.round(km) : '—'}</b></div><div><div className="lbl">Mezzi usati</div><b style={{ fontSize: 22 }}>{giri.length}</b></div><div><div className="lbl">Gasolio stimato</div><b style={{ fontSize: 22 }}>—</b></div></div>
@@ -260,7 +263,7 @@ function MappaGiro({ n, chi }: { n: number; chi: string }) {
   </svg>;
 }
 
-const STATO_GIRO: Record<string, string> = { Preparato: 'In sede', Partito: 'Partito', Rientrato: 'Rientrato', Chiuso: 'Chiuso' };
+const STATO_GIRO: Record<string, string> = { Preparato: 'In magazzino', Partito: 'Partito', Rientrato: 'Rientrato', Chiuso: 'Chiuso' };
 function GiroPagina({ giro: g, giri, libere }: { giro: any; giri: any[]; libere: any[] }) {
   const { db, vai } = useApp();
   const az = useAzione();
@@ -323,7 +326,7 @@ function GiroPagina({ giro: g, giri, libere }: { giro: any; giri: any[]; libere:
                 <select aria-label="Passa a un altro mezzo" value={dest[f.id] ?? ''} onChange={(e) => setDest({ ...dest, [f.id]: e.target.value })}
                   style={{ font: 'inherit', fontSize: 14, padding: '6px 8px', borderRadius: 999, border: '1px solid var(--line)', background: '#fff' }}>
                   <option value="">Passa a…</option>{altri.map((x) => <option key={x.id} value={x.id}>{x.dipendenti?.nome ?? '—'}</option>)}</select>
-                <Btn ghost sm disabled={!dest[f.id] || az.inCorso} onClick={() => fai('giro_passa', { p_fermata: f.id, p_giro: dest[f.id] })}>Sposta</Btn>
+                <Btn ghost sm disabled={az.inCorso} onClick={() => { if (dest[f.id]) fai('giro_passa', { p_fermata: f.id, p_giro: dest[f.id] }); }}>Sposta</Btn>
                 <Btn ghost sm disabled={az.inCorso} onClick={() => fai('giro_togli', { p_fermata: f.id })}>Togli</Btn>
               </div>}
             </div>
@@ -360,7 +363,7 @@ export function Giacenze() {
   const tar = (c: string, v: string) => dati.tariffe.find((t) => t.cliente_id === c && t.voce === v);
   const costoGiacenza = (g: any) => { const t = tar(g.cliente_id, 'Giacenza'); return !t ? 0 : t.unita === 'giorno' ? t.prezzo * Math.max(1, g.giorni) : t.prezzo; };
   const daPren = G.filter((g) => !g.riconsegna_il && (g.motivo !== 'Merce rifiutata' || g.richiesta)).length;
-  const fmtT = (t: any) => t ? `${eur(t.prezzo)} ${t.unita === 'giorno' ? 'al giorno' : t.unita === 'spedizione' ? '' : 'a ' + t.unita}`.trim() : '[tariffa da inserire in Clienti]';
+  const fmtT = (t: any) => t ? `${eur(t.prezzo)} ${t.unita === 'giorno' ? 'al giorno' : t.unita === 'spedizione' ? '' : 'a ' + t.unita}`.trim() : '€ [tariffa]';
   const prenota = () => az.esegui(() => db.rpc('prenota_riconsegna', { p_giacenza: cur.id, p_data: s.data, p_ora: s.ora })).then((ok) => ok && set({ msg: 'prenotata', prenota: false }));
   const reso = () => az.esegui(() => db.rpc('reso_al_mittente', { p_giacenza: cur.id })).then((ok) => ok && set({ msg: 'reso', reso: false }));
   // un clic: la mail parte e la giacenza resta segnata «chiesta», il tasto non si ripete
@@ -396,7 +399,7 @@ export function Giacenze() {
         </div>
         <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
           <div className="lbl" style={{ marginBottom: 6 }}>Cosa paga il cliente, con la sua tariffa</div>
-          <div className="tbox"><table className="t"><tbody>
+          <div className="tbox"><table className="t" style={{ minWidth: 0 }}><tbody>
             <tr><td>Consegna tentata</td><td>{fmtT(tar(cur.cliente_id, 'Base'))}</td></tr>
             <tr><td>Giacenza</td><td>{fmtT(tar(cur.cliente_id, 'Giacenza'))}</td></tr>
             <tr><td>Riconsegna, quando la prenota</td><td>{fmtT(tar(cur.cliente_id, 'Riconsegna'))}</td></tr>
