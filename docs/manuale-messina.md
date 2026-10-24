@@ -1,7 +1,7 @@
 # Manuale Messina — bozze
 
 Base di conoscenza di Messina Autotrasporti e Messina Corporation per JARVIS e gli agenti.
-Questo file è solo il banco di lavoro delle bozze: la fonte unica sarà la tabella del Manuale in Supabase, quando la sua struttura sarà approvata.
+Questo file è solo il banco di lavoro delle bozze. La fonte unica è la tabella `manuale` in Supabase (migrazione `supabase/migrations/20261025000100_manuale.sql`): quando il progetto Supabase di Messina esiste, le bozze si caricano una volta con `node tools/manuale-importa.mjs docs/manuale-messina.md trasporti` e da lì in poi si lavora solo nella tabella.
 
 **Fase 1 · Ufficio bolle** — bozze scritte il 25/10/2026 dal materiale esistente (racconti di Alessandro, Matteo e Pier; Dossier; listini di Gianluca; regole già scritte nel sistema). Nessuna scheda è approvata: ognuna va letta e confermata da chi conosce il lavoro.
 
